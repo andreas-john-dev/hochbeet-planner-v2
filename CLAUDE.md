@@ -43,7 +43,9 @@ pnpm synth                       # cdk synth inkl. cdk-nag über Turborepo (läu
 pnpm format                      # Prettier schreiben; pnpm format:check prüft nur
 pnpm exec vitest                 # Alle Vitest-Projekte in einem Prozess (Watch-Modus)
 pnpm --filter web dev            # Frontend lokal
-pnpm --filter e2e test           # Playwright
+pnpm --filter e2e test           # Playwright; startet den Vite-Dev-Server selbst
+pnpm --filter e2e test --update-snapshots   # Screenshot-Baselines neu erzeugen (Diff vorher ansehen)
+pnpm --filter e2e screenshots    # Ganzseiten-Screenshots aller Seiten nach e2e/screenshots-out/
 pnpm --filter infra cdk synth    # CDK-CLI direkt, z. B. auch `cdk diff` oder `cdk ls`
 ```
 
@@ -52,6 +54,13 @@ Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `pac
 Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
 Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test, build und synth aus;
 der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
+Frontend (`apps/web`): Routen code-basiert in `src/router.tsx` (deutsche Pfade `/beete`, `/katalog`, `/profil`, `/admin`),
+Seiten in `src/routes/`, shadcn/ui-Komponenten in `src/components/ui/` (Konfiguration `components.json`), Import-Alias `@/` → `src/`.
+Farbschema über `useTheme()` aus `src/lib/theme.ts`; Wochenlabels über `formatWeek()` aus `src/lib/week.ts`.
+Neue Seiten in `e2e/tests/pages.ts` eintragen: Tests und PR-Screenshots nutzen diese Liste.
+Der Workflow `screenshots.yml` kommentiert in jedem PR mit Frontend-Änderungen Desktop- und Mobil-Screenshots der geänderten Seiten
+(Vergleich mit `main`); die Bilder liegen im Branch `screenshots`, der nie gemergt wird.
+Playwright-Projekte: `desktop-chrome`, `iphone` (iPhone-Viewport mit Chromium), `pixel`; die Uhr ist in `e2e/tests/fixtures.ts` auf den 7. Oktober 2026 fixiert.
 TypeScript bleibt vorerst auf 6.0, weil typescript-eslint TypeScript 7 noch nicht unterstützt.
 Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Version passende Doku in `node_modules/turbo/docs/` lesen.
 
