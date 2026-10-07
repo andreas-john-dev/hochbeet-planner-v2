@@ -39,7 +39,7 @@ pnpm build                       # Builds (aktuell nur apps/web via Vite)
 pnpm lint                        # ESLint (Flat Config aus packages/eslint-config)
 pnpm typecheck                   # tsc --noEmit je Paket
 pnpm test                        # Unit- und Integrationstests (Vitest), ohne e2e
-pnpm synth                       # cdk synth inkl. cdk-nag über Turborepo (läuft auch in der CI)
+pnpm synth                       # cdk synth inkl. cdk-nag über Turborepo; baut apps/web vorher (läuft auch in der CI)
 pnpm format                      # Prettier schreiben; pnpm format:check prüft nur
 pnpm exec vitest                 # Alle Vitest-Projekte in einem Prozess (Watch-Modus)
 pnpm --filter web dev            # Frontend lokal
