@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hochbeet/contracts": "workspace:*"
+    "@hochbeet/contracts": "workspace:*",
+    "date-fns": "^4.4.0"
   }
 }
