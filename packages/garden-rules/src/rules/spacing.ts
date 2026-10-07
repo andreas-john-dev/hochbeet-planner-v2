@@ -1,4 +1,4 @@
-import { forEachPair, type RuleContext, sortedIds } from '../context';
+import { forEachPair, pairNames, type RuleContext, sortedIds } from '../context';
 import { EPSILON_CM, type Finding } from '../findings';
 import { gap } from '../geometry';
 import { intersect } from '../time';
@@ -21,7 +21,7 @@ export function spacingRule({ plantings }: RuleContext): Finding[] {
       severity: 'WARNING',
       plantingIds: sortedIds(a, b),
       period,
-      message: `${a.plant.name} und ${b.plant.name} stehen zu eng: Die Standflächen überlappen um ${String(overlapCm)} cm.`,
+      message: `${pairNames(a, b)} stehen zu eng: Die Standflächen überlappen um ${String(overlapCm)} cm.`,
     });
   });
   return findings;
