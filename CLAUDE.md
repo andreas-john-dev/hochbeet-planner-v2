@@ -53,6 +53,7 @@ Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src
 Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test, build und synth aus;
 der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
 TypeScript bleibt vorerst auf 6.0, weil typescript-eslint TypeScript 7 noch nicht unterstützt.
+Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Version passende Doku in `node_modules/turbo/docs/` lesen.
 
 ## Konventionen
 
