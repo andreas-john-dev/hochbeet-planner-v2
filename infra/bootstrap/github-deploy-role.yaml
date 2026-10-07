@@ -80,7 +80,9 @@ Resources:
               - Effect: Allow
                 Action: sts:AssumeRole
                 Resource:
-                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-*-${AWS::AccountId}-${AWS::Region}
+                  # The app region (this stack's region) and us-east-1 for the CloudFront certificate.
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-*-${AWS::AccountId}-${AWS::Region}
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-*-${AWS::AccountId}-us-east-1
 
 Outputs:
   RoleArn:

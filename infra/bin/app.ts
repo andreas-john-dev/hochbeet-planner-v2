@@ -1,7 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { App, Validations } from 'aws-cdk-lib';
 import { AwsSolutionsChecks } from 'cdk-nag';
-import { stages } from '../lib/config/stages';
+import { CLOUDFRONT_CERTIFICATE_REGION, stages } from '../lib/config/stages';
+import { CertificateStack } from '../lib/frontend/CertificateStack';
 import { FrontendStack } from '../lib/frontend/FrontendStack';
 import { SharedStatefulStack } from '../lib/shared/SharedStatefulStack';
 
@@ -15,10 +16,15 @@ for (const stage of stages) {
     env,
     stage,
   });
+  const certificate = new CertificateStack(app, `${stage.stackPrefix}-Certificate`, {
+    env: { account: env.account, region: CLOUDFRONT_CERTIFICATE_REGION },
+    stage,
+  });
   const frontend = new FrontendStack(app, `${stage.stackPrefix}-Frontend`, {
     env,
     stage,
     webDistPath,
+    certificate: certificate.certificate,
   });
   frontend.addStackDependency(shared, 'config.json reads the user pool ids from SSM');
 }

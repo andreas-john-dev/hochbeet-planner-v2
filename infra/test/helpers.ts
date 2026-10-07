@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { App, Validations } from 'aws-cdk-lib';
 import { AwsSolutionsChecks } from 'cdk-nag';
-import type { StageConfig } from '../lib/config/stages';
+import { stages, type StageConfig } from '../lib/config/stages';
 
-export const stage: StageConfig = { name: 'prod', stackPrefix: 'Prod', region: 'eu-central-1' };
+const [prod] = stages;
+if (!prod) throw new Error('prod stage missing');
+export const stage: StageConfig = prod;
 export const env = { account: '123456789012', region: stage.region };
 
 interface ValidationReport {
