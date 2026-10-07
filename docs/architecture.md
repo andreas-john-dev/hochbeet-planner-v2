@@ -77,7 +77,14 @@ Jede Pflanzung hat eine Standfläche, die alle Regeln einheitlich macht und im E
 - Einzelpflanze: Kreis um `(x, y)` mit Radius `spacingInRowCm / 2`.
 - Reihe: Streifen entlang der Reihe mit Breite `rowSpacingCm`, an den Enden je `spacingInRowCm / 2` überstehend.
 
-Die **Lücke** zwischen zwei Pflanzungen ist der kürzeste Abstand zwischen ihren Standflächen. Überlappen sie, ist die Lücke negativ.
+Die **Lücke** zwischen zwei Pflanzungen ist der kürzeste Abstand zwischen ihren Standflächen. Überlappen sie, ist die Lücke negativ; ihr Betrag ist die Eindringtiefe. Berühren sie sich nur, ist die Lücke 0.
+
+Umsetzung in `packages/garden-rules` (`geometry.ts`):
+
+- Der Streifen einer Reihe ist ein achsenparalleles Rechteck. Bei `orientation: H` reicht er von `x − Abstand/2` bis `x + lengthCm + Abstand/2` und quer dazu `y ± rowSpacingCm/2`, bei `V` mit vertauschten Achsen.
+- Eine Standfläche belegt eine **Rasterzelle**, wenn sich ihre Flächen überschneiden; bloßes Berühren zählt nicht. Zelle `(col, row)` umfasst `[5·col, 5·col + 5) × [5·row, 5·row + 5)`. Eine Einzelpflanze auf einem Rasterpunkt belegt damit immer mindestens vier Zellen.
+- Abstände (`spacingInRowCm`, `rowSpacingCm`) sind ganze Zentimeter, aber nicht an das 5-cm-Raster gebunden, weil die Quellen Werte wie 7 cm nennen. Das Raster gilt nur für Positionen, Längen und Beetmaße.
+- Standard-Reihenrichtung eines neuen Beets: `V`, wenn das Beet mindestens so breit wie tief ist, sonst `H`.
 
 ## Regel-Engine
 
