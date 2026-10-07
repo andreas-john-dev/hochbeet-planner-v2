@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Manual runs from the Actions tab
+  workflow_dispatch:
 
 permissions:
   contents: read
