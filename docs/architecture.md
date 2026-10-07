@@ -335,6 +335,31 @@ Regeln für stateful Stacks: `RemovalPolicy.RETAIN`, Point-in-Time-Recovery, Ter
 
 Cognito verschickt Mails zunächst über den eingebauten Versand (etwa 50 Mails pro Tag). SES kann später folgen, ebenso der Google-Login als Identity Provider.
 
+### SSM-Parameter
+
+Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-Name aus `stages.ts`, also `prod`.
+
+| Parameter | Geschrieben von | Inhalt |
+| --- | --- | --- |
+| `/hochbeet/<stage>/shared/user-pool-id` | `Prod-SharedStateful` | ID des User Pools |
+| `/hochbeet/<stage>/shared/user-pool-client-id` | `Prod-SharedStateful` | ID des SPA-Clients |
+
+### Cognito-Konfiguration
+
+- Feature-Plan **Lite**: E-Mail-Login, Selbstregistrierung und SRP sind enthalten, Kosten im Leerlauf nahe null.
+- Passwortrichtlinie: mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Ziffer und Sonderzeichen.
+- Kontowiederherstellung nur per E-Mail; der SPA-Client verhindert Hinweise darauf, ob ein Konto existiert.
+- Löschschutz am User Pool, `RETAIN` und Termination Protection am Stack.
+
+### cdk-nag
+
+cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; jeder nicht bestätigte Fund lässt `cdk synth` und damit die CI scheitern. Bewusst bestätigte Funde (`Validations.of(...).acknowledge`):
+
+| Regel | Ressource | Begründung |
+| --- | --- | --- |
+| `AwsSolutions-COG2` (MFA nicht Pflicht) | User Pool | Hobby-App; vereinbart ist Login per E-Mail und Passwort. MFA kann später optional ergänzt werden. |
+| `AwsSolutions-COG8` (kein Plus-Feature-Plan) | User Pool | Threat Protection gibt es nur im Plus-Plan, der pro aktivem User kostet; die App soll im Leerlauf nahezu nichts kosten. |
+
 ## Testing & CI/CD
 
 Die Regel-Engine bekommt die dichteste Testabdeckung, weil dort die Fachlogik liegt. UI-Fehler und schlechtes Design sollen über Playwright-Screenshots sichtbar werden.
