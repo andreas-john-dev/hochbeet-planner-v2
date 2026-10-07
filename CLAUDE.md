@@ -59,7 +59,7 @@ Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:ch
 der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
 Frontend (`apps/web`): Routen code-basiert in `src/router.tsx` (deutsche Pfade `/beete`, `/katalog`, `/profil`, `/admin`),
 Seiten in `src/routes/`, shadcn/ui-Komponenten in `src/components/ui/` (Konfiguration `components.json`), Import-Alias `@/` → `src/`.
-Farbschema über `useTheme()` aus `src/lib/theme.ts`; Wochenlabels über `formatWeek()` aus `src/lib/week.ts`.
+Farbschema über `useTheme()` aus `src/lib/theme.ts`; Wochenlabels über `formatWeek()` aus `@hochbeet/garden-rules`.
 Anmeldung über `useAuth()` aus `src/lib/auth/context.ts`; API-Aufrufe nur über `createApiClient()` aus `src/lib/api.ts` (sendet das ID-Token).
 Dev-Server und Playwright nutzen Mock-Auth (`apps/web/config.dev.json`): `test@example.com` bzw. `admin@example.com`, Passwort `Gemuese1!`, Code `123456`.
 In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten; Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.

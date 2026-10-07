@@ -129,11 +129,19 @@ Geplant wird in Wochen, angezeigt werden aber echte Daten: Im UI steht „30. M�
 - **Dauerkulturen** wie Rosmarin bleiben unbegrenzt, bis man „Entfernen ab …“ wählt.
 - **Entfernen** setzt `removedDate` auf den Montag der gewählten Woche. Die Pflanzung bleibt in der Historie sichtbar und zählt für die Fruchtfolge.
 
+Umsetzung in `packages/garden-rules` (`time.ts`):
+
+- **Zeitraum einer Pflanzung:** halboffen `[Start, Ende)`. Das Ende ist der erste Tag, an dem die Pflanzung nicht mehr im Beet steht; endet eine Pflanzung am Montag, an dem die nächste beginnt, überlappen sie nicht. Kein Ende heißt unbegrenzt.
+- **Effektives Ende:** `removedDate` vor `endDate` vor dem Lebenszyklus (`ANNUAL`: Start + Kulturwochen, `MULTI_YEAR`: Start + Jahre, `PERENNIAL`: kein Ende). `removedDate` gewinnt auch, wenn es nach dem geplanten Ende liegt.
+- **Woche:** ISO-8601, Montag bis Sonntag. Eine Pflanzung ist in einer Woche sichtbar, wenn sie an mindestens einem Tag der Woche im Beet steht.
+- **Anzeige:** `formatWeek()` liefert „30. März – 5. April 2026 · KW 14“; Frontend und Regeln nutzen dieselbe Funktion.
+
 ### Saisongrenze
 
 Die Fruchtfolge gilt nur innerhalb einer Saison, weil jedes Jahr neue Erde aufgefüllt wird. Jedes Beet hat Ereignisse „Erde erneuert am …“, und eine Fruchtfolge-Warnung entsteht nur, wenn zwischen dem Ende des Vorgängers und dem Start des Nachfolgers keine Erneuerung liegt.
 
-- Ohne eigenen Eintrag gilt jedes Jahr der 1. März als Erneuerung.
+- Ohne eigenen Eintrag gilt jedes Jahr der 1. März als Erneuerung. Das gilt **pro Jahr**: Hat ein Beet für ein Jahr eigene Daten, ersetzen sie dort den 1. März; alle anderen Jahre behalten den Standard.
+- Eine Erneuerung zählt, wenn sie zwischen dem Ende des Vorgängers und dem Start des Nachfolgers liegt, beide Tage eingeschlossen.
 - Der User kann das Datum pro Beet setzen oder verschieben, etwa wenn Knoblauch über den Winter steht.
 - Dauerkulturen und Erdbeeren stehen über eine Erneuerung hinweg einfach weiter.
 

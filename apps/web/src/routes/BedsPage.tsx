@@ -1,7 +1,7 @@
 import { CalendarDays, Sprout } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { formatWeek } from '@/lib/week';
+import { formatWeek } from '@hochbeet/garden-rules';
 
 export function BedsPage() {
   const { range, week } = formatWeek(new Date());
