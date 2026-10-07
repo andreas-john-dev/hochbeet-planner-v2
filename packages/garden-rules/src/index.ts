@@ -6,3 +6,4 @@ export * from './context';
 export { spacingRule } from './rules/spacing';
 export { bedEdgeRule } from './rules/bed-edge';
 export { neighborsRule } from './rules/neighbors';
+export { heavyFeedersRule } from './rules/heavy-feeders';
