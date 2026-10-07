@@ -68,6 +68,14 @@ export function overlaps(a: Interval, b: Interval): boolean {
   return (b.end === null || a.start < b.end) && (a.end === null || b.start < a.end);
 }
 
+/** The days both spans share, or null when they do not overlap. */
+export function intersect(a: Interval, b: Interval): Interval | null {
+  if (!overlaps(a, b)) return null;
+  const start = a.start > b.start ? a.start : b.start;
+  const end = a.end === null ? b.end : b.end === null ? a.end : a.end < b.end ? a.end : b.end;
+  return { start, end };
+}
+
 /** Monday of the ISO week that contains `date`. */
 export function weekStart(date: IsoDate | Date): IsoDate {
   return toIso(startOfISOWeek(typeof date === 'string' ? toDate(date) : date));
