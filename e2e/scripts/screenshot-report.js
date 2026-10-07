@@ -71,7 +71,7 @@ if (import.meta.url === `file://${process.argv[1] ?? ''}`) {
     baselineDir,
     currentUrl,
     baselineUrl,
-    sha: process.env.GITHUB_SHA ?? 'local',
+    sha: process.env.HEAD_SHA ?? process.env.GITHUB_SHA ?? 'local',
   });
   writeFileSync(outFile, markdown);
   if (process.env.GITHUB_OUTPUT)

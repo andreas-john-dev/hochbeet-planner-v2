@@ -37,6 +37,8 @@ jobs:
     timeout-minutes: 15
     env:
       TARGET: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
+      # On pull requests GITHUB_SHA is the temporary merge commit; show the PR head instead.
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Set paths
         run: |
@@ -80,7 +82,7 @@ jobs:
           rm -rf "$TARGET"
           cp -r "$SHOTS" "$TARGET"
           git add -A
-          git commit -qm "screenshots: $TARGET @ ${GITHUB_SHA::7}" || echo 'No changes to store'
+          git commit -qm "screenshots: $TARGET @ ${HEAD_SHA::7}" || echo 'No changes to store'
           for attempt in 1 2 3; do
             git push origin HEAD:refs/heads/screenshots && break
             git pull --rebase -q origin screenshots
