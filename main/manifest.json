@@ -1,0 +1,26 @@
+[
+  {
+    "id": "beete",
+    "path": "/beete",
+    "heading": "Meine Beete",
+    "navLabel": "Beete"
+  },
+  {
+    "id": "katalog",
+    "path": "/katalog",
+    "heading": "Pflanzenkatalog",
+    "navLabel": "Katalog"
+  },
+  {
+    "id": "profil",
+    "path": "/profil",
+    "heading": "Profil",
+    "navLabel": "Profil"
+  },
+  {
+    "id": "admin",
+    "path": "/admin",
+    "heading": "Administration",
+    "navLabel": "Admin"
+  }
+]
