@@ -56,10 +56,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Usually takes under a minute; fail fast if a download hangs.
+      # Without --with-deps: the runner image already has Chromium's system libraries, and the
+      # optional font packages --with-deps adds came from a very slow apt mirror (5+ minutes).
       - name: Install Chromium
         timeout-minutes: 5
-        run: pnpm --filter e2e exec playwright install --with-deps chromium
+        run: pnpm --filter e2e exec playwright install chromium
 
       - name: Capture screenshots
         run: pnpm --filter e2e screenshots
