@@ -316,6 +316,10 @@ Auf dem Smartphone ist Zoom Pflicht: Ein 120 cm breites Beet ergibt auf 375 px n
 
 Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Region und übergibt sie an `Amplify.configure`. Die Datei schreibt CDK beim Deploy in den Bucket. API-Aufrufe gehen relativ an `/api/...` auf derselben Domain.
 
+```json
+{ "region": "eu-central-1", "userPoolId": "eu-central-1_…", "userPoolClientId": "…" }
+```
+
 ## IaC
 
 Eine CDK-App in TypeScript deployt sechs Stacks nach `eu-central-1`. Werte zwischen Stacks fließen über SSM-Parameter statt CloudFormation-Exports, damit spätere Änderungen nicht an Export-Sperren scheitern.
@@ -330,6 +334,21 @@ Eine CDK-App in TypeScript deployt sechs Stacks nach `eu-central-1`. Werte zwisc
 | `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront, `config.json`, Deployment des Builds | User Pool, API-URLs |
 
 CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP API und alles andere auf den Bucket. Damit gibt es nur eine Origin und keine CORS-Konfiguration. Die Origin-Request-Policy reicht den `Authorization`-Header durch, für `/api/*` ist Caching aus.
+
+### Frontend-Stack
+
+- **SPA-Fallback:** Eine CloudFront Function (`infra/lib/frontend/spa-rewrite.js`, Viewer Request) schreibt Pfade ohne Dateiendung, etwa `/beete/123`, auf `/index.html` um. Bewusst keine 403/404-Fehlerseiten: Die würden auch Fehlerantworten der APIs durch `index.html` ersetzen.
+- **Caching:**
+
+  | Pfad | CloudFront | `Cache-Control` im Bucket |
+  | --- | --- | --- |
+  | `/assets/*` (Dateinamen mit Hash) | `CachingOptimized` | `public, max-age=31536000, immutable` |
+  | `/config.json` | `CachingDisabled` | `no-cache` |
+  | alles andere, v. a. `index.html` | eigene Policy, TTL 0 | `no-cache` |
+
+- **Deployment:** Zwei `BucketDeployment`s mit unterschiedlichem `Cache-Control`, beide ohne `prune`. So bleiben Assets des vorherigen Builds erreichbar, solange Browser noch das alte `index.html` haben. Nach dem Deploy werden `/index.html` und `/config.json` invalidiert.
+- **API-Behaviors:** `FrontendStack.addApiBehavior('/api/catalog/*' | '/api/garden/*', origin)` hängt die HTTP APIs an (alle Methoden, alle Viewer-Header außer `Host`, kein Caching).
+- Der Bucket ist zustandslos (`DESTROY` mit `autoDeleteObjects`), weil sein Inhalt bei jedem Deploy neu entsteht. `cdk synth` braucht den Build von `apps/web`; Turborepo baut ihn vorher, weil `infra` von `web` abhängt.
 
 Regeln für stateful Stacks: `RemovalPolicy.RETAIN`, Point-in-Time-Recovery, Termination Protection, DynamoDB im On-Demand-Modus. Eine Stage-Konfiguration in `infra/lib/config/stages.ts` enthält nur `prod`; `dev` wird dort später als zweiter Eintrag ergänzt.
 
@@ -359,6 +378,12 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | --- | --- | --- |
 | `AwsSolutions-COG2` (MFA nicht Pflicht) | User Pool | Hobby-App; vereinbart ist Login per E-Mail und Passwort. MFA kann später optional ergänzt werden. |
 | `AwsSolutions-COG8` (kein Plus-Feature-Plan) | User Pool | Threat Protection gibt es nur im Plus-Plan, der pro aktivem User kostet; die App soll im Leerlauf nahezu nichts kosten. |
+| `AwsSolutions-S1` (keine Server-Access-Logs) | Web-Bucket | Nur CloudFront liest den Bucket; Logs kosten ohne Nutzen. |
+| `AwsSolutions-CFR1` (keine Geo-Sperre) | Distribution | Die App soll überall nutzbar sein. |
+| `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
+| `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
+| `AwsSolutions-CFR4` (TLS-Mindestversion) | Distribution | Ohne eigene Domain gilt das Standardzertifikat von CloudFront, bei dem sich die Mindestversion nicht setzen lässt. Mit eigener Domain entfällt die Ausnahme. |
+| `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
 
 ## Testing & CI/CD
 

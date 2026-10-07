@@ -56,7 +56,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Usually takes under a minute; fail fast if a download hangs.
       - name: Install Chromium
+        timeout-minutes: 5
         run: pnpm --filter e2e exec playwright install --with-deps chromium
 
       - name: Capture screenshots
