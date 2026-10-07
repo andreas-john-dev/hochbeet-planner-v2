@@ -1,5 +1,6 @@
 {
   "$schema": "https://turborepo.com/schema.json",
+  "agentGuidance": false,
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -13,6 +14,10 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "synth": {
+      "dependsOn": ["^build"],
+      "outputs": ["cdk.out/**"]
     }
   }
 }

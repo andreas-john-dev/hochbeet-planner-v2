@@ -39,6 +39,7 @@ pnpm build                       # Builds (aktuell nur apps/web via Vite)
 pnpm lint                        # ESLint (Flat Config aus packages/eslint-config)
 pnpm typecheck                   # tsc --noEmit je Paket
 pnpm test                        # Unit- und Integrationstests (Vitest), ohne e2e
+pnpm synth                       # cdk synth über Turborepo (ab T-03, läuft auch in der CI)
 pnpm format                      # Prettier schreiben; pnpm format:check prüft nur
 pnpm exec vitest                 # Alle Vitest-Projekte in einem Prozess (Watch-Modus)
 pnpm --filter web dev            # Frontend lokal
@@ -49,7 +50,10 @@ pnpm --filter infra cdk synth    # CDK synthetisieren (ab T-03)
 Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `packages/*`,
 `@hochbeet/catalog-service` und `@hochbeet/garden-service`.
 Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
+Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test, build und synth aus;
+der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
 TypeScript bleibt vorerst auf 6.0, weil typescript-eslint TypeScript 7 noch nicht unterstützt.
+Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Version passende Doku in `node_modules/turbo/docs/` lesen.
 
 ## Konventionen
 
