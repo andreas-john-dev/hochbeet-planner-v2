@@ -1,0 +1,103 @@
+name: Deploy
+
+# Deploys every green main commit to prod, then runs the smoke tests against it.
+# AWS access via OIDC only; one-time setup in docs/deployment.md.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    name: Check setup
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$ROLE_ARN" ]; then
+            echo "::warning title=Deploy skipped::Repository variable AWS_DEPLOY_ROLE_ARN is not set. See docs/deployment.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy prod and smoke test
+    needs: setup
+    if: needs.setup.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: prod
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The commit CI just tested, not whatever main points to now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: hochbeet-deploy-${{ github.run_id }}
+          aws-region: eu-central-1
+
+      - name: Build
+        run: pnpm build
+
+      - name: CDK deploy
+        id: deploy
+        working-directory: infra
+        run: |
+          pnpm exec cdk deploy --all --require-approval never --outputs-file cdk-outputs.json
+          url=$(node -p "require('./cdk-outputs.json')['Prod-Frontend'].Url")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "### Live: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # Usually takes under a minute; fail fast if a download hangs.
+      - name: Install Chromium
+        timeout-minutes: 5
+        run: pnpm --filter e2e exec playwright install --with-deps chromium
+
+      - name: Smoke tests
+        run: pnpm --filter e2e smoke
+        env:
+          SMOKE_BASE_URL: ${{ steps.deploy.outputs.url }}
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-test-results
+          path: e2e/test-results/
+          retention-days: 14

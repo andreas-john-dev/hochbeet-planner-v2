@@ -404,6 +404,8 @@ E2E-Tests laufen lokal gegen den Vite-Dev-Server mit gemocktem API (MSW) und nac
 1. Bei jedem Pull Request: Lint, Typecheck, Unit- und Integrationstests, `cdk synth` mit `cdk-nag`, Playwright gegen den Dev-Server mit MSW.
 2. Bei Merge auf `main`: Build, `cdk deploy --all` per OIDC-Rolle (keine Access Keys im Repo), danach Playwright-Smoke-Tests gegen `prod`.
 
+Umsetzung: `deploy.yml` startet per `workflow_run`, sobald die CI auf `main` grün ist, und deployt genau den getesteten Commit. Der Job läuft in der GitHub-Umgebung `prod`; nur diese darf die Rolle `hochbeet-github-deploy` übernehmen, und die Rolle darf ausschließlich die CDK-Bootstrap-Rollen übernehmen. Die einmalige Einrichtung (Bootstrap, Rolle aus `infra/bootstrap/github-deploy-role.yaml`, GitHub-Umgebung und Variable `AWS_DEPLOY_ROLE_ARN`) steht in [`docs/deployment.md`](./deployment.md). Die Smoke-Tests (`e2e/smoke/`) sind rein lesend und prüfen Startseite, Deep-Links, `config.json` und das Caching der Assets.
+
 Deployt wird ausschließlich über diese Pipeline, nicht aus Entwickler- oder Claude-Code-Sessions.
 
 ## Entscheidungen und Annahmen

@@ -143,6 +143,12 @@ describe('FrontendStack', () => {
     expect(api?.AllowedMethods).toContain('POST');
   });
 
+  it('outputs the CloudFront URL for the smoke tests', () => {
+    template.hasOutput('Url', {
+      Value: { 'Fn::Join': ['', ['https://', { 'Fn::GetAtt': [Match.anyValue(), 'DomainName'] }]] },
+    });
+  });
+
   it('has no unacknowledged cdk-nag AwsSolutions findings', () => {
     expect(nagViolations).toEqual([]);
   });

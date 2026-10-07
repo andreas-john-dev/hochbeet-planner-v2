@@ -46,12 +46,15 @@ pnpm --filter web dev            # Frontend lokal
 pnpm --filter e2e test           # Playwright; startet den Vite-Dev-Server selbst
 pnpm --filter e2e test --update-snapshots   # Screenshot-Baselines neu erzeugen (Diff vorher ansehen)
 pnpm --filter e2e screenshots    # Ganzseiten-Screenshots aller Seiten nach e2e/screenshots-out/
+SMOKE_BASE_URL=https://… pnpm --filter e2e smoke   # Smoke-Tests gegen eine deployte Stage (nur lesend)
 pnpm --filter infra cdk synth    # CDK-CLI direkt, z. B. auch `cdk diff` oder `cdk ls`
 ```
 
 Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `packages/*`,
 `@hochbeet/catalog-service` und `@hochbeet/garden-service`.
 Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
+Deployment: `deploy.yml` deployt jeden grünen `main`-Commit per OIDC nach `prod` und führt danach die Smoke-Tests aus;
+einmalige Einrichtung und Fehlersuche in `docs/deployment.md`.
 Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test, build und synth aus;
 der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
 Frontend (`apps/web`): Routen code-basiert in `src/router.tsx` (deutsche Pfade `/beete`, `/katalog`, `/profil`, `/admin`),
