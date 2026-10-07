@@ -49,6 +49,11 @@ aws cloudformation describe-stacks \
 
 Gibt es im Konto schon einen OIDC-Provider für `token.actions.githubusercontent.com`, hänge `--parameter-overrides CreateOidcProvider=false` an.
 
+Nutzt das Repo unveränderliche OIDC-Subjects (`use_immutable_subject: true` in
+`gh api repos/andreas-john-dev/hochbeet-planner-v2/actions/oidc/customization/sub`), setze zusätzlich
+`GitHubSubjectPrefix` auf den dort angezeigten `sub_claim_prefix`, z. B.
+`--parameter-overrides CreateOidcProvider=false 'GitHubSubjectPrefix=repo:andreas-john-dev@15031893/hochbeet-planner-v2@1408917306'`.
+
 ### 3. GitHub einrichten
 
 1. **Umgebung:** Settings → Environments → *New environment* → Name `prod`. Unter *Deployment branches and tags* „Selected branches and tags“ wählen und `main` eintragen.
@@ -73,7 +78,8 @@ Actions → *Deploy* → *Run workflow* auf `main`. Der erste Lauf dauert wegen 
 
 | Meldung | Ursache |
 | --- | --- |
-| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Job läuft nicht in der Umgebung `prod`, Repo-Name im Template weicht ab oder OIDC-Provider fehlt. |
+| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Job läuft nicht in der Umgebung `prod`, Repo-Name im Template weicht ab, OIDC-Provider fehlt oder das Repo nutzt unveränderliche Subjects und `GitHubSubjectPrefix` ist nicht gesetzt (siehe Schritt 2). |
+| `ResourceExistenceCheck` beim Anlegen der Deploy-Rolle | OIDC-Provider existiert schon im Konto; `CreateOidcProvider=false` setzen. |
 | `… is not authorized to perform: sts:AssumeRole on resource: …cdk-hnb659fds-…` | `cdk bootstrap` fehlt in `eu-central-1` oder wurde mit anderem Qualifier ausgeführt (dann `CdkQualifier` im Template anpassen). |
 | `This stack uses assets, so the toolkit stack must be deployed` | Schritt 1 fehlt. |
 | `Unable to fetch parameters [/hochbeet/prod/shared/…]` | `Prod-SharedStateful` ist nicht deployt; `cdk deploy --all` deployt ihn eigentlich vor `Prod-Frontend`. |
