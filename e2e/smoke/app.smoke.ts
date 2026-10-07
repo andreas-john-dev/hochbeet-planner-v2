@@ -1,17 +1,26 @@
 import { expect, test } from '@playwright/test';
 
-test('start page loads and redirects to the beds', async ({ page }) => {
+// Read-only: no sign-in against prod here (a dedicated test user follows in T-34).
+
+test('start page sends signed-out visitors to the sign-in page', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveURL(/\/beete$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Meine Beete' })).toBeVisible();
+  await expect(page).toHaveURL(/\/anmelden/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+  await expect(page.getByLabel('E-Mail')).toBeVisible();
 });
 
-test('deep link survives a reload (SPA fallback)', async ({ page }) => {
+test('protected deep links survive a reload and keep the target', async ({ page }) => {
+  const response = await page.goto('/katalog');
+  expect(response?.status()).toBe(200);
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('redirect')).toBe('/katalog');
+});
+
+test('unknown deep links are served by the SPA (no CloudFront 403/404)', async ({ page }) => {
   const response = await page.goto('/beete/123');
   expect(response?.status()).toBe(200);
   await page.reload();
-  // The app is rendered; the route itself does not exist yet and shows the 404 page.
-  await expect(page.getByRole('navigation', { name: 'Hauptnavigation' }).first()).toBeAttached();
   await expect(page.getByRole('heading', { name: 'Seite nicht gefunden' })).toBeVisible();
 });
 
