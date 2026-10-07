@@ -39,12 +39,12 @@ pnpm build                       # Builds (aktuell nur apps/web via Vite)
 pnpm lint                        # ESLint (Flat Config aus packages/eslint-config)
 pnpm typecheck                   # tsc --noEmit je Paket
 pnpm test                        # Unit- und Integrationstests (Vitest), ohne e2e
-pnpm synth                       # cdk synth über Turborepo (ab T-03, läuft auch in der CI)
+pnpm synth                       # cdk synth inkl. cdk-nag über Turborepo (läuft auch in der CI)
 pnpm format                      # Prettier schreiben; pnpm format:check prüft nur
 pnpm exec vitest                 # Alle Vitest-Projekte in einem Prozess (Watch-Modus)
 pnpm --filter web dev            # Frontend lokal
 pnpm --filter e2e test           # Playwright
-pnpm --filter infra cdk synth    # CDK synthetisieren (ab T-03)
+pnpm --filter infra cdk synth    # CDK-CLI direkt, z. B. auch `cdk diff` oder `cdk ls`
 ```
 
 Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `packages/*`,
@@ -64,6 +64,8 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 - Warnungen werden nie gespeichert und blockieren nie das Speichern.
 - UI-Texte und Fehlermeldungen auf Deutsch; Code, Bezeichner, Kommentare und Commits auf Englisch (Conventional Commits).
 - Region `eu-central-1`, Stage-Konfiguration in `infra/lib/config/stages.ts` (zunächst nur `prod`).
+- Werte zwischen Stacks über SSM-Parameter; Namen nur in `infra/lib/config/ssm.ts` definieren.
+- cdk-nag 3: Ausnahmen per `Validations.of(construct).acknowledge({ id, reason })` (nicht `NagSuppressions`) und in `docs/architecture.md` unter „cdk-nag“ eintragen.
 
 ## Was nicht aus Sessions passiert
 
