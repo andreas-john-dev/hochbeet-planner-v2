@@ -7,3 +7,4 @@ export { spacingRule } from './rules/spacing';
 export { bedEdgeRule } from './rules/bed-edge';
 export { neighborsRule } from './rules/neighbors';
 export { heavyFeedersRule } from './rules/heavy-feeders';
+export { cropRotationRule } from './rules/crop-rotation';
