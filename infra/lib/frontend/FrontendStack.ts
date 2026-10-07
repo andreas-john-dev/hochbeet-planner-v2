@@ -1,5 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { Duration, RemovalPolicy, Stack, type StackProps, Token, Validations } from 'aws-cdk-lib';
+import {
+  CfnOutput,
+  Duration,
+  RemovalPolicy,
+  Stack,
+  type StackProps,
+  Token,
+  Validations,
+} from 'aws-cdk-lib';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -118,6 +126,13 @@ export class FrontendStack extends Stack {
       cacheControl: [s3deploy.CacheControl.fromString('no-cache')],
       distribution: this.distribution,
       distributionPaths: ['/index.html', '/config.json'],
+    });
+
+    // Read by the deploy workflow to run the smoke tests.
+    new CfnOutput(this, 'Url', {
+      key: 'Url',
+      value: `https://${this.distribution.distributionDomainName}`,
+      description: 'Public URL of the app',
     });
 
     this.acknowledgeNagFindings();

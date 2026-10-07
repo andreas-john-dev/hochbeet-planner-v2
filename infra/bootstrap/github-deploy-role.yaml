@@ -1,0 +1,76 @@
+# One-time setup, deployed by hand (see docs/deployment.md):
+# GitHub OIDC provider and the role that the Deploy workflow assumes.
+# The role may only assume the CDK bootstrap roles; it has no other permissions.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Hochbeet-Planer - GitHub Actions deploy role (OIDC, no access keys)
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Default: andreas-john-dev
+  GitHubRepo:
+    Type: String
+    Default: hochbeet-planner-v2
+  GitHubEnvironment:
+    Type: String
+    Default: prod
+    Description: Only jobs running in this GitHub environment may assume the role.
+  CreateOidcProvider:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Set to false if the account already has the token.actions.githubusercontent.com provider.
+  CdkQualifier:
+    Type: String
+    Default: hnb659fds
+    Description: Qualifier used by `cdk bootstrap` (default value unless you changed it).
+
+Conditions:
+  CreateProvider:
+    Fn::Equals: [Ref: CreateOidcProvider, 'true']
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: hochbeet-github-deploy
+      Description: Assumed by the Deploy workflow of the Hochbeet-Planer repository
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRoleWithWebIdentity
+            Principal:
+              Federated:
+                Fn::If:
+                  - CreateProvider
+                  - Ref: GitHubOidcProvider
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub:
+                  Fn::Sub: repo:${GitHubOwner}/${GitHubRepo}:environment:${GitHubEnvironment}
+      Policies:
+        - PolicyName: assume-cdk-bootstrap-roles
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-*-${AWS::AccountId}-${AWS::Region}
+
+Outputs:
+  RoleArn:
+    Description: Value for the GitHub repository variable AWS_DEPLOY_ROLE_ARN
+    Value:
+      Fn::GetAtt: [DeployRole, Arn]
