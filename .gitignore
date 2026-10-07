@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+cdk.out/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.env
+.env.*
+.DS_Store

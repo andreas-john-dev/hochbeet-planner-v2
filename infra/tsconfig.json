@@ -1,0 +1,4 @@
+{
+  "extends": "@hochbeet/tsconfig/node.json",
+  "include": ["bin", "lib", "test", "*.ts"]
+}

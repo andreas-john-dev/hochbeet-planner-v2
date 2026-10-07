@@ -1,0 +1,12 @@
+{
+  "name": "@hochbeet/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "*.json"
+  ],
+  "scripts": {
+    "test": "vitest run"
+  }
+}

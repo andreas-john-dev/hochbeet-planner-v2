@@ -1,0 +1,4 @@
+{
+  "extends": "@hochbeet/tsconfig/dom.json",
+  "include": ["src", "*.ts"]
+}

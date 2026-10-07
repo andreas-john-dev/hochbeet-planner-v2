@@ -1,0 +1,7 @@
+{
+  "extends": "@hochbeet/tsconfig/node.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["tests", "*.ts"]
+}

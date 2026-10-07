@@ -31,18 +31,25 @@ TypeScript-Monorepo: React-Frontend, serverless AWS-Backend, CDK.
 
 ## Befehle
 
-Werden in T-01 angelegt; danach hier aktuell halten.
+Node 22, pnpm 10 (über `packageManager` in `package.json`). Alle Root-Befehle laufen über Turborepo.
 
 ```bash
 pnpm install
-pnpm build
-pnpm lint
-pnpm typecheck
-pnpm test                        # Unit- und Integrationstests (Vitest)
+pnpm build                       # Builds (aktuell nur apps/web via Vite)
+pnpm lint                        # ESLint (Flat Config aus packages/eslint-config)
+pnpm typecheck                   # tsc --noEmit je Paket
+pnpm test                        # Unit- und Integrationstests (Vitest), ohne e2e
+pnpm format                      # Prettier schreiben; pnpm format:check prüft nur
+pnpm exec vitest                 # Alle Vitest-Projekte in einem Prozess (Watch-Modus)
 pnpm --filter web dev            # Frontend lokal
 pnpm --filter e2e test           # Playwright
-pnpm --filter infra cdk synth    # CDK synthetisieren
+pnpm --filter infra cdk synth    # CDK synthetisieren (ab T-03)
 ```
+
+Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `packages/*`,
+`@hochbeet/catalog-service` und `@hochbeet/garden-service`.
+Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
+TypeScript bleibt vorerst auf 6.0, weil typescript-eslint TypeScript 7 noch nicht unterstützt.
 
 ## Konventionen
 
