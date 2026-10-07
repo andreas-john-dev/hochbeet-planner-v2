@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { HttpOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { CLOUDFRONT_CERTIFICATE_REGION } from '../lib/config/stages';
+import { CertificateStack } from '../lib/frontend/CertificateStack';
 import { FrontendStack } from '../lib/frontend/FrontendStack';
 import { createApp, env, stage, synthAndCollectNagViolations } from './helpers';
 
@@ -34,10 +36,15 @@ describe('FrontendStack', () => {
 
   beforeAll(() => {
     const { app, outdir } = createApp();
+    const certificateStack = new CertificateStack(app, 'Prod-Certificate', {
+      env: { ...env, region: CLOUDFRONT_CERTIFICATE_REGION },
+      stage,
+    });
     const stack = new FrontendStack(app, 'Prod-Frontend', {
       env,
       stage,
       webDistPath: fakeWebDist(),
+      certificate: certificateStack.certificate,
     });
     stack.addApiBehavior('/api/catalog/*', new HttpOrigin('catalog.example.com'));
     nagViolations = synthAndCollectNagViolations(app, outdir);
@@ -143,10 +150,31 @@ describe('FrontendStack', () => {
     expect(api?.AllowedMethods).toContain('POST');
   });
 
-  it('outputs the CloudFront URL for the smoke tests', () => {
-    template.hasOutput('Url', {
-      Value: { 'Fn::Join': ['', ['https://', { 'Fn::GetAtt': [Match.anyValue(), 'DomainName'] }]] },
+  it('serves the app under its own domain with TLS 1.2 or newer', () => {
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        Aliases: ['hochbeet.andi-john-dev.de'],
+        ViewerCertificate: Match.objectLike({
+          MinimumProtocolVersion: 'TLSv1.2_2021',
+          SslSupportMethod: 'sni-only',
+        }),
+      }),
     });
+  });
+
+  it('points A and AAAA alias records of the hosted zone at CloudFront', () => {
+    for (const type of ['A', 'AAAA']) {
+      template.hasResourceProperties('AWS::Route53::RecordSet', {
+        Name: 'hochbeet.andi-john-dev.de.',
+        Type: type,
+        HostedZoneId: 'Z024045030QTTBYY772I9',
+        AliasTarget: Match.objectLike({ HostedZoneId: Match.anyValue() }),
+      });
+    }
+  });
+
+  it('outputs the app URL for the smoke tests', () => {
+    template.hasOutput('Url', { Value: 'https://hochbeet.andi-john-dev.de' });
   });
 
   it('has no unacknowledged cdk-nag AwsSolutions findings', () => {

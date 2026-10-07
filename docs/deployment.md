@@ -5,7 +5,7 @@ Jeder Commit auf `main`, dessen CI grün ist, wird automatisch nach `prod` deplo
 1. startet nach erfolgreicher CI auf `main` (oder manuell über „Run workflow“),
 2. meldet sich per OIDC bei AWS an – es gibt keine Access Keys, weder im Repo noch in GitHub-Secrets,
 3. baut die App und führt `cdk deploy --all` aus,
-4. testet die App unter der CloudFront-URL mit den Playwright-Smoke-Tests (`e2e/smoke/`). Schlägt ein Test fehl, ist der Workflow rot.
+4. testet die App unter https://hochbeet.andi-john-dev.de mit den Playwright-Smoke-Tests (`e2e/smoke/`). Schlägt ein Test fehl, ist der Workflow rot.
 
 Solange die einmalige Einrichtung unten fehlt, wird der Deploy mit einer Warnung übersprungen.
 
@@ -20,10 +20,11 @@ In den Beispielen ist `123456789012` deine AWS-Account-ID und `admin` dein AWS-C
 
 ### 1. CDK bootstrappen
 
-Legt in `eu-central-1` die Rollen und den Asset-Bucket an, die CDK zum Deployen nutzt.
+Legt die Rollen und den Asset-Bucket an, die CDK zum Deployen nutzt: in `eu-central-1` für die App und in `us-east-1` für das TLS-Zertifikat, weil CloudFront Zertifikate nur aus `us-east-1` annimmt.
 
 ```bash
-pnpm --filter infra exec cdk bootstrap aws://123456789012/eu-central-1 --profile admin
+pnpm --filter infra exec cdk bootstrap \
+  aws://123456789012/eu-central-1 aws://123456789012/us-east-1 --profile admin
 ```
 
 ### 2. Deploy-Rolle für GitHub anlegen
@@ -31,7 +32,7 @@ pnpm --filter infra exec cdk bootstrap aws://123456789012/eu-central-1 --profile
 Das Template `infra/bootstrap/github-deploy-role.yaml` legt den OIDC-Provider für GitHub und die Rolle `hochbeet-github-deploy` an. Die Rolle darf
 
 - nur von Jobs dieses Repos in der GitHub-Umgebung `prod` übernommen werden und
-- selbst nur die Bootstrap-Rollen von CDK übernehmen (`cdk-hnb659fds-*`), sonst nichts.
+- selbst nur die Bootstrap-Rollen von CDK in `eu-central-1` und `us-east-1` übernehmen (`cdk-hnb659fds-*`), sonst nichts.
 
 ```bash
 aws cloudformation deploy \
@@ -54,6 +55,8 @@ Nutzt das Repo unveränderliche OIDC-Subjects (`use_immutable_subject: true` in
 `GitHubSubjectPrefix` auf den dort angezeigten `sub_claim_prefix`, z. B.
 `--parameter-overrides CreateOidcProvider=false 'GitHubSubjectPrefix=repo:andreas-john-dev@15031893/hochbeet-planner-v2@1408917306'`.
 
+Die Domain `hochbeet.andi-john-dev.de` und die Hosted Zone stehen in `infra/lib/config/stages.ts`. Die Hosted Zone muss im selben AWS-Konto liegen; CDK legt dort den Validierungseintrag für das Zertifikat und die Alias-Einträge auf CloudFront an.
+
 ### 3. GitHub einrichten
 
 1. **Umgebung:** Settings → Environments → *New environment* → Name `prod`. Unter *Deployment branches and tags* „Selected branches and tags“ wählen und `main` eintragen.
@@ -65,13 +68,20 @@ Nutzt das Repo unveränderliche OIDC-Subjects (`use_immutable_subject: true` in
 
 ### 4. Erster Deploy
 
-Actions → *Deploy* → *Run workflow* auf `main`. Der erste Lauf dauert wegen CloudFront etwa 10–15 Minuten. Die URL der App steht danach in der Zusammenfassung des Laufs und unter *Deployments* → `prod`.
+Actions → *Deploy* → *Run workflow* auf `main`. Der erste Lauf dauert wegen CloudFront und der Zertifikatsprüfung etwa 10–20 Minuten. Danach ist die App unter https://hochbeet.andi-john-dev.de erreichbar; die URL steht auch in der Zusammenfassung des Laufs und unter *Deployments* → `prod`.
+
+### Umstellung einer bestehenden Einrichtung auf die eigene Domain
+
+Wer die Einrichtung schon vor der eigenen Domain gemacht hat, braucht einmalig:
+
+1. `us-east-1` bootstrappen: `pnpm --filter infra exec cdk bootstrap aws://123456789012/us-east-1 --profile admin`
+2. Die Deploy-Rolle aktualisieren: den `aws cloudformation deploy`-Befehl aus Schritt 2 erneut ausführen, mit denselben `--parameter-overrides` wie beim ersten Mal. Damit darf die Rolle auch die Bootstrap-Rollen in `us-east-1` übernehmen.
 
 ## Betrieb
 
-- **Smoke-Tests lokal gegen prod:** `SMOKE_BASE_URL=https://<id>.cloudfront.net pnpm --filter e2e smoke`
+- **Smoke-Tests lokal gegen prod:** `SMOKE_BASE_URL=https://hochbeet.andi-john-dev.de pnpm --filter e2e smoke`
 - **Fehlgeschlagener Smoke-Test:** Die Ergebnisse inklusive Traces hängen als Artefakt `smoke-test-results` am Lauf.
-- **Kosten:** Im Leerlauf fallen praktisch nur Cent-Beträge an (S3, CloudFront, SSM; Cognito Lite ist bis 10.000 aktive Nutzer kostenlos).
+- **Kosten:** Im Leerlauf fallen praktisch nur Cent-Beträge an (S3, CloudFront, SSM, Route-53-Abfragen; Cognito Lite ist bis 10.000 aktive Nutzer kostenlos). Das ACM-Zertifikat ist kostenlos.
 - **Abbauen:** `Prod-SharedStateful` hat Termination Protection und der User Pool Löschschutz; beides muss vor dem Löschen in der AWS-Konsole bewusst abgeschaltet werden. Der User Pool bleibt wegen `RETAIN` danach trotzdem bestehen.
 
 ## Fehlersuche
@@ -80,6 +90,7 @@ Actions → *Deploy* → *Run workflow* auf `main`. Der erste Lauf dauert wegen 
 | --- | --- |
 | `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Job läuft nicht in der Umgebung `prod`, Repo-Name im Template weicht ab, OIDC-Provider fehlt oder das Repo nutzt unveränderliche Subjects und `GitHubSubjectPrefix` ist nicht gesetzt (siehe Schritt 2). |
 | `ResourceExistenceCheck` beim Anlegen der Deploy-Rolle | OIDC-Provider existiert schon im Konto; `CreateOidcProvider=false` setzen. |
-| `… is not authorized to perform: sts:AssumeRole on resource: …cdk-hnb659fds-…` | `cdk bootstrap` fehlt in `eu-central-1` oder wurde mit anderem Qualifier ausgeführt (dann `CdkQualifier` im Template anpassen). |
+| `… is not authorized to perform: sts:AssumeRole on resource: …cdk-hnb659fds-…` | `cdk bootstrap` fehlt in `eu-central-1` oder `us-east-1`, die Deploy-Rolle ist noch nicht aktualisiert (siehe „Umstellung“) oder der Qualifier weicht ab (dann `CdkQualifier` im Template anpassen). |
+| `Prod-Certificate` hängt lange in `CREATE_IN_PROGRESS` | ACM wartet auf die DNS-Validierung; die Hosted Zone muss die öffentlich delegierte Zone von `andi-john-dev.de` sein. |
 | `This stack uses assets, so the toolkit stack must be deployed` | Schritt 1 fehlt. |
 | `Unable to fetch parameters [/hochbeet/prod/shared/…]` | `Prod-SharedStateful` ist nicht deployt; `cdk deploy --all` deployt ihn eigentlich vor `Prod-Frontend`. |

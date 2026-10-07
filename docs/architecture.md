@@ -322,7 +322,7 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
 
 ## IaC
 
-Eine CDK-App in TypeScript deployt sechs Stacks nach `eu-central-1`. Werte zwischen Stacks fließen über SSM-Parameter statt CloudFormation-Exports, damit spätere Änderungen nicht an Export-Sperren scheitern.
+Eine CDK-App in TypeScript deployt sechs Stacks nach `eu-central-1` und den Zertifikat-Stack nach `us-east-1`. Werte zwischen Stacks fließen über SSM-Parameter statt CloudFormation-Exports, damit spätere Änderungen nicht an Export-Sperren scheitern. Einzige Ausnahme ist die Zertifikats-ARN: Sie kommt per `crossRegionReferences` von CDK, das den Wert selbst über SSM-Parameter in die andere Region überträgt.
 
 | Stack | Inhalt | Liest aus SSM |
 | --- | --- | --- |
@@ -331,7 +331,8 @@ Eine CDK-App in TypeScript deployt sechs Stacks nach `eu-central-1`. Werte zwisc
 | `Prod-CatalogStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
 | `Prod-GardenStateful` | DynamoDB-Tabelle | – |
 | `Prod-GardenStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
-| `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront, `config.json`, Deployment des Builds | User Pool, API-URLs |
+| `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
+| `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds | User Pool, API-URLs; Zertifikat per Cross-Region-Referenz |
 
 CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP API und alles andere auf den Bucket. Damit gibt es nur eine Origin und keine CORS-Konfiguration. Die Origin-Request-Policy reicht den `Authorization`-Header durch, für `/api/*` ist Caching aus.
 
@@ -382,7 +383,6 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-CFR1` (keine Geo-Sperre) | Distribution | Die App soll überall nutzbar sein. |
 | `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
 | `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
-| `AwsSolutions-CFR4` (TLS-Mindestversion) | Distribution | Ohne eigene Domain gilt das Standardzertifikat von CloudFront, bei dem sich die Mindestversion nicht setzen lässt. Mit eigener Domain entfällt die Ausnahme. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
 
 ## Testing & CI/CD
@@ -415,6 +415,6 @@ Deployt wird ausschließlich über diese Pipeline, nicht aus Entwickler- oder Cl
 - Reihenrichtung: pro Beet wählbar, Standard parallel zur kürzeren Kante; gilt für Einzelpflanzen und als Vorbelegung neuer Reihen.
 - Der Einflussradius für gute und schlechte Nachbarn beträgt wie bei Starkzehrern 30 cm.
 - Reihen verlaufen immer parallel zu den Beetkanten.
-- Region ist `eu-central-1`, ohne eigene Domain; die App läuft unter der CloudFront-URL.
+- Region ist `eu-central-1`; die App läuft unter https://hochbeet.andi-john-dev.de (Hosted Zone `andi-john-dev.de` in Route 53, Zertifikat aus ACM in `us-east-1`).
 - Pflanz- und Entfernungsdaten liegen immer auf einem Montag; Wochen folgen ISO-8601.
 - Der eingebaute Cognito-Mailversand reicht für den Anfang.

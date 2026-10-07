@@ -8,8 +8,11 @@ import {
   Token,
   Validations,
 } from 'aws-cdk-lib';
+import type * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
@@ -21,6 +24,8 @@ export interface FrontendStackProps extends StackProps {
   readonly stage: StageConfig;
   /** Directory with the Vite build of apps/web. */
   readonly webDistPath: string;
+  /** Certificate for `stage.domain.name`, issued in us-east-1 (see CertificateStack). */
+  readonly certificate: acm.ICertificate;
 }
 
 /** Runtime configuration read by the SPA at start-up. */
@@ -38,7 +43,9 @@ export class FrontendStack extends Stack {
   readonly distribution: cloudfront.Distribution;
 
   constructor(scope: Construct, id: string, props: FrontendStackProps) {
-    super(scope, id, props);
+    // The certificate comes from the us-east-1 CertificateStack.
+    super(scope, id, { crossRegionReferences: true, ...props });
+    const { domain } = props.stage;
 
     // Stateless: the content is rebuilt on every deployment.
     this.bucket = new s3.Bucket(this, 'WebBucket', {
@@ -70,6 +77,9 @@ export class FrontendStack extends Stack {
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: `Hochbeet-Planer ${props.stage.name}`,
       defaultRootObject: 'index.html',
+      domainNames: [domain.name],
+      certificate: props.certificate,
+      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       defaultBehavior: {
@@ -128,10 +138,24 @@ export class FrontendStack extends Stack {
       distributionPaths: ['/index.html', '/config.json'],
     });
 
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+      hostedZoneId: domain.hostedZoneId,
+      zoneName: domain.hostedZoneName,
+    });
+    const target = route53.RecordTarget.fromAlias(
+      new route53Targets.CloudFrontTarget(this.distribution),
+    );
+    new route53.ARecord(this, 'AliasRecord', { zone: hostedZone, recordName: domain.name, target });
+    new route53.AaaaRecord(this, 'AliasRecordIpv6', {
+      zone: hostedZone,
+      recordName: domain.name,
+      target,
+    });
+
     // Read by the deploy workflow to run the smoke tests.
     new CfnOutput(this, 'Url', {
       key: 'Url',
-      value: `https://${this.distribution.distributionDomainName}`,
+      value: `https://${domain.name}`,
       description: 'Public URL of the app',
     });
 
@@ -176,11 +200,6 @@ export class FrontendStack extends Stack {
       this.distribution,
       'AwsSolutions-CFR3',
       'Access logs are not needed for a hobby app and would add storage cost.',
-    );
-    ack(
-      this.distribution,
-      'AwsSolutions-CFR4',
-      'Without a custom domain the default CloudFront certificate is used, which does not allow setting a minimum TLS version.',
     );
 
     // Singleton Lambda that CDK's BucketDeployment creates and manages.
