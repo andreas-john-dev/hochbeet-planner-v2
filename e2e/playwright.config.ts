@@ -15,7 +15,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   expect: {
-    toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
+    // Strict enough to notice small UI changes such as a new button in the sidebar.
+    toHaveScreenshot: { maxDiffPixelRatio: 0.001 },
   },
   projects: [
     { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },

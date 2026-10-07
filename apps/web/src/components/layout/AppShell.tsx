@@ -1,4 +1,8 @@
-import { Link, Outlet } from '@tanstack/react-router';
+import { Link, Outlet, useNavigate } from '@tanstack/react-router';
+import { LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/auth/context';
+import { isAdmin } from '@/lib/auth/types';
 import { cn } from '@/lib/utils';
 import { Logo } from './Logo';
 import { navItems } from './nav-items';
@@ -6,6 +10,9 @@ import { ThemeToggle } from './ThemeToggle';
 
 /** Sidebar on desktop, top bar and bottom navigation on phones. */
 export function AppShell() {
+  const { user } = useAuth();
+  const items = navItems.filter((item) => !item.adminOnly || isAdmin(user));
+
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
       <aside className="bg-sidebar sticky top-0 hidden h-dvh flex-col border-r p-4 md:flex">
@@ -13,7 +20,7 @@ export function AppShell() {
           <Logo />
         </Link>
         <nav aria-label="Hauptnavigation" className="mt-8 flex flex-col gap-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {items.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
@@ -28,8 +35,12 @@ export function AppShell() {
             </Link>
           ))}
         </nav>
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col gap-1 border-t pt-3">
+          <p className="text-muted-foreground truncate px-3 pb-1 text-xs" title={user?.email}>
+            {user?.email}
+          </p>
           <ThemeToggle showLabel />
+          <SignOutButton />
         </div>
       </aside>
 
@@ -48,9 +59,9 @@ export function AppShell() {
 
       <nav
         aria-label="Hauptnavigation"
-        className="bg-background/95 fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="bg-background/95 fixed inset-x-0 bottom-0 z-10 grid auto-cols-fr grid-flow-col border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {items.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}
             to={to}
@@ -62,5 +73,22 @@ export function AppShell() {
         ))}
       </nav>
     </div>
+  );
+}
+
+export function SignOutButton({ variant = 'sidebar' }: { variant?: 'sidebar' | 'card' }) {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  return (
+    <Button
+      variant={variant === 'sidebar' ? 'ghost' : 'outline'}
+      className={variant === 'sidebar' ? 'w-full justify-start' : 'w-fit'}
+      onClick={() => {
+        void signOut().then(() => navigate({ to: '/anmelden' }));
+      }}
+    >
+      <LogOut aria-hidden />
+      Abmelden
+    </Button>
   );
 }
