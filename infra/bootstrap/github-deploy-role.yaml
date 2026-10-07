@@ -15,6 +15,13 @@ Parameters:
     Type: String
     Default: prod
     Description: Only jobs running in this GitHub environment may assume the role.
+  GitHubSubjectPrefix:
+    Type: String
+    Default: ''
+    Description: >-
+      Prefix of the OIDC sub claim if the repository uses immutable subjects
+      (e.g. repo:owner@123/repo@456); see `gh api repos/{owner}/{repo}/actions/oidc/customization/sub`.
+      Empty means repo:<GitHubOwner>/<GitHubRepo>.
   CreateOidcProvider:
     Type: String
     Default: 'true'
@@ -28,6 +35,9 @@ Parameters:
 Conditions:
   CreateProvider:
     Fn::Equals: [Ref: CreateOidcProvider, 'true']
+  UseSubjectPrefix:
+    Fn::Not:
+      - Fn::Equals: [Ref: GitHubSubjectPrefix, '']
 
 Resources:
   GitHubOidcProvider:
@@ -58,7 +68,10 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
                 token.actions.githubusercontent.com:sub:
-                  Fn::Sub: repo:${GitHubOwner}/${GitHubRepo}:environment:${GitHubEnvironment}
+                  Fn::If:
+                    - UseSubjectPrefix
+                    - Fn::Sub: ${GitHubSubjectPrefix}:environment:${GitHubEnvironment}
+                    - Fn::Sub: repo:${GitHubOwner}/${GitHubRepo}:environment:${GitHubEnvironment}
       Policies:
         - PolicyName: assume-cdk-bootstrap-roles
           PolicyDocument:
