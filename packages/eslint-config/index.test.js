@@ -14,3 +14,11 @@ describe('eslint config', () => {
     expect(config.at(-1)?.rules).toEqual(prettier.rules);
   });
 });
+
+describe('react eslint config', () => {
+  it('extends the base config with the react hooks rules', async () => {
+    const { default: react } = await import('./react.js');
+    expect(react.length).toBeGreaterThan(config.length);
+    expect(react.some((c) => c.rules?.['react-hooks/rules-of-hooks'])).toBe(true);
+  });
+});
