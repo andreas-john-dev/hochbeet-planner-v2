@@ -1,0 +1,118 @@
+name: Screenshots
+
+# Screenshots of every page (desktop and mobile). On main they become the baseline;
+# on pull requests the changed pages are posted as a comment. Images live on the
+# orphan branch `screenshots`, so they render in comments without bloating main.
+
+on:
+  pull_request:
+    paths:
+      - apps/web/**
+      - packages/**
+      - e2e/**
+      - pnpm-lock.yaml
+      - .github/workflows/screenshots.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/web/**
+      - packages/**
+      - e2e/**
+      - pnpm-lock.yaml
+      - .github/workflows/screenshots.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: screenshots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    name: Capture and report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
+    steps:
+      - name: Set paths
+        run: |
+          echo "SHOTS=$RUNNER_TEMP/shots" >> "$GITHUB_ENV"
+          echo "STORE=$RUNNER_TEMP/store" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter e2e exec playwright install --with-deps chromium
+
+      - name: Capture screenshots
+        run: pnpm --filter e2e screenshots
+        env:
+          SCREENSHOT_DIR: ${{ env.SHOTS }}
+
+      - name: Store screenshots on branch `screenshots`
+        id: store
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin screenshots >/dev/null; then
+            git fetch --depth=1 origin screenshots
+            git worktree add --detach "$STORE" FETCH_HEAD
+          else
+            git worktree add --detach "$STORE"
+            git -C "$STORE" checkout --orphan screenshots
+            git -C "$STORE" rm -rfq --ignore-unmatch .
+            git -C "$STORE" clean -fdxq
+          fi
+          cd "$STORE"
+          rm -rf "$TARGET"
+          cp -r "$SHOTS" "$TARGET"
+          git add -A
+          git commit -qm "screenshots: $TARGET @ ${GITHUB_SHA::7}" || echo 'No changes to store'
+          for attempt in 1 2 3; do
+            git push origin HEAD:refs/heads/screenshots && break
+            git pull --rebase -q origin screenshots
+          done
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build comment
+        if: github.event_name == 'pull_request'
+        id: report
+        run: |
+          base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${{ steps.store.outputs.sha }}"
+          node e2e/scripts/screenshot-report.js \
+            "$STORE/$TARGET" "$STORE/main" "$base/$TARGET" "$base/main" "$RUNNER_TEMP/comment.md"
+
+      - name: Post or update comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v9
+        env:
+          CHANGED: ${{ steps.report.outputs.changed }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const body = fs.readFileSync(`${process.env.RUNNER_TEMP}/comment.md`, 'utf8');
+            const marker = '<!-- pr-screenshots -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            const existing = comments.find((c) => c.body?.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else if (process.env.CHANGED !== '0') {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

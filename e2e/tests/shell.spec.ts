@@ -1,11 +1,5 @@
 import { expect, open, test } from './fixtures';
-
-const pages = [
-  { path: '/beete', heading: 'Meine Beete' },
-  { path: '/katalog', heading: 'Pflanzenkatalog' },
-  { path: '/profil', heading: 'Profil' },
-  { path: '/admin', heading: 'Administration' },
-];
+import { appPages } from './pages';
 
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`shell matches screenshot (${colorScheme})`, async ({ page }) => {
@@ -19,18 +13,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
 test('navigates between all sections', async ({ page }) => {
   await open(page, '/', 'Meine Beete');
   const nav = page.getByRole('navigation', { name: 'Hauptnavigation' }).filter({ visible: true });
-  for (const { heading } of pages.slice(1)) {
-    const label = { Pflanzenkatalog: 'Katalog', Profil: 'Profil', Administration: 'Admin' }[
-      heading
-    ];
-    await nav.getByRole('link', { name: label }).click();
+  for (const { heading, navLabel } of appPages.slice(1)) {
+    await nav.getByRole('link', { name: navLabel }).click();
     await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
   }
 });
 
 test('has no horizontal scrollbar at 375 px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  for (const { path, heading } of pages) {
+  for (const { path, heading } of appPages) {
     await open(page, path, heading);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

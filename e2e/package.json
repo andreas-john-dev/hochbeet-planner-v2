@@ -6,9 +6,12 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "playwright test"
+    "test": "playwright test",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1"
+    "@playwright/test": "1.56.1",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0"
   }
 }
