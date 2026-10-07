@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   effectiveEnd,
   formatWeek,
+  intersect,
   hasSoilRenewalBetween,
   isActiveInWeek,
   lifecycleEnd,
@@ -97,6 +98,32 @@ describe('overlaps', () => {
       { start: '2026-05-04', end: '2026-05-11' },
     ];
     for (const a of spans) for (const b of spans) expect(overlaps(a, b)).toBe(overlaps(b, a));
+  });
+});
+
+describe('intersect', () => {
+  it('returns the shared days', () => {
+    expect(
+      intersect({ start: '2026-05-04', end: '2026-08-03' }, { start: '2026-07-06', end: null }),
+    ).toEqual({
+      start: '2026-07-06',
+      end: '2026-08-03',
+    });
+  });
+
+  it('stays open when both are open', () => {
+    expect(
+      intersect({ start: '2026-05-04', end: null }, { start: '2027-04-05', end: null }),
+    ).toEqual({
+      start: '2027-04-05',
+      end: null,
+    });
+  });
+
+  it('returns null without shared days', () => {
+    expect(
+      intersect({ start: '2026-05-04', end: '2026-06-01' }, { start: '2026-06-01', end: null }),
+    ).toBeNull();
   });
 });
 
