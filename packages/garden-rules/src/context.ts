@@ -56,3 +56,9 @@ export function forEachPair(
 
 export const sortedIds = (...items: ResolvedPlanting[]) =>
   items.map((item) => item.planting.id).sort();
+
+/** "A und B" with names in German alphabetical order, so the text does not depend on input order. */
+export function pairNames(a: ResolvedPlanting, b: ResolvedPlanting): string {
+  const [first, second] = [a.plant.name, b.plant.name].sort((x, y) => x.localeCompare(y, 'de'));
+  return `${first ?? ''} und ${second ?? ''}`;
+}

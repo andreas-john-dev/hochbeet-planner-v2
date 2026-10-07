@@ -19,7 +19,7 @@ describe('spacing rule', () => {
         severity: 'WARNING',
         plantingIds: ['b', 't'],
         period: { start: '2026-05-04', end: '2026-07-27' },
-        message: 'Tomate und Basilikum stehen zu eng: Die Standflächen überlappen um 10 cm.',
+        message: 'Basilikum und Tomate stehen zu eng: Die Standflächen überlappen um 10 cm.',
       },
     ]);
   });
@@ -103,7 +103,7 @@ describe('spacing rule', () => {
     const plantings = [single('t', 'tomate', 30, 30), single('b', 'basilikum', 60, 30)];
     const forward = spacingRule(context(plants, plantings));
     const backward = spacingRule(context(plants, [...plantings].reverse()));
-    expect(backward.map((f) => f.plantingIds)).toEqual(forward.map((f) => f.plantingIds));
+    expect(backward).toEqual(forward);
   });
 
   it('skips plantings whose plant is unknown', () => {
