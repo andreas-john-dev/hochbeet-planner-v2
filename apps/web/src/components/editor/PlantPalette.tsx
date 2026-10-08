@@ -19,10 +19,13 @@ const KINDS: readonly { value: PlantingKind; label: string }[] = [
 function Choice({
   pressed,
   onClick,
+  large,
   children,
 }: {
   pressed: boolean;
   onClick: () => void;
+  /** 44 px high for touch screens. */
+  large: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -31,7 +34,8 @@ function Choice({
       aria-pressed={pressed}
       onClick={onClick}
       className={cn(
-        'focus-visible:ring-ring/50 h-9 rounded-md px-2.5 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px]',
+        'focus-visible:ring-ring/50 rounded-md px-2.5 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px]',
+        large ? 'h-11 px-3' : 'h-9',
         pressed
           ? 'bg-primary text-primary-foreground'
           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -47,7 +51,14 @@ export interface PaletteDragData {
   plant: Plant;
 }
 
-function PaletteItem({
+const itemClass = (active: boolean) =>
+  cn(
+    'focus-visible:ring-ring/50 flex h-11 w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors outline-none focus-visible:ring-[3px]',
+    active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
+  );
+
+/** Sidebar item: drag it into the bed, or click it to place it with the keyboard. */
+function DraggableItem({
   plant,
   active,
   onChoose,
@@ -74,8 +85,8 @@ function PaletteItem({
           onChoose(plant);
         }}
         className={cn(
-          'focus-visible:ring-ring/50 flex h-11 w-full cursor-grab touch-none items-center gap-3 rounded-md px-2 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] active:cursor-grabbing',
-          active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
+          itemClass(active),
+          'cursor-grab touch-none active:cursor-grabbing',
           isDragging && 'opacity-50',
         )}
       >
@@ -86,21 +97,53 @@ function PaletteItem({
   );
 }
 
+/** Sheet item on phones: a plain button, so that the list scrolls by touch. */
+function TapItem({
+  plant,
+  active,
+  onChoose,
+}: {
+  plant: Plant;
+  active: boolean;
+  onChoose: (plant: Plant) => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        aria-pressed={active}
+        onClick={() => {
+          onChoose(plant);
+        }}
+        className={itemClass(active)}
+      >
+        <PlantIcon plant={plant} size={28} decorative />
+        <span className="truncate">{plant.name}</span>
+      </button>
+    </li>
+  );
+}
+
 /**
- * Sidebar with all plants: search, category filter and the choice between a single plant
- * and a row. Plants are dragged into the bed or picked for keyboard placement.
+ * All plants with search, category filter and the choice between a single plant and a row.
+ * As desktop sidebar, plants are dragged into the bed or picked for keyboard placement; in
+ * the bottom sheet on phones, a tap picks the plant for tap-to-place.
  */
 export function PlantPalette({
   plants,
   store,
   onChoose,
+  variant = 'sidebar',
   className,
 }: {
   plants: readonly Plant[];
   store: EditorStore;
   onChoose: (plant: Plant) => void;
+  variant?: 'sidebar' | 'sheet';
   className?: string;
 }) {
+  const sheet = variant === 'sheet';
+  const Item = sheet ? TapItem : DraggableItem;
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category | null>(null);
   const { kind, setKind, preview } = useStore(store);
@@ -110,13 +153,18 @@ export function PlantPalette({
   return (
     <aside
       aria-label="Pflanzen hinzufügen"
-      className={cn('bg-card flex min-h-0 flex-col gap-3 rounded-xl border p-3', className)}
+      className={cn(
+        'flex min-h-0 flex-col gap-3',
+        !sheet && 'bg-card rounded-xl border p-3',
+        className,
+      )}
     >
-      <h2 className="text-sm font-semibold">Pflanzen hinzufügen</h2>
+      {!sheet && <h2 className="text-sm font-semibold">Pflanzen hinzufügen</h2>}
       <div role="group" aria-label="Pflanzart" className="bg-muted flex gap-1 rounded-lg p-1">
         {KINDS.map((k) => (
           <Choice
             key={k.value}
+            large={sheet}
             pressed={kind === k.value}
             onClick={() => {
               setKind(k.value);
@@ -147,6 +195,7 @@ export function PlantPalette({
       </div>
       <div role="group" aria-label="Kategorie" className="flex flex-wrap gap-1">
         <Choice
+          large={sheet}
           pressed={category === null}
           onClick={() => {
             setCategory(null);
@@ -157,6 +206,7 @@ export function PlantPalette({
         {CATEGORIES.map((c) => (
           <Choice
             key={c.value}
+            large={sheet}
             pressed={category === c.value}
             onClick={() => {
               setCategory(c.value);
@@ -169,7 +219,7 @@ export function PlantPalette({
       {shown.length > 0 ? (
         <ul aria-label="Sorten" className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           {shown.map((plant) => (
-            <PaletteItem
+            <Item
               key={plant.id}
               plant={plant}
               active={preview?.source === 'cursor' && preview.plant.id === plant.id}
@@ -180,9 +230,11 @@ export function PlantPalette({
       ) : (
         <p className="text-muted-foreground text-sm">Keine Sorte gefunden.</p>
       )}
-      <p className="text-muted-foreground text-xs">
-        Ins Beet ziehen oder auswählen und mit Pfeiltasten und Enter setzen.
-      </p>
+      {!sheet && (
+        <p className="text-muted-foreground text-xs">
+          Ins Beet ziehen oder auswählen und mit Pfeiltasten und Enter setzen.
+        </p>
+      )}
     </aside>
   );
 }

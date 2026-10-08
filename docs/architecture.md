@@ -438,7 +438,7 @@ Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bl
 - Beim Ziehen zeigt eine Vorschau die Warnungen live an, bevor man loslässt.
 - Der Wochen-Slider steuert, welche Pflanzungen sichtbar sind.
 
-Umsetzung (Stand T-26):
+Umsetzung (Stand T-27):
 
 - **Route:** `/beete/$bedId` (`BedEditorPage`); jede Beetkarte verlinkt dorthin. Unbekannte Beete zeigen „Beet nicht gefunden“. Clientfehler (4xx) wiederholt TanStack Query nicht (`shouldRetry` in `lib/api.ts`).
 - **Ansicht:** Der Viewport (`lib/editor/viewport.ts`) besteht aus Verschiebung in px und Maßstab in px pro cm. Er wird in einen `viewBox` umgerechnet, sodass alle Formen in cm gezeichnet werden. Beim ersten Messen passt er das Beet mit Rand ein. Zoom hält den Punkt unter Mauszeiger bzw. Fingern fest (Maßstab 0,05 bis 40 px/cm).
@@ -467,7 +467,17 @@ Umsetzung (Stand T-26):
 - **Undo/Redo:** Buttons „Rückgängig“/„Wiederholen“ sowie Strg+Z und Strg+Umschalt+Z (oder Strg+Y); in Textfeldern bleibt das native Undo.
   - Jede Änderung ist ein Paar `{ before, after }` (`lib/editor/history.ts`, höchstens 100 Schritte je geöffnetem Beet, nicht gespeichert).
   - Undo schickt den Zustand `before` an die API: PUT, DELETE oder POST für eine gelöschte Pflanzung. Weil der Server beim Anlegen eine neue ID vergibt, ersetzt `remapId` die alte ID in der ganzen Historie.
-  - Solange eine Anfrage läuft, sind Undo und Redo gesperrt, damit temporäre IDs erst aufgelöst werden.
+- **Smartphone (unter `md`, `useMediaQuery` in `lib/media-query.ts`):**
+  - Statt Seitenleisten gibt es Bottom-Sheets (`components/ui/sheet.tsx`, Radix Dialog).
+  - **Pflanze hinzufügen:** Der Button unter dem Beet öffnet die Palette als Sheet; deren Einträge sind einfache Buttons, damit die Liste per Finger scrollt. Nach der Wahl schließt das Sheet und die Vorschau steht in der Beetmitte. Ein Tipp aufs Beet setzt sie dorthin (5-cm-Raster). „Hier pflanzen“ bestätigt, „Abbrechen“ verwirft.
+  - **Bearbeiten:** Ein Tipp auf eine Pflanzung öffnet das Detailpanel als Sheet (`inspecting` im Store). Ein Long-Press-Verschieben öffnet es nicht, damit das Beet sichtbar bleibt.
+  - **Verschieben:** Ein Finger verschiebt die Ansicht, zwei zoomen. Bleibt der Finger 200 ms auf einer Pflanzung, folgt sie ihm im Raster (mit kurzer Vibration, wo verfügbar).
+    - Bewegt er sich vorher oder kommt ein zweiter Finger dazu, bleibt es Pan bzw. Pinch.
+    - Entscheidend ist der Zeitstempel des Events, nicht seine Verarbeitung: Ist der Hauptthread kurz blockiert, wird ein Wisch nicht zum Verschieben.
+  - **Browsergesten:** Auf dem Beet unterdrückt ein nicht-passiver `touchstart`-Handler die Gesten des Browsers (Long-Press-Menü, Auswahl). Sonst verschluckt Android nach einem langen Druck den nächsten Tipp. Pointer Events kommen weiter an.
+  - **Kein Doppeltipp-Zoom:** `touch-action: manipulation` auf `html`; Pan und Pinch-Zoom der Seite bleiben.
+  - **Touch-Ziele** in Sheets und unter dem Beet sind mindestens 44 px hoch.
+- **Undo-Warteschlange:** Rückgängig und Wiederholen werden nicht mehr verworfen, solange eine Anfrage läuft. Sie werden eingereiht und nacheinander ausgeführt, sobald keine Anfrage mehr offen ist (`queryClient.isMutating()`). So gehen schnelle Strg+Z nicht verloren, und temporäre IDs sind vorher aufgelöst.
 - **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe, Viewport, Pflanzart, Vorschau, Auswahl, den Entwurf beim Ziehen (Position oder Länge) und die Undo-Historie.
 - **Speichern:** Für Pflanzungen gibt es `useSavePlanting` und `useDeletePlanting` in `lib/garden.ts`. Sie ändern den Query-Cache optimistisch, rollen bei Fehlern zurück und laden danach neu. Neue Pflanzungen tragen bis zur Antwort eine temporäre ID (`tmp-…`); erst danach erscheint der Griff.
 

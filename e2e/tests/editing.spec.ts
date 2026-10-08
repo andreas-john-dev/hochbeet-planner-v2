@@ -107,18 +107,14 @@ test.describe('editing plantings', () => {
     await expect(tomato).toHaveCount(0);
     await expect.poll(() => stored(page, TOMATO_ID)).toBeNull();
 
-    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeEnabled();
+    // Three quick undos: they queue up behind the running requests, none gets lost. The first
+    // one recreates the tomato with a new id from the server, the others move it back.
     await page.keyboard.press('Control+Z');
-    // Recreated by the server with a new id, at the last position.
-    await expect(tomato).toHaveAttribute('data-x', '115');
-    // Undo waits for running requests, so step by step.
-    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeEnabled();
     await page.keyboard.press('Control+Z');
-    await expect(tomato).toHaveAttribute('data-y', '50');
-    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeEnabled();
     await page.keyboard.press('Control+Z');
     await expect(tomato).toHaveAttribute('data-x', '120');
     await expect(tomato).toHaveAttribute('data-y', '50');
+    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeDisabled();
   });
 
   test('shows details, changes the end and removes from the chosen week', async ({

@@ -10,6 +10,9 @@ export const GRID_CM = 5;
 /** Length of a new row before the user drags its handle. */
 export const DEFAULT_ROW_LENGTH_CM = 50;
 
+/** Hold time on a touch screen before a planting follows the finger instead of panning. */
+export const LONG_PRESS_MS = 200;
+
 /** Prefix of ids that only exist in the cache until the server has answered. */
 export const TEMP_ID_PREFIX = 'tmp-';
 

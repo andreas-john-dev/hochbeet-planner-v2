@@ -38,6 +38,12 @@ export interface EditorState {
   /** The planting shown in the detail panel and with the row handle. */
   selectedId: string | null;
   select: (id: string | null) => void;
+  /**
+   * True when the selection came from a tap or click, not from moving: on phones the detail
+   * sheet only opens then, so that a long-press move does not cover the bed.
+   */
+  inspecting: boolean;
+  inspect: (id: string) => void;
   /** Position or row length while a planting is dragged, before it is saved. */
   draft: Draft | null;
   setDraft: (draft: Draft | null) => void;
@@ -97,7 +103,11 @@ export function createEditorStore() {
     },
     selectedId: null,
     select: (selectedId) => {
-      set({ selectedId, draft: null });
+      set({ selectedId, draft: null, inspecting: false });
+    },
+    inspecting: false,
+    inspect: (selectedId) => {
+      set({ selectedId, draft: null, inspecting: true });
     },
     draft: null,
     setDraft: (draft) => {

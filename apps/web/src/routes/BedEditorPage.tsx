@@ -11,6 +11,7 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Maximize, MapPinOff, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
@@ -21,12 +22,14 @@ import { PlantPalette, type PaletteDragData } from '@/components/editor/PlantPal
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { ApiError, apiErrorMessage } from '@/lib/api';
 import { activePlantings } from '@/lib/active-plantings';
 import type { Change, Step } from '@/lib/editor/history';
 import { bedCentre, isTempId, newPlanting, snapToBed } from '@/lib/editor/placement';
 import { createEditorStore, type EditorStore } from '@/lib/editor/store';
 import { toCm } from '@/lib/editor/viewport';
+import { DESKTOP_QUERY, useMediaQuery } from '@/lib/media-query';
 import { useBedWithPlantings, useDeletePlanting, usePlants, useSavePlanting } from '@/lib/garden';
 
 const ZOOM_STEP = 1.4;
@@ -53,26 +56,36 @@ function BedEditor({ bedId }: { bedId: string }) {
   const save = useSavePlanting(bedId);
   const remove = useDeletePlanting(bedId);
   const { history } = useStore(store);
-  // Undo and redo wait for running requests, so that temporary ids are resolved first.
-  const busy = save.isPending || remove.isPending;
+  const queryClient = useQueryClient();
+  // Undo and redo run one after another, each after all running requests have finished,
+  // so that temporary ids are resolved first and no key press gets lost.
+  const queue = useRef<Promise<void>>(Promise.resolve());
   const error = save.error ?? remove.error;
 
+  /** Resolves once no request is running any more. */
+  const settled = () =>
+    new Promise<void>((resolve) => {
+      if (queryClient.isMutating() === 0) {
+        resolve();
+        return;
+      }
+      const unsubscribe = queryClient.getMutationCache().subscribe(() => {
+        if (queryClient.isMutating() > 0) return;
+        unsubscribe();
+        resolve();
+      });
+    });
+
   /** Sends what turns `current` into `target`: create, change or delete. */
-  const apply = ({ target, current }: Step) => {
+  const apply = async ({ target, current }: Step) => {
     if (target && current) {
-      save.mutate({ planting: target, isNew: false });
+      await save.mutateAsync({ planting: target, isNew: false });
     } else if (target) {
-      save.mutate(
-        { planting: target, isNew: true },
-        // The server assigns the real id; the history and the selection follow it.
-        {
-          onSuccess: (created) => {
-            store.getState().remapId(target.id, created.id);
-          },
-        },
-      );
+      const created = await save.mutateAsync({ planting: target, isNew: true });
+      // The server assigns the real id; the history and the selection follow it.
+      store.getState().remapId(target.id, created.id);
     } else if (current) {
-      remove.mutate(current.id);
+      await remove.mutateAsync(current.id);
     }
   };
 
@@ -81,16 +94,21 @@ function BedEditor({ bedId }: { bedId: string }) {
     // A planting that is still being created cannot be changed yet.
     if (change.before && isTempId(change.before.id)) return;
     store.getState().record(change);
-    apply({ target: change.after, current: change.before });
+    // Errors are shown below the editor; the optimistic update rolls itself back.
+    apply({ target: change.after, current: change.before }).catch(() => undefined);
   };
 
   const travel = (direction: 'undo' | 'redo') => {
-    if (busy) return;
-    const state = store.getState();
-    const step = direction === 'undo' ? state.undo() : state.redo();
-    if (!step) return;
-    state.select(step.target?.id ?? null);
-    apply(step);
+    queue.current = queue.current
+      .then(settled)
+      .then(async () => {
+        const state = store.getState();
+        const step = direction === 'undo' ? state.undo() : state.redo();
+        if (!step) return;
+        state.select(step.target?.id ?? null);
+        await apply(step);
+      })
+      .catch(() => undefined);
   };
 
   // Ctrl+Z / Cmd+Z undoes, with Shift (or Ctrl+Y) redoes; text fields keep their own undo.
@@ -169,7 +187,7 @@ function BedEditor({ bedId }: { bedId: string }) {
               aria-label="Rückgängig"
               title="Rückgängig (Strg+Z)"
               aria-keyshortcuts="Control+Z"
-              disabled={busy || history.past.length === 0}
+              disabled={history.past.length === 0}
               onClick={() => {
                 travel('undo');
               }}
@@ -182,7 +200,7 @@ function BedEditor({ bedId }: { bedId: string }) {
               aria-label="Wiederholen"
               title="Wiederholen (Strg+Umschalt+Z)"
               aria-keyshortcuts="Control+Shift+Z"
-              disabled={busy || history.future.length === 0}
+              disabled={history.future.length === 0}
               onClick={() => {
                 travel('redo');
               }}
@@ -259,6 +277,32 @@ function plantName(data: unknown) {
   return (data as PaletteDragData | undefined)?.plant.name ?? 'Pflanze';
 }
 
+/** The line under the bed: what the user can do right now, read out by screen readers. */
+function hint({
+  placing,
+  kind,
+  selected,
+  isDesktop,
+}: {
+  placing: { plant: Plant; at: { x: number; y: number } } | null;
+  kind: Planting['kind'];
+  selected: string | undefined;
+  isDesktop: boolean;
+}) {
+  if (placing) {
+    const what = `${placing.plant.name} als ${kind === 'ROW' ? 'Reihe' : 'Einzelpflanze'} bei ${String(placing.at.x)} × ${String(placing.at.y)} cm`;
+    return isDesktop
+      ? `${what}: Pfeiltasten verschieben (mit Umschalt 25 cm), Enter oder Klick setzt, Escape bricht ab.`
+      : `${what}: Auf die gewünschte Stelle im Beet tippen, dann „Hier pflanzen“.`;
+  }
+  if (selected && isDesktop) {
+    return `${selected} ausgewählt: ziehen oder Pfeiltasten verschieben, Entf löscht, Escape hebt die Auswahl auf.`;
+  }
+  return isDesktop
+    ? 'Zoomen mit dem Mausrad oder zwei Fingern, verschieben durch Ziehen. Pflanzung anklicken zum Bearbeiten.'
+    : 'Mit zwei Fingern zoomen, mit einem verschieben. Pflanzung antippen zum Bearbeiten, lange drücken zum Verschieben.';
+}
+
 /** Client coordinates where a pointer drag currently is. */
 function dragPoint(event: DragMoveEvent) {
   const start = event.activatorEvent;
@@ -285,7 +329,10 @@ function Workspace({
   const svgRef = useRef<SVGSVGElement>(null);
   const hintId = useId();
   const [dragged, setDragged] = useState<Plant | null>(null);
-  const { preview, kind, selectedId } = useStore(store);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const { preview, kind, selectedId, inspecting } = useStore(store);
+  // Sidebars on wide screens, bottom sheets on phones.
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
   // A short move starts a drag; a plain click on a palette item picks the plant.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -359,8 +406,15 @@ function Workspace({
   const choose = (plant: Plant) => {
     const state = store.getState();
     const at = state.preview?.at ?? bedCentre(bed);
+    state.select(null);
     state.setPreview({ plant, at, source: 'cursor' });
-    svgRef.current?.focus();
+    // Keyboard users continue in the bed; on phones the sheet closes for tap-to-place.
+    if (isDesktop) svgRef.current?.focus();
+    else setPaletteOpen(false);
+  };
+
+  const cancelPlacing = () => {
+    store.getState().setPreview(null);
   };
 
   const placing = preview?.source === 'cursor' ? preview : null;
@@ -381,28 +435,29 @@ function Workspace({
       }}
     >
       <div className="flex flex-col gap-4 md:h-[65dvh] md:flex-row">
-        {selected ? (
-          <PlantingDetails
-            // Fresh form state for another planting or after undo.
-            key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
-            planting={selected.planting}
-            plant={selected.plant}
-            week={today}
-            onChange={change}
-            onDelete={remove}
-            onClose={() => {
-              store.getState().select(null);
-            }}
-            className="hidden w-72 shrink-0 md:flex"
-          />
-        ) : (
-          <PlantPalette
-            plants={plants}
-            store={store}
-            onChoose={choose}
-            className="hidden w-72 shrink-0 md:flex"
-          />
-        )}
+        {isDesktop &&
+          (selected ? (
+            <PlantingDetails
+              // Fresh form state for another planting or after undo.
+              key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
+              planting={selected.planting}
+              plant={selected.plant}
+              week={today}
+              onChange={change}
+              onDelete={remove}
+              onClose={() => {
+                store.getState().select(null);
+              }}
+              className="w-72 shrink-0"
+            />
+          ) : (
+            <PlantPalette
+              plants={plants}
+              store={store}
+              onChoose={choose}
+              className="w-72 shrink-0"
+            />
+          ))}
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="bg-card h-[60dvh] min-h-72 overflow-hidden rounded-xl border md:h-auto md:flex-1">
             <BedCanvas
@@ -417,15 +472,81 @@ function Workspace({
               onDelete={remove}
             />
           </div>
+          {!isDesktop &&
+            (placing ? (
+              <div
+                role="group"
+                aria-label="Pflanze setzen"
+                className="bg-card flex flex-col gap-2 rounded-xl border p-3"
+              >
+                <div className="flex gap-2">
+                  <Button variant="outline" className="h-11 flex-1" onClick={cancelPlacing}>
+                    Abbrechen
+                  </Button>
+                  <Button
+                    className="h-11 flex-1"
+                    onClick={() => {
+                      place(placing.plant, placing.at);
+                    }}
+                  >
+                    Hier pflanzen
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                className="h-11"
+                onClick={() => {
+                  setPaletteOpen(true);
+                }}
+              >
+                <Plus aria-hidden />
+                Pflanze hinzufügen
+              </Button>
+            ))}
           <p id={hintId} className="text-muted-foreground text-xs" aria-live="polite">
-            {placing
-              ? `${placing.plant.name} als ${kind === 'ROW' ? 'Reihe' : 'Einzelpflanze'} bei ${String(placing.at.x)} × ${String(placing.at.y)} cm: Pfeiltasten verschieben (mit Umschalt 25 cm), Enter oder Klick setzt, Escape bricht ab.`
-              : selected
-                ? `${selected.plant.name} ausgewählt: ziehen oder Pfeiltasten verschieben, Entf löscht, Escape hebt die Auswahl auf.`
-                : 'Zoomen mit dem Mausrad oder zwei Fingern, verschieben durch Ziehen. Pflanzung anklicken zum Bearbeiten.'}
+            {hint({ placing, kind, selected: selected?.plant.name, isDesktop })}
           </p>
         </div>
       </div>
+      <Sheet open={!isDesktop && paletteOpen} onOpenChange={setPaletteOpen}>
+        <SheetContent aria-describedby={undefined}>
+          <SheetTitle>Pflanze hinzufügen</SheetTitle>
+          <PlantPalette
+            plants={plants}
+            store={store}
+            onChoose={choose}
+            variant="sheet"
+            className="flex-1"
+          />
+        </SheetContent>
+      </Sheet>
+      <Sheet
+        open={!isDesktop && selected !== undefined && inspecting}
+        onOpenChange={(open) => {
+          if (!open) store.getState().select(null);
+        }}
+      >
+        <SheetContent showClose={false} aria-describedby={undefined}>
+          {selected && (
+            <>
+              <SheetTitle className="sr-only">{`Pflanzung ${selected.plant.name}`}</SheetTitle>
+              <PlantingDetails
+                key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
+                planting={selected.planting}
+                plant={selected.plant}
+                week={today}
+                onChange={change}
+                onDelete={remove}
+                onClose={() => {
+                  store.getState().select(null);
+                }}
+                className="rounded-none border-0 bg-transparent p-0"
+              />
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
       <DragOverlay dropAnimation={null}>
         {dragged && !preview ? (
           <div className="bg-card flex items-center gap-2 rounded-md border px-2 py-1 text-sm shadow-md">
