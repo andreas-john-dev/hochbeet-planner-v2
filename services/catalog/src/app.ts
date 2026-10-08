@@ -1,14 +1,22 @@
-import type { ErrorResponse, ListPlantsResponse } from '@hochbeet/contracts';
-import { Hono } from 'hono';
+import {
+  type ErrorResponse,
+  type ListPlantsResponse,
+  SaveOverrideRequestSchema,
+  SavePlantRequestSchema,
+} from '@hochbeet/contracts';
+import { type Context, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { effectiveCatalog } from './catalog/effective';
-import type { CatalogRepository } from './catalog/repository';
+import type { z } from 'zod';
+import { CatalogService, type CatalogStore } from './catalog/service';
+import { issuesOf, NotFoundError, ValidationError } from './errors';
 import { errorFields, type Logger } from './logger';
 import { type ApiEvent, userFromEvent, type User } from './user';
 
 export interface AppDeps {
-  repository: Pick<CatalogRepository, 'listGlobalPlants' | 'listUserItems'>;
+  store: CatalogStore;
   logger: Logger;
+  now?: () => Date;
+  newId?: () => string;
 }
 
 interface Env {
@@ -21,8 +29,24 @@ export const BASE_PATH = '/api/catalog';
 
 const errorBody = (message: string): ErrorResponse => ({ message });
 
-export function createApp({ repository, logger }: AppDeps) {
+/** Parses the JSON body with a contract schema; 400 with field issues otherwise. */
+async function parseBody<T extends z.ZodType>(c: Context<Env>, schema: T): Promise<z.infer<T>> {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new ValidationError('Die Anfrage ist kein gültiges JSON.', []);
+  }
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    throw new ValidationError('Bitte prüfe deine Eingaben.', issuesOf(result.error));
+  }
+  return result.data;
+}
+
+export function createApp({ store, logger, now, newId }: AppDeps) {
   const app = new Hono<Env>().basePath(BASE_PATH);
+  const catalog = new CatalogService(store, now, newId);
 
   // Request logging and the user context from the JWT claims of the API Gateway authorizer.
   app.use(async (c, next) => {
@@ -49,13 +73,35 @@ export function createApp({ repository, logger }: AppDeps) {
   });
 
   app.get('/plants', async (c) => {
-    const user = c.get('user');
-    const [globals, { overrides, own }] = await Promise.all([
-      repository.listGlobalPlants(),
-      repository.listUserItems(user.id),
-    ]);
-    const body: ListPlantsResponse = { plants: effectiveCatalog(globals, overrides, own) };
+    const body: ListPlantsResponse = { plants: await catalog.list(c.get('user').id) };
     return c.json(body);
+  });
+
+  // Own plants: create, change, archive.
+  app.post('/plants', async (c) => {
+    const fields = await parseBody(c, SavePlantRequestSchema);
+    return c.json(await catalog.createOwnPlant(c.get('user').id, fields), 201);
+  });
+
+  app.put('/plants/:id', async (c) => {
+    const fields = await parseBody(c, SavePlantRequestSchema);
+    return c.json(await catalog.updateOwnPlant(c.get('user').id, c.req.param('id'), fields));
+  });
+
+  app.delete('/plants/:id', async (c) => {
+    await catalog.archiveOwnPlant(c.get('user').id, c.req.param('id'));
+    return c.body(null, 204);
+  });
+
+  // Personal overrides of global plants.
+  app.put('/plants/:id/override', async (c) => {
+    const fields = await parseBody(c, SaveOverrideRequestSchema);
+    return c.json(await catalog.saveOverride(c.get('user').id, c.req.param('id'), fields));
+  });
+
+  app.delete('/plants/:id/override', async (c) => {
+    await catalog.resetOverride(c.get('user').id, c.req.param('id'));
+    return c.body(null, 204);
   });
 
   app.notFound((c) => c.json(errorBody('Diese Adresse gibt es nicht.'), 404));
@@ -64,6 +110,14 @@ export function createApp({ repository, logger }: AppDeps) {
     if (error instanceof HTTPException) {
       return c.json(errorBody(error.message), error.status);
     }
+    if (error instanceof ValidationError) {
+      const body: ErrorResponse =
+        error.issues.length > 0
+          ? { message: error.message, issues: error.issues }
+          : errorBody(error.message);
+      return c.json(body, 400);
+    }
+    if (error instanceof NotFoundError) return c.json(errorBody(error.message), 404);
     ((c.get('logger') as Logger | undefined) ?? logger).error(
       'unhandled error',
       errorFields(error),

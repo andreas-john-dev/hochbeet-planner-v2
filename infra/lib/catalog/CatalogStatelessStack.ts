@@ -51,10 +51,16 @@ export class CatalogStatelessStack extends Stack {
       }),
       bundling: { format: OutputFormat.ESM, minify: true, sourceMap: true },
     });
-    // Read access for GET /catalog/plants; write actions follow with T-19/T-20.
+    // Item access on the table only, no scans and no index wildcard.
     this.handler.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ['dynamodb:Query', 'dynamodb:GetItem'],
+        actions: [
+          'dynamodb:Query',
+          'dynamodb:GetItem',
+          'dynamodb:PutItem',
+          'dynamodb:UpdateItem',
+          'dynamodb:DeleteItem',
+        ],
         resources: [
           this.formatArn({ service: 'dynamodb', resource: 'table', resourceName: tableName }),
         ],

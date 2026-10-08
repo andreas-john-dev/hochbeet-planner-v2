@@ -1,6 +1,14 @@
-import { type DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { type Plant, PlantSchema } from '@hochbeet/contracts';
-import { GLOBAL_PK, OVERRIDE_PREFIX, PLANT_PREFIX, userPk } from '../table';
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
+import {
+  DeleteCommand,
+  type DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from '@aws-sdk/lib-dynamodb';
+import { type Plant, type PlantOverride, PlantSchema } from '@hochbeet/contracts';
+import { GLOBAL_PK, OVERRIDE_PREFIX, overrideSk, PLANT_PREFIX, plantSk, userPk } from '../table';
 import {
   type OverrideItem,
   OverrideItemSchema,
@@ -47,6 +55,93 @@ export class CatalogRepository {
         .filter((item) => sk(item).startsWith(PLANT_PREFIX))
         .map((item) => OwnPlantItemSchema.parse(item)),
     };
+  }
+
+  async getGlobalPlant(plantId: string): Promise<Plant | undefined> {
+    const { Item } = await this.client.send(
+      new GetCommand({ TableName: this.tableName, Key: { PK: GLOBAL_PK, SK: plantSk(plantId) } }),
+    );
+    return Item ? PlantSchema.parse(Item) : undefined;
+  }
+
+  /** An own plant of the user, archived ones included. */
+  async getOwnPlant(userId: string, plantId: string): Promise<OwnPlantItem | undefined> {
+    const { Item } = await this.client.send(
+      new GetCommand({ TableName: this.tableName, Key: this.ownKey(userId, plantId) }),
+    );
+    return Item ? OwnPlantItemSchema.parse(Item) : undefined;
+  }
+
+  async createOwnPlant(userId: string, item: OwnPlantItem): Promise<void> {
+    await this.client.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: { ...this.ownKey(userId, item.id), ...item },
+        ConditionExpression: 'attribute_not_exists(PK)',
+      }),
+    );
+  }
+
+  /** Replaces an own plant that exists and is not archived; false otherwise. */
+  async replaceOwnPlant(userId: string, item: OwnPlantItem): Promise<boolean> {
+    return this.ifConditionHolds(() =>
+      this.client.send(
+        new PutCommand({
+          TableName: this.tableName,
+          Item: { ...this.ownKey(userId, item.id), ...item },
+          ConditionExpression: 'attribute_exists(PK) AND archived <> :true',
+          ExpressionAttributeValues: { ':true': true },
+        }),
+      ),
+    );
+  }
+
+  /** Marks an own plant as archived. It stays stored because plantings may reference it. */
+  async archiveOwnPlant(userId: string, plantId: string, archivedAt: string): Promise<boolean> {
+    return this.ifConditionHolds(() =>
+      this.client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: this.ownKey(userId, plantId),
+          UpdateExpression: 'SET archived = :true, archivedAt = :at',
+          ConditionExpression: 'attribute_exists(PK) AND archived <> :true',
+          ExpressionAttributeValues: { ':true': true, ':at': archivedAt },
+        }),
+      ),
+    );
+  }
+
+  async putOverride(userId: string, plantId: string, fields: PlantOverride): Promise<void> {
+    const item: OverrideItem = { plantId, fields };
+    await this.client.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: { PK: userPk(userId), SK: overrideSk(plantId), ...item },
+      }),
+    );
+  }
+
+  async deleteOverride(userId: string, plantId: string): Promise<void> {
+    await this.client.send(
+      new DeleteCommand({
+        TableName: this.tableName,
+        Key: { PK: userPk(userId), SK: overrideSk(plantId) },
+      }),
+    );
+  }
+
+  private ownKey(userId: string, plantId: string) {
+    return { PK: userPk(userId), SK: plantSk(plantId) };
+  }
+
+  private async ifConditionHolds(write: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await write();
+      return true;
+    } catch (error) {
+      if (error instanceof ConditionalCheckFailedException) return false;
+      throw error;
+    }
   }
 
   /** All items of one partition, following pagination. */

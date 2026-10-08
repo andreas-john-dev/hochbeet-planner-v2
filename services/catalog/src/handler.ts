@@ -15,7 +15,7 @@ const client = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
 /** Lambda entry of the catalog Lambdalith behind the HTTP API. */
 export const handler = handle(
   createApp({
-    repository: new CatalogRepository(client, tableName),
+    store: new CatalogRepository(client, tableName),
     logger: createLogger({ service: 'catalog' }),
   }),
 );

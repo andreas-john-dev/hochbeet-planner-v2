@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from './app';
 import type { UserCatalogItems } from './catalog/repository';
+import type { CatalogStore } from './catalog/service';
 import { createLogger } from './logger';
 import { authorized, seedPlant, USER_A } from './test/fixtures';
 
-function setup(overrides: Partial<Parameters<typeof createApp>[0]['repository']> = {}) {
+function setup(overrides: Partial<CatalogStore> = {}) {
   const lines: Record<string, unknown>[] = [];
   const logger = createLogger({ service: 'catalog' }, (line) => {
     lines.push(JSON.parse(line) as Record<string, unknown>);
@@ -14,9 +15,16 @@ function setup(overrides: Partial<Parameters<typeof createApp>[0]['repository']>
     listUserItems: vi.fn((): Promise<UserCatalogItems> =>
       Promise.resolve({ overrides: [], own: [] }),
     ),
+    getGlobalPlant: vi.fn(() => Promise.resolve(undefined)),
+    getOwnPlant: vi.fn(() => Promise.resolve(undefined)),
+    createOwnPlant: vi.fn(() => Promise.resolve()),
+    replaceOwnPlant: vi.fn(() => Promise.resolve(true)),
+    archiveOwnPlant: vi.fn(() => Promise.resolve(true)),
+    putOverride: vi.fn(() => Promise.resolve()),
+    deleteOverride: vi.fn(() => Promise.resolve()),
     ...overrides,
   };
-  return { app: createApp({ repository, logger }), repository, lines };
+  return { app: createApp({ store: repository, logger }), repository, lines };
 }
 
 describe('catalog app', () => {
