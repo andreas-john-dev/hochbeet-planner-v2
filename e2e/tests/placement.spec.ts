@@ -77,7 +77,8 @@ test.describe('adding plants on the desktop', () => {
     await expect(carrots).toHaveAttribute('data-x', '120');
     await expect(carrots).toHaveAttribute('data-y', '0');
     await expect(carrots).toHaveAttribute('data-length-cm', '100');
-    await expect(carrots).toHaveAccessibleName('Möhre, Reihe mit 26 Pflanzen');
+    // The row touches the bed edge, so its name also carries the hint.
+    await expect(carrots).toHaveAccessibleName(/^Möhre, Reihe mit 26 Pflanzen/);
   });
 
   test('places a plant with the keyboard', async ({ page }) => {

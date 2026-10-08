@@ -438,7 +438,7 @@ Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bl
 - Beim Ziehen zeigt eine Vorschau die Warnungen live an, bevor man loslässt.
 - Der Wochen-Slider steuert, welche Pflanzungen sichtbar sind.
 
-Umsetzung (Stand T-28):
+Umsetzung (Stand T-29):
 
 - **Route:** `/beete/$bedId` (`BedEditorPage`); jede Beetkarte verlinkt dorthin. Unbekannte Beete zeigen „Beet nicht gefunden“. Clientfehler (4xx) wiederholt TanStack Query nicht (`shouldRetry` in `lib/api.ts`).
 - **Ansicht:** Der Viewport (`lib/editor/viewport.ts`) besteht aus Verschiebung in px und Maßstab in px pro cm. Er wird in einen `viewBox` umgerechnet, sodass alle Formen in cm gezeichnet werden. Beim ersten Messen passt er das Beet mit Rand ein. Zoom hält den Punkt unter Mauszeiger bzw. Fingern fest (Maßstab 0,05 bis 40 px/cm).
@@ -450,6 +450,18 @@ Umsetzung (Stand T-28):
   - Der Slider deckt alle Montage im Jahr der gewählten Woche ab und ist mit Monatsnamen beschriftet (auf dem Smartphone nur die Anfangsbuchstaben). Daneben stehen „4. – 10. Mai 2026 · KW 19“ und die Buttons Woche zurück, Woche vor und „Heute“. Über den Jahreswechsel hinweg wechselt der Slider ins andere Jahr.
   - Die Woche bestimmt die sichtbaren Pflanzungen, den Start neuer Pflanzungen und „Entfernen ab“.
   - **Geister** (`ghosts()` in `lib/editor/timeline.ts`): Für jede Pflanzung der Woche erscheinen der direkte Vorgänger an derselben Stelle und der direkte Nachfolger blass (30 % Deckkraft) und gestrichelt. Der Vorgänger endet spätestens am Start der Pflanzung, der Nachfolger beginnt frühestens an ihrem Ende und nach der Woche. Dabei überlappen sich die Standflächen. Geister sind nicht anklickbar (`data-testid="ghost-<id>"`, `data-ghost="before" | "after"`). Dauerkulturen ohne Ende haben keinen Nachfolger.
+- **Warnungen (`lib/editor/warnings.ts`, `components/editor/FindingsList.tsx`):**
+  - `evaluateBed` läuft im Editor bei jeder Änderung über alle Pflanzungen des Beets. Dazu zählen auch die gerade gezogene Pflanzung (Entwurf) und die Vorschau beim Setzen, sodass eine Warnung schon vor dem Loslassen erscheint. Gespeichert wird trotzdem immer.
+  - **Markierung am Objekt** für die gewählte Woche: ein Abzeichen oben rechts an der Standfläche, gleich groß bei jedem Zoom; Farbe immer zusammen mit einem Symbol.
+    - Warnung: rot „!“, dazu ein roter Umriss.
+    - Hinweis (Beetrand): grau „i“.
+    - Gute Nachbarn: grün „✓“.
+    - Pro Pflanzung zählt der schwerste Befund. Der Status steht auch im Namen für Screenreader („Tomate (Warnung)“).
+  - **Liste „Hinweise dieser Saison“** unter dem Editor, mit deutschem Text, Zeitraum in Kalenderwochen und einer Zusammenfassung („2 Warnungen · 1 Hinweis“).
+    - Saison = von einer Erneuerung der Erde bis zur nächsten (`seasonOf`, Standard 1. März).
+    - Befunde außerhalb der gewählten Woche sind blasser.
+    - Ein Klick hebt die betroffenen Pflanzungen mit einem Ring hervor und springt in ihre erste Woche (oder bleibt in der aktuellen, wenn der Befund dort gilt). Ein zweiter Klick oder Escape hebt die Markierung auf.
+  - **Übersicht:** Jede Beetkarte zeigt die Warnungen der laufenden Saison als Zähler.
 - **Pflanzen hinzufügen (Desktop):**
   - Die Seitenleiste „Pflanzen hinzufügen“ (ab `md`) bietet Suche, Kategorie-Filter, Icons und den Umschalter Einzelpflanze/Reihe.
   - Sorten werden mit dnd-kit (Pointer-Sensor, ab 5 px Bewegung) ins Beet gezogen. Die Vorschau rastet auf 5 cm ein und bleibt im Beet.

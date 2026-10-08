@@ -27,8 +27,9 @@ const garden = {
   ],
 };
 
+/** A planting in the bed by plant name; the name may carry a status, e.g. "(Warnung)". */
 const inBed = (page: Page, name: string) =>
-  page.getByTestId('bed-canvas').getByRole('button', { name, exact: true });
+  page.getByTestId('bed-canvas').getByRole('button', { name: new RegExp(`^${name}( \\(|$)`) });
 
 /** Moves the slider to the n-th Monday of the year (0 = first). */
 async function slideTo(page: Page, index: number) {

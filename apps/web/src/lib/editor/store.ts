@@ -53,6 +53,10 @@ export interface EditorState {
   draft: Draft | null;
   setDraft: (draft: Draft | null) => void;
 
+  /** Plantings of the finding picked in the list; drawn with a ring. */
+  highlighted: readonly string[];
+  setHighlighted: (ids: readonly string[]) => void;
+
   /** Undo/redo of planting changes made in this editor. */
   history: History;
   record: (change: Change) => void;
@@ -121,6 +125,10 @@ export function createEditorStore(today: Date = new Date()) {
     draft: null,
     setDraft: (draft) => {
       set({ draft });
+    },
+    highlighted: [],
+    setHighlighted: (highlighted) => {
+      set({ highlighted });
     },
     history: emptyHistory,
     record: (change) => {
