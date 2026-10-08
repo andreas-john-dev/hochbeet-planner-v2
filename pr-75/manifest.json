@@ -1,0 +1,280 @@
+[
+  {
+    "id": "anmelden",
+    "path": "/anmelden",
+    "heading": "Anmelden",
+    "access": "public"
+  },
+  {
+    "id": "registrieren",
+    "path": "/registrieren",
+    "heading": "Registrieren",
+    "access": "public"
+  },
+  {
+    "id": "passwort-vergessen",
+    "path": "/passwort-vergessen",
+    "heading": "Passwort vergessen",
+    "access": "public"
+  },
+  {
+    "id": "beete",
+    "path": "/beete",
+    "heading": "Meine Beete",
+    "access": "user",
+    "navLabel": "Beete",
+    "seed": {
+      "beds": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "name": "Hochbeet Süd",
+          "widthCm": 200,
+          "depthCm": 100,
+          "mainRowDirection": "V",
+          "soilRenewals": []
+        }
+      ],
+      "plantings": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T01",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00JTGP22ZW0RKZZT9K",
+          "kind": "SINGLE",
+          "x": 15,
+          "y": 15,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T02",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00Y146B7QH3XHMRCBA",
+          "kind": "SINGLE",
+          "x": 15,
+          "y": 50,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T03",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00W2T9ZJHHDX8H5YMY",
+          "kind": "SINGLE",
+          "x": 15,
+          "y": 85,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T04",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00A6TVTS7JDM60G9YY",
+          "kind": "SINGLE",
+          "x": 50,
+          "y": 50,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T05",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00PAF8V0RQKEJ6T6FT",
+          "kind": "ROW",
+          "x": 90,
+          "y": 25,
+          "startDate": "2026-06-01",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 30
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T06",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00BS8T7Z8ZDSW03PXH",
+          "kind": "ROW",
+          "x": 85,
+          "y": 75,
+          "startDate": "2026-06-15",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 45
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T07",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV007QZ49TY1XCYCQ54J",
+          "kind": "ROW",
+          "x": 160,
+          "y": 10,
+          "startDate": "2026-08-03",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "V",
+          "lengthCm": 80
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T08",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV009C9ACEM9APGSMT4E",
+          "kind": "ROW",
+          "x": 185,
+          "y": 10,
+          "startDate": "2026-09-07",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "V",
+          "lengthCm": 80
+        }
+      ]
+    }
+  },
+  {
+    "id": "beet-editor",
+    "path": "/beete/01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+    "heading": "Hochbeet Süd",
+    "access": "user",
+    "seed": {
+      "beds": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "name": "Hochbeet Süd",
+          "widthCm": 200,
+          "depthCm": 100,
+          "mainRowDirection": "V",
+          "soilRenewals": []
+        }
+      ],
+      "plantings": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T01",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00JTGP22ZW0RKZZT9K",
+          "kind": "SINGLE",
+          "x": 15,
+          "y": 15,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T02",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00Y146B7QH3XHMRCBA",
+          "kind": "SINGLE",
+          "x": 15,
+          "y": 50,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T03",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00W2T9ZJHHDX8H5YMY",
+          "kind": "SINGLE",
+          "x": 15,
+          "y": 85,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T04",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00A6TVTS7JDM60G9YY",
+          "kind": "SINGLE",
+          "x": 50,
+          "y": 50,
+          "startDate": "2026-05-04",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T05",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00PAF8V0RQKEJ6T6FT",
+          "kind": "ROW",
+          "x": 90,
+          "y": 25,
+          "startDate": "2026-06-01",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 30
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T06",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV00BS8T7Z8ZDSW03PXH",
+          "kind": "ROW",
+          "x": 85,
+          "y": 75,
+          "startDate": "2026-06-15",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 45
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T07",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV007QZ49TY1XCYCQ54J",
+          "kind": "ROW",
+          "x": 160,
+          "y": 10,
+          "startDate": "2026-08-03",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "V",
+          "lengthCm": 80
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0T08",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A",
+          "plantId": "01M49THV009C9ACEM9APGSMT4E",
+          "kind": "ROW",
+          "x": 185,
+          "y": 10,
+          "startDate": "2026-09-07",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "V",
+          "lengthCm": 80
+        }
+      ]
+    }
+  },
+  {
+    "id": "katalog",
+    "path": "/katalog",
+    "heading": "Pflanzenkatalog",
+    "access": "user",
+    "navLabel": "Katalog"
+  },
+  {
+    "id": "profil",
+    "path": "/profil",
+    "heading": "Profil",
+    "access": "user",
+    "navLabel": "Profil"
+  },
+  {
+    "id": "admin",
+    "path": "/admin",
+    "heading": "Administration",
+    "access": "admin",
+    "navLabel": "Admin"
+  },
+  {
+    "id": "dev-icons",
+    "path": "/dev/icons",
+    "heading": "Icon-Galerie",
+    "access": "public"
+  }
+]
