@@ -1,52 +1,10 @@
 import type { Page } from '@playwright/test';
 import { expect, open, signInAs, test } from './fixtures';
-import { bed, planting, PLANTS, seedGarden } from './garden';
+import { EXAMPLE_BED_ID, exampleGarden, exampleId, seedGarden } from './garden';
 
-const BED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0S1A';
-const id = (n: number) => `01J9ZQ3W8D6V2K5M7N8P9R0T${String(n).padStart(2, '0')}`;
-
-// 2 × 1 m with 8 plantings that are all in the bed on 7 October 2026 (fixed clock).
-const example = {
-  beds: [bed(BED_ID, 'Hochbeet Süd', 200, 100)],
-  plantings: [
-    planting(id(1), BED_ID, PLANTS.chives, { x: 15, y: 15 }),
-    planting(id(2), BED_ID, PLANTS.thyme, { x: 15, y: 50 }),
-    planting(id(3), BED_ID, PLANTS.parsley, { x: 15, y: 85 }),
-    planting(id(4), BED_ID, PLANTS.kale, { x: 50, y: 50 }),
-    planting(id(5), BED_ID, PLANTS.chard, {
-      kind: 'ROW',
-      x: 90,
-      y: 25,
-      orientation: 'H',
-      lengthCm: 30,
-      startDate: '2026-06-01',
-    }),
-    planting(id(6), BED_ID, PLANTS.leek, {
-      kind: 'ROW',
-      x: 85,
-      y: 75,
-      orientation: 'H',
-      lengthCm: 45,
-      startDate: '2026-06-15',
-    }),
-    planting(id(7), BED_ID, PLANTS.beetroot, {
-      kind: 'ROW',
-      x: 160,
-      y: 10,
-      orientation: 'V',
-      lengthCm: 80,
-      startDate: '2026-08-03',
-    }),
-    planting(id(8), BED_ID, PLANTS.spinach, {
-      kind: 'ROW',
-      x: 185,
-      y: 10,
-      orientation: 'V',
-      lengthCm: 80,
-      startDate: '2026-09-07',
-    }),
-  ],
-};
+const BED_ID = EXAMPLE_BED_ID;
+const example = exampleGarden;
+const id = exampleId;
 
 const canvas = (page: Page) => page.getByTestId('bed-canvas');
 const scaleOf = async (page: Page) => Number(await canvas(page).getAttribute('data-scale'));
