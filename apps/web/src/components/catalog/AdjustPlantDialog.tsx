@@ -70,6 +70,10 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
   const lifecycleId = useId();
   const update = (change: Partial<AdjustForm>) => {
     setForm((current) => ({ ...current, ...change }));
+    // A field's message goes away as soon as the field is edited.
+    setErrors((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => !(key in change))),
+    );
   };
 
   const onSubmit = async () => {

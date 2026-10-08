@@ -49,6 +49,12 @@ export const appPages: readonly AppPage[] = [
     navLabel: 'Katalog',
   },
   {
+    id: 'katalog-neu',
+    path: '/katalog/neu',
+    heading: 'Eigene Sorte anlegen',
+    access: 'user',
+  },
+  {
     id: 'katalog-sorte',
     path: '/katalog/01M49THV00RK9E9PC83NEE87CJ',
     heading: 'Kopfsalat',

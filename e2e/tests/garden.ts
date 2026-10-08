@@ -6,6 +6,8 @@ const MOCK_API_KEY = 'hochbeet-mock-api';
 export interface Garden {
   beds: unknown[];
   plantings: unknown[];
+  /** Own plants as the catalogue lists them (`source: 'OWN'`, with `publication`). */
+  ownPlants?: unknown[];
 }
 
 /** Seeds the mock API with beds and plantings for a test user (default: the normal user). */

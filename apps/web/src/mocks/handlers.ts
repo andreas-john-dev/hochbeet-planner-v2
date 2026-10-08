@@ -8,15 +8,17 @@ import {
   type ListPlantsResponse,
   type Plant,
   type Planting,
+  type PlantFields,
   type PlantOverride,
   SaveBedRequestSchema,
   SaveOverrideRequestSchema,
   SavePlantingRequestSchema,
+  SavePlantRequestSchema,
 } from '@hochbeet/contracts';
 import { http, HttpResponse } from 'msw';
 import { ulid } from 'ulid';
 import type { z } from 'zod';
-import type { MockStore } from './store';
+import type { MockGarden, MockStore, OwnMockPlant } from './store';
 
 const error = (message: string, status: number, issues?: ErrorResponse['issues']) =>
   HttpResponse.json<ErrorResponse>(issues ? { message, issues } : { message }, { status });
@@ -52,6 +54,25 @@ function effective(plant: Plant, override: PlantOverride | undefined): CatalogPl
   return { ...plant, ...override, id: plant.id, source: 'GLOBAL', overridden: true, global };
 }
 
+const GLOBAL_IDS = new Set(seedPlants.map((p) => p.id));
+
+/** Like the catalog service: neighbours must be known plants and never the plant itself. */
+function neighborIssues(fields: PlantFields, selfId: string, known: Set<string>, unknown: string) {
+  return (['goodNeighbors', 'badNeighbors'] as const).flatMap((list) =>
+    fields[list].flatMap((neighborId, index) => {
+      const path = `${list}.${String(index)}`;
+      if (neighborId === selfId)
+        return [{ path, message: 'Eine Sorte kann nicht ihr eigener Nachbar sein.' }];
+      return known.has(neighborId) ? [] : [{ path, message: unknown }];
+    }),
+  );
+}
+
+const ownKnown = (garden: MockGarden) =>
+  new Set([...GLOBAL_IDS, ...(garden.ownPlants ?? []).filter((p) => !p.archived).map((p) => p.id)]);
+
+const listed = ({ archived: _archived, ...plant }: OwnMockPlant): CatalogPlant => plant;
+
 /**
  * MSW handlers that mimic the garden and catalog services for the dev server and
  * Playwright: same routes, schemas and error format, data per user in the mock store.
@@ -75,10 +96,103 @@ export function createHandlers(store: MockStore, newId: () => string = () => uli
     http.get(
       '/api/catalog/plants',
       withUser(({ userId }) => {
-        const overrides = store.read(userId).overrides ?? {};
+        const garden = store.read(userId);
+        const overrides = garden.overrides ?? {};
+        const own = (garden.ownPlants ?? [])
+          .filter((p) => !p.archived && p.publication?.status !== 'PUBLISHED')
+          .map(listed);
         return HttpResponse.json<ListPlantsResponse>({
-          plants: seedPlants.map((plant) => effective(plant, overrides[plant.id])),
+          plants: [
+            ...seedPlants.map((plant) => effective(plant, overrides[plant.id])),
+            ...own,
+          ].sort((a, b) => a.name.localeCompare(b.name, 'de')),
         });
+      }),
+    ),
+
+    http.post(
+      '/api/catalog/plants',
+      withUser(async ({ request, userId }) => {
+        const parsed = await parse(request, SavePlantRequestSchema);
+        if (parsed.response) return parsed.response;
+        const garden = store.read(userId);
+        const id = newId();
+        const issues = neighborIssues(parsed.data, id, ownKnown(garden), 'Unbekannte Sorte.');
+        if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+        const plant: CatalogPlant = {
+          ...parsed.data,
+          id,
+          source: 'OWN',
+          overridden: false,
+          publication: { status: 'PRIVATE' },
+        };
+        store.write(userId, { ...garden, ownPlants: [...(garden.ownPlants ?? []), plant] });
+        return HttpResponse.json(plant, { status: 201 });
+      }),
+    ),
+
+    http.put(
+      '/api/catalog/plants/:id',
+      withUser(async ({ request, params, userId }) => {
+        const parsed = await parse(request, SavePlantRequestSchema);
+        if (parsed.response) return parsed.response;
+        const garden = store.read(userId);
+        const existing = garden.ownPlants?.find((p) => p.id === params.id && !p.archived);
+        if (!existing) return error(PLANT_NOT_FOUND, 404);
+        const issues = neighborIssues(
+          parsed.data,
+          existing.id,
+          ownKnown(garden),
+          'Unbekannte Sorte.',
+        );
+        if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+        // Publication state is not part of the fields; it changes only through the workflow.
+        const plant: OwnMockPlant = { ...existing, ...parsed.data, id: existing.id };
+        store.write(userId, {
+          ...garden,
+          ownPlants: (garden.ownPlants ?? []).map((p) => (p.id === plant.id ? plant : p)),
+        });
+        return HttpResponse.json<CatalogPlant>(listed(plant));
+      }),
+    ),
+
+    http.delete(
+      '/api/catalog/plants/:id',
+      withUser(({ params, userId }) => {
+        const garden = store.read(userId);
+        if (!garden.ownPlants?.some((p) => p.id === params.id)) return error(PLANT_NOT_FOUND, 404);
+        store.write(userId, {
+          ...garden,
+          ownPlants: garden.ownPlants.map((p) =>
+            p.id === params.id ? { ...p, archived: true } : p,
+          ),
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ),
+
+    http.post(
+      '/api/catalog/plants/:id/publication',
+      withUser(({ params, userId }) => {
+        const garden = store.read(userId);
+        const existing = garden.ownPlants?.find((p) => p.id === params.id && !p.archived);
+        if (!existing) return error(PLANT_NOT_FOUND, 404);
+        const status = existing.publication?.status;
+        if (status === 'PUBLISHED') return error('Diese Sorte ist bereits veröffentlicht.', 409);
+        if (status === 'PENDING') return HttpResponse.json<CatalogPlant>(listed(existing));
+        const issues = neighborIssues(
+          existing,
+          existing.id,
+          GLOBAL_IDS,
+          'Globale Sorten dürfen nur auf globale Sorten verweisen.',
+        );
+        if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+        const plant: OwnMockPlant = { ...existing, publication: { status: 'PENDING' } };
+        store.write(userId, {
+          ...garden,
+          ownPlants: (garden.ownPlants ?? []).map((p) => (p.id === plant.id ? plant : p)),
+        });
+        return HttpResponse.json<CatalogPlant>(listed(plant));
       }),
     ),
 
@@ -164,6 +278,7 @@ export function createHandlers(store: MockStore, newId: () => string = () => uli
         const garden = store.read(userId);
         if (!garden.beds.some((b) => b.id === params.bedId)) return error(BED_NOT_FOUND, 404);
         store.write(userId, {
+          ...garden,
           beds: garden.beds.filter((b) => b.id !== params.bedId),
           plantings: garden.plantings.filter((p) => p.bedId !== params.bedId),
         });

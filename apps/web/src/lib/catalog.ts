@@ -170,3 +170,14 @@ export function parseAdjustForm(
     fields: { family, feeder: form.feeder, spacingInRowCm, rowSpacingCm, lifecycle },
   };
 }
+
+/** Publication of an own plant as the UI shows it; a rejection is PRIVATE with a comment. */
+export type PublicationState = 'PRIVATE' | 'PENDING' | 'REJECTED' | 'PUBLISHED';
+
+export function publicationState(plant: CatalogPlant): PublicationState {
+  const publication = plant.publication;
+  if (!publication || publication.status === 'PRIVATE') {
+    return publication?.rejectionComment ? 'REJECTED' : 'PRIVATE';
+  }
+  return publication.status;
+}

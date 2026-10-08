@@ -7,6 +7,7 @@ import type {
   ListPlantsResponse,
   Planting,
   PlantingFields,
+  PlantFields,
   PlantOverride,
 } from '@hochbeet/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -59,6 +60,31 @@ export function useAdjustPlant(plantId: string) {
             body: JSON.stringify(override),
           })
         : api<undefined>(`/api/catalog/plants/${plantId}/override`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.plants }),
+  });
+}
+
+/** Creates (without id) or changes an own plant; resolves with the saved plant. */
+export function useSaveOwnPlant() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fields }: { id?: string; fields: PlantFields }) =>
+      api<CatalogPlant>(id ? `/api/catalog/plants/${id}` : '/api/catalog/plants', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(fields),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.plants }),
+  });
+}
+
+/** Asks the admins to publish an own plant for everyone. */
+export function useRequestPublication(plantId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<CatalogPlant>(`/api/catalog/plants/${plantId}/publication`, { method: 'POST' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.plants }),
   });
 }
