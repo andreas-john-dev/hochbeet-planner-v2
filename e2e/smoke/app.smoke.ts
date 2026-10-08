@@ -44,3 +44,14 @@ test('hashed assets are cached long', async ({ page, request }) => {
   expect(response.status()).toBe(200);
   expect(response.headers()['cache-control']).toBe('public, max-age=31536000, immutable');
 });
+
+test('catalog API is routed through CloudFront and rejects requests without a valid token', async ({
+  request,
+}) => {
+  const withoutToken = await request.get('/api/catalog/plants');
+  expect(withoutToken.status()).toBe(401);
+  const withBadToken = await request.get('/api/catalog/plants', {
+    headers: { Authorization: 'Bearer not-a-jwt' },
+  });
+  expect(withBadToken.status()).toBe(401);
+});

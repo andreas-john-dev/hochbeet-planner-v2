@@ -4,12 +4,14 @@ import { bed, plantings, plants } from './engine.perf.fixture';
 
 describe('rule engine performance', () => {
   it('evaluates 200 plantings in under 50 ms', () => {
-    // Warm up the JIT, then take the median of several runs to smooth out CI noise.
+    // Warm up the JIT, then take the median of several runs. CPU time of this process instead
+    // of wall-clock time: Turborepo runs other test suites in parallel on the same cores.
     for (let i = 0; i < 3; i++) evaluateBed(bed, plantings, plants);
     const durations = Array.from({ length: 9 }, () => {
-      const start = performance.now();
+      const start = process.cpuUsage();
       evaluateBed(bed, plantings, plants);
-      return performance.now() - start;
+      const { user, system } = process.cpuUsage(start);
+      return (user + system) / 1000;
     }).sort((a, b) => a - b);
     const median = durations[4] ?? Infinity;
 

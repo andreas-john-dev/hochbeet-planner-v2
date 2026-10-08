@@ -11,3 +11,7 @@ export const catalogTable = {
 
 export const GLOBAL_PK = 'GLOBAL';
 export const plantSk = (plantId: string) => `PLANT#${plantId}`;
+export const userPk = (userId: string) => `USER#${userId}`;
+export const overrideSk = (plantId: string) => `OVERRIDE#${plantId}`;
+export const PLANT_PREFIX = 'PLANT#';
+export const OVERRIDE_PREFIX = 'OVERRIDE#';

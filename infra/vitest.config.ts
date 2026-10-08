@@ -1,3 +1,4 @@
 import { defineProject } from 'vitest/config';
 
-export default defineProject({ test: { name: 'infra' } });
+// Synth with esbuild bundling of the Lambdas takes a few seconds, more when other suites run.
+export default defineProject({ test: { name: 'infra', hookTimeout: 60_000 } });
