@@ -68,6 +68,7 @@ Beet-Editor unter `/beete/$bedId`: SVG in cm über einen `viewBox`, Viewport-Mat
 Platzierlogik rein in `src/lib/editor/placement.ts`, Drag & Drop mit `@dnd-kit/core` nur in `BedEditorPage`.
 Die gewählte Woche steht als `week` (Montag) im Editor-Store; Zeitachse und Geister in `src/lib/editor/timeline.ts`.
 Warnungen im Editor: Saison, Status je Pflanzung und Liste über `src/lib/editor/warnings.ts`; Pflanzungen tragen `data-status` (`warning`/`hint`/`positive`).
+Erneuerungen der Erde (Saisongrenzen) pflegt der Beet-Dialog über `src/lib/soil-renewals.ts`.
 Änderungen an Pflanzungen im Editor laufen über `commit({ before, after })` in `BedEditorPage`, damit sie in der Undo-Historie (`src/lib/editor/history.ts`) landen.
 Unter `md` ersetzen Bottom-Sheets (`src/components/ui/sheet.tsx`) die Seitenleisten des Editors; Touch-Gesten in Playwright über `touchDrag()` in `e2e/tests/mobile.spec.ts` (CDP mit Zeitstempeln).
 In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten, Beete und Pflanzungen mit `seedGarden()` aus `e2e/tests/garden.ts` vorbelegen; Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.
