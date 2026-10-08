@@ -7,6 +7,8 @@ export const AppConfigSchema = z.object({
   userPoolClientId: z.string().min(1),
   /** `mock` uses a local fake instead of Cognito (dev server and Playwright only). */
   authMode: z.enum(['cognito', 'mock']).default('cognito'),
+  /** `mock` answers /api/* in the browser with MSW handlers (dev server and Playwright only). */
+  apiMode: z.enum(['live', 'mock']).default('live'),
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;

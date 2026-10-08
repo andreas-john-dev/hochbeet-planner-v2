@@ -33,3 +33,12 @@ export function createApiClient(getIdToken: TokenProvider, fetchFn: typeof fetch
 }
 
 export type ApiFetch = ReturnType<typeof createApiClient>;
+
+/** German message of a failed API call: the service's `message`, or a generic hint. */
+export function apiErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const body = error.body as { message?: unknown } | undefined;
+    if (typeof body?.message === 'string') return body.message;
+  }
+  return 'Das hat nicht geklappt. Bitte versuche es noch einmal.';
+}

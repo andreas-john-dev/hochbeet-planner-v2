@@ -2,5 +2,6 @@
   "region": "eu-central-1",
   "userPoolId": "eu-central-1_mock",
   "userPoolClientId": "mock",
-  "authMode": "mock"
+  "authMode": "mock",
+  "apiMode": "mock"
 }

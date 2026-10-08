@@ -11,6 +11,7 @@ const config = {
   userPoolId: 'eu-central-1_pool',
   userPoolClientId: 'client',
   authMode: 'cognito' as const,
+  apiMode: 'live' as const,
 };
 
 function cognitoError(name: string) {
