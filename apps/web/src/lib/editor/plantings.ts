@@ -14,3 +14,13 @@ export function plantPositions(planting: Planting, plant: Plant): { x: number; y
       : { x: planting.x, y: planting.y + i * plant.spacingInRowCm },
   );
 }
+
+/** A planting with the position or length it has while being dragged. */
+export function withDraft(
+  planting: Planting,
+  draft: { id: string; x?: number; y?: number; lengthCm?: number } | null,
+): Planting {
+  if (draft?.id !== planting.id) return planting;
+  const moved = { ...planting, x: draft.x ?? planting.x, y: draft.y ?? planting.y };
+  return moved.kind === 'ROW' ? { ...moved, lengthCm: draft.lengthCm ?? moved.lengthCm } : moved;
+}

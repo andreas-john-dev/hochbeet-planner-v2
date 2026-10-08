@@ -2,8 +2,10 @@ import type { Bed, Plant, Planting } from '@hochbeet/contracts';
 import { useEffect, useRef, type RefObject } from 'react';
 import { useStore } from 'zustand';
 import { isTempId, LONG_PRESS_MS, moveByKey, newPlanting, snapToBed } from '@/lib/editor/placement';
-import type { Draft, EditorStore } from '@/lib/editor/store';
+import { withDraft } from '@/lib/editor/plantings';
+import type { EditorStore } from '@/lib/editor/store';
 import type { Ghost } from '@/lib/editor/timeline';
+import type { Severity } from '@hochbeet/garden-rules';
 import { toCm, viewBox } from '@/lib/editor/viewport';
 import { BedGrid } from './BedGrid';
 import { PlantingShape } from './PlantingShape';
@@ -24,12 +26,6 @@ interface Move {
 
 /** Pointer travel in px up to which a press counts as a click, not a pan or move. */
 const CLICK_TOLERANCE_PX = 5;
-
-const withDraft = (planting: Planting, draft: Draft | null): Planting => {
-  if (draft?.id !== planting.id) return planting;
-  const moved = { ...planting, x: draft.x ?? planting.x, y: draft.y ?? planting.y };
-  return moved.kind === 'ROW' ? { ...moved, lengthCm: draft.lengthCm ?? moved.lengthCm } : moved;
-};
 
 /** The planting id of an element inside a planting, if any. */
 const plantingIdOf = (target: EventTarget) =>
@@ -52,6 +48,7 @@ export function BedCanvas({
   svgRef,
   today,
   ghosts = [],
+  statuses,
   describedBy,
   onPlace,
   onChange,
@@ -65,6 +62,8 @@ export function BedCanvas({
   today: Date;
   /** Predecessors and successors at the same place, drawn faintly. */
   ghosts?: readonly Ghost[];
+  /** Most serious finding of the shown week per planting id (`preview` for the preview). */
+  statuses?: ReadonlyMap<string, Severity>;
   /** Id of the element with the keyboard instructions. */
   describedBy?: string;
   onPlace: (plant: Plant, at: { x: number; y: number }) => void;
@@ -79,7 +78,7 @@ export function BedCanvas({
   const longPress = useRef<number | null>(null);
   // Event time of the last press; finger moves are judged by when they happened.
   const pressTime = useRef(0);
-  const { size, viewport, fitted, preview, kind, selectedId, draft } = useStore(store);
+  const { size, viewport, fitted, preview, kind, selectedId, draft, highlighted } = useStore(store);
 
   // Measure the drawing area and fit the bed once the size is known.
   useEffect(() => {
@@ -295,6 +294,7 @@ export function BedCanvas({
     if (event.key === 'Escape') {
       state.setPreview(null);
       state.select(null);
+      state.setHighlighted([]);
       if (plantingIdOf(event.target)) svgRef.current?.focus();
       return;
     }
@@ -379,6 +379,9 @@ export function BedCanvas({
             planting={planting}
             plant={plant}
             selected={planting.id === selectedId}
+            highlighted={highlighted.includes(planting.id)}
+            status={statuses?.get(planting.id)}
+            scale={viewport.scale}
             onFocus={() => {
               if (store.getState().selectedId !== planting.id) store.getState().select(planting.id);
             }}
@@ -417,6 +420,8 @@ export function BedCanvas({
           })}
           plant={preview.plant}
           variant="preview"
+          status={statuses?.get('preview')}
+          scale={viewport.scale}
         />
       )}
     </svg>

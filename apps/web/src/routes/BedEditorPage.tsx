@@ -1,4 +1,5 @@
 import type { Bed, Plant, Planting } from '@hochbeet/contracts';
+import { type Finding, isActiveInWeek } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import {
   DndContext,
@@ -14,9 +15,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import { parseISO } from 'date-fns';
 import { ArrowLeft, Maximize, MapPinOff, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
-import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { BedCanvas } from '@/components/editor/BedCanvas';
+import { FindingsList } from '@/components/editor/FindingsList';
 import { PlantingDetails } from '@/components/editor/PlantingDetails';
 import { PlantPalette, type PaletteDragData } from '@/components/editor/PlantPalette';
 import { WeekSlider } from '@/components/editor/WeekSlider';
@@ -28,7 +30,9 @@ import { ApiError, apiErrorMessage } from '@/lib/api';
 import { activePlantings } from '@/lib/active-plantings';
 import type { Change, Step } from '@/lib/editor/history';
 import { bedCentre, isTempId, newPlanting, snapToBed } from '@/lib/editor/placement';
+import { withDraft } from '@/lib/editor/plantings';
 import { createEditorStore, type EditorStore } from '@/lib/editor/store';
+import { seasonFindings, statusByPlanting, weekOfFinding } from '@/lib/editor/warnings';
 import { ghosts, withPlants, type Ghost } from '@/lib/editor/timeline';
 import { toCm } from '@/lib/editor/viewport';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/media-query';
@@ -257,6 +261,7 @@ function BedEditor({ bedId }: { bedId: string }) {
           bed={bed}
           plants={plants.data}
           plantings={shown}
+          allPlantings={details.data?.plantings ?? []}
           ghosts={faint}
           store={store}
           week={weekDate}
@@ -325,6 +330,7 @@ function Workspace({
   bed,
   plants,
   plantings,
+  allPlantings,
   ghosts,
   store,
   week,
@@ -332,7 +338,10 @@ function Workspace({
 }: {
   bed: Bed;
   plants: readonly Plant[];
+  /** Plantings in the bed in the shown week. */
   plantings: readonly { planting: Planting; plant: Plant }[];
+  /** All plantings of the bed over time, for the rules. */
+  allPlantings: readonly Planting[];
   ghosts: readonly Ghost[];
   store: EditorStore;
   /** The week the editor shows; new plantings start on its Monday. */
@@ -343,7 +352,43 @@ function Workspace({
   const hintId = useId();
   const [dragged, setDragged] = useState<Plant | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const { preview, kind, selectedId, inspecting } = useStore(store);
+  const {
+    preview,
+    kind,
+    selectedId,
+    inspecting,
+    draft,
+    highlighted,
+    week: weekIso,
+  } = useStore(store);
+
+  // The rules run on every change, including a planting being dragged or about to be placed,
+  // so that warnings show up before the user lets go. They never block saving.
+  const { seasonal, statuses } = useMemo(() => {
+    const live = allPlantings.map((p) => withDraft(p, draft));
+    if (preview) {
+      live.push(
+        newPlanting({
+          bed,
+          plant: preview.plant,
+          kind,
+          at: preview.at,
+          today: week,
+          id: 'preview',
+        }),
+      );
+    }
+    const season = seasonFindings(bed, live, plants, weekIso);
+    const thisWeek = season.filter((f) => isActiveInWeek(f.period, weekIso));
+    return { seasonal: season, statuses: statusByPlanting(thisWeek) };
+  }, [allPlantings, draft, preview, bed, kind, week, plants, weekIso]);
+
+  const pick = (finding: Finding) => {
+    const state = store.getState();
+    const same = finding.plantingIds.join(',') === state.highlighted.join(',');
+    state.setHighlighted(same ? [] : finding.plantingIds);
+    state.setWeek(weekOfFinding(finding, state.week));
+  };
   // Sidebars on wide screens, bottom sheets on phones.
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   // A short move starts a drag; a plain click on a palette item picks the plant.
@@ -480,6 +525,7 @@ function Workspace({
               svgRef={svgRef}
               today={week}
               ghosts={ghosts}
+              statuses={statuses}
               describedBy={hintId}
               onPlace={place}
               onChange={change}
@@ -523,6 +569,7 @@ function Workspace({
           </p>
         </div>
       </div>
+      <FindingsList findings={seasonal} week={weekIso} highlighted={highlighted} onPick={pick} />
       <Sheet open={!isDesktop && paletteOpen} onOpenChange={setPaletteOpen}>
         <SheetContent aria-describedby={undefined}>
           <SheetTitle>Pflanze hinzufügen</SheetTitle>

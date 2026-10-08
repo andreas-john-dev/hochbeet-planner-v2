@@ -1,10 +1,12 @@
 import type { Bed } from '@hochbeet/contracts';
 import { Link } from '@tanstack/react-router';
-import { Pencil, Trash2 } from 'lucide-react';
+import { weekStart } from '@hochbeet/garden-rules';
+import { Pencil, Trash2, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { activePlantings } from '@/lib/active-plantings';
+import { seasonFindings } from '@/lib/editor/warnings';
 import { useBedWithPlantings, usePlants } from '@/lib/garden';
 import { BedFormDialog } from './BedFormDialog';
 import { BedPreview } from './BedPreview';
@@ -20,6 +22,9 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
   const [deleting, setDeleting] = useState(false);
   const plantings = details.data?.plantings ?? [];
   const active = activePlantings(plantings, plants.data ?? [], today).length;
+  const warnings = seasonFindings(bed, plantings, plants.data ?? [], weekStart(today)).filter(
+    (f) => f.severity === 'WARNING',
+  ).length;
 
   return (
     <Card
@@ -49,6 +54,21 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
               ? 'Noch keine Pflanzungen'
               : `${String(active)} ${active === 1 ? 'Pflanzung' : 'Pflanzungen'} in dieser Woche`}
           </p>
+          {plantings.length > 0 && (
+            <p
+              data-testid="season-warnings"
+              className={
+                warnings > 0
+                  ? 'flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-400'
+                  : 'text-muted-foreground text-xs'
+              }
+            >
+              {warnings > 0 && <TriangleAlert aria-hidden className="size-3.5" />}
+              {warnings === 0
+                ? 'Keine Warnungen in dieser Saison'
+                : `${String(warnings)} ${warnings === 1 ? 'Warnung' : 'Warnungen'} in dieser Saison`}
+            </p>
+          )}
         </div>
         {/* Above the stretched link of the name, so they stay clickable. */}
         <div className="relative z-10 -mr-2 flex shrink-0">
