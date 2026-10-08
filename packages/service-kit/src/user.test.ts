@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authorized } from './test/fixtures';
+import { authorized } from './testing';
 import { isAdmin, parseGroups, userFromEvent } from './user';
 
 describe('parseGroups', () => {

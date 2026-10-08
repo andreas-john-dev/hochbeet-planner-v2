@@ -375,6 +375,35 @@ Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen �
 
 Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erzeugen den Hinweis „Beetrand“.
 
+**Umsetzung (`services/garden`):**
+
+- **Muster:** Der Service folgt dem Catalog-Service. Routen liegen unter `/api/garden`, Middleware, Logging und Fehlerformat kommen aus `@hochbeet/service-kit` (siehe unten).
+- **Beete:**
+  - `GET /garden/beds` liefert die Beete des Users, sortiert nach Namen.
+  - `POST` legt ein Beet mit neuer ULID an.
+  - `GET /garden/beds/{bedId}` liefert Beet und Pflanzungen aus einer Query.
+  - `PUT` ersetzt die Felder, inklusive Reihenrichtung und Erneuerungsdaten.
+  - `DELETE` löscht erst alle Pflanzungen des Beets, dann das Beet. So lässt sich ein unterbrochener Löschvorgang einfach wiederholen. Gelöscht wird mit einzelnen `DeleteItem`-Aufrufen, jeweils 25 parallel; dafür braucht die Lambda kein `BatchWriteItem`.
+- **Mandantentrennung:** Fremde und unbekannte Beete liefern 404. Weil der User Teil jedes Schlüssels ist, kann eine Query nie fremde Beete treffen.
+- **Tests:** Integrationstests gegen DynamoDB Local; die Hilfsfunktionen dafür stellt `@hochbeet/service-kit/testing` bereit.
+
+### Gemeinsamer Service-Code
+
+`packages/service-kit` (`@hochbeet/service-kit`) enthält, was alle Lambdaliths teilen:
+
+- `createServiceApp(basePath, logger)` erzeugt eine Hono-App mit User-Kontext aus den JWT-Claims (401 ohne), einer JSON-Logzeile pro Request und deutschen Fehlerantworten. `ValidationError` wird zu 400, `NotFoundError` zu 404, `ConflictError` zu 409, alles andere zu 500.
+- `parseBody(c, schema)` prüft den Request-Body gegen ein Contract-Schema.
+- Dazu kommen `userFromEvent`, `isAdmin` und `createLogger`.
+- `@hochbeet/service-kit/testing` bietet DynamoDB Local über Testcontainers (`startDynamoDbTable`) und `authorized()` für Claims in Tests.
+
+In der Infrastruktur legt `ServiceApiStack` (`infra/lib/shared/`) für jeden Service dieselben Bausteine an:
+
+- Lambdalith, HTTP API mit JWT-Authorizer, Access-Logs und Throttling;
+- IAM nur für Item-Operationen auf der Tabelle, optional `Query` auf benannte Indizes;
+- den SSM-Parameter mit der API-Domain.
+
+`CatalogStatelessStack` und `GardenStatelessStack` sind nur noch Konfiguration. Das Catalog-Template hat sich durch die Umstellung nicht geändert.
+
 ## Frontend & Mobile-UX
 
 Das Frontend ist eine React-SPA, die auf Desktop und Smartphone gleich gut bedienbar ist.
@@ -474,6 +503,8 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 | `/hochbeet/<stage>/shared/user-pool-client-id` | `Prod-SharedStateful` | ID des SPA-Clients |
 | `/hochbeet/<stage>/catalog/table-name` | `Prod-CatalogStateful` | Name der Catalog-Tabelle |
 | `/hochbeet/<stage>/catalog/api-domain` | `Prod-CatalogStateless` | Domain der Catalog-HTTP-API, Origin für `/api/catalog/*` in CloudFront |
+| `/hochbeet/<stage>/garden/table-name` | `Prod-GardenStateful` | Name der Garden-Tabelle |
+| `/hochbeet/<stage>/garden/api-domain` | `Prod-GardenStateless` | Domain der Garden-HTTP-API, Origin für `/api/garden/*` in CloudFront |
 
 ### Cognito-Konfiguration
 
@@ -494,7 +525,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-CFR1` (keine Geo-Sperre) | Distribution | Die App soll überall nutzbar sein. |
 | `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
 | `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
-| `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog-Lambdalith | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur Item-Operationen auf der Tabelle und `Query` auf `GSI1`, kein Scan, keine Index-Wildcard). |
+| `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog- und Garden-Lambdalith (`ServiceApiStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur Item-Operationen auf der Tabelle und `Query` auf `GSI1`, kein Scan, keine Index-Wildcard). |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |

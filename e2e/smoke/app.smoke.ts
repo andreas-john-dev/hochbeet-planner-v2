@@ -55,3 +55,13 @@ test('catalog API is routed through CloudFront and rejects requests without a va
   });
   expect(withBadToken.status()).toBe(401);
 });
+
+test('garden API is routed through CloudFront and rejects requests without a valid token', async ({
+  request,
+}) => {
+  expect((await request.get('/api/garden/beds')).status()).toBe(401);
+  const withBadToken = await request.get('/api/garden/beds', {
+    headers: { Authorization: 'Bearer not-a-jwt' },
+  });
+  expect(withBadToken.status()).toBe(401);
+});

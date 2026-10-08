@@ -6,7 +6,7 @@ import {
   type PublicationQueueResponse,
 } from '@hochbeet/contracts';
 import { ulid } from 'ulid';
-import { ConflictError, NotFoundError } from '../errors';
+import { ConflictError, NotFoundError } from '@hochbeet/service-kit';
 import {
   type CatalogStore,
   checkNeighbors,

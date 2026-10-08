@@ -7,6 +7,8 @@ import { CatalogStatefulStack } from '../lib/catalog/CatalogStatefulStack';
 import { CatalogStatelessStack } from '../lib/catalog/CatalogStatelessStack';
 import { ssmParameters } from '../lib/config/ssm';
 import { CLOUDFRONT_CERTIFICATE_REGION, stages } from '../lib/config/stages';
+import { GardenStatefulStack } from '../lib/garden/GardenStatefulStack';
+import { GardenStatelessStack } from '../lib/garden/GardenStatelessStack';
 import { CertificateStack } from '../lib/frontend/CertificateStack';
 import { FrontendStack } from '../lib/frontend/FrontendStack';
 import { SharedStatefulStack } from '../lib/shared/SharedStatefulStack';
@@ -31,6 +33,17 @@ for (const stage of stages) {
   });
   catalogStateless.addStackDependency(shared, 'JWT authorizer reads the user pool ids from SSM');
   catalogStateless.addStackDependency(catalogStateful, 'reads the table name from SSM');
+
+  const gardenStateful = new GardenStatefulStack(app, `${stage.stackPrefix}-GardenStateful`, {
+    env,
+    stage,
+  });
+  const gardenStateless = new GardenStatelessStack(app, `${stage.stackPrefix}-GardenStateless`, {
+    env,
+    stage,
+  });
+  gardenStateless.addStackDependency(shared, 'JWT authorizer reads the user pool ids from SSM');
+  gardenStateless.addStackDependency(gardenStateful, 'reads the table name from SSM');
   const certificate = new CertificateStack(app, `${stage.stackPrefix}-Certificate`, {
     env: { account: env.account, region: CLOUDFRONT_CERTIFICATE_REGION },
     stage,
@@ -43,12 +56,12 @@ for (const stage of stages) {
   });
   frontend.addStackDependency(shared, 'config.json reads the user pool ids from SSM');
   frontend.addStackDependency(catalogStateless, '/api/catalog/* reads the API domain from SSM');
-  frontend.addApiBehavior(
-    '/api/catalog/*',
-    new HttpOrigin(
-      ssm.StringParameter.valueForStringParameter(frontend, ssmParameters(stage).catalogApiDomain),
-    ),
-  );
+  frontend.addStackDependency(gardenStateless, '/api/garden/* reads the API domain from SSM');
+  const names = ssmParameters(stage);
+  const apiOrigin = (parameterName: string) =>
+    new HttpOrigin(ssm.StringParameter.valueForStringParameter(frontend, parameterName));
+  frontend.addApiBehavior('/api/catalog/*', apiOrigin(names.catalogApiDomain));
+  frontend.addApiBehavior('/api/garden/*', apiOrigin(names.gardenApiDomain));
 }
 
 // cdk-nag runs as a policy validation plugin; violations fail `cdk synth`.

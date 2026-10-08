@@ -7,7 +7,7 @@ import type {
 } from '@hochbeet/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
-import { createLogger } from '../logger';
+import { createLogger } from '@hochbeet/service-kit';
 import { writeSeed } from '../seed/handler';
 import { seedItems } from '../seed/items';
 import { plantSk, userPk } from '../table';
