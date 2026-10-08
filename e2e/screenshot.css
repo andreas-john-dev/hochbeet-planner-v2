@@ -1,0 +1,16 @@
+/*
+ * Applied to every screenshot (playwright.config.ts and the PR captures). A full-page
+ * screenshot makes the page taller, not the viewport, so bars tied to the viewport would end
+ * where the screen ended: the phone navigation would sit in the middle of the image and the
+ * desktop sidebar would stop halfway. Here they follow the page instead.
+ */
+html {
+  position: relative;
+}
+[data-screenshot='bottom-nav'] {
+  position: absolute !important;
+}
+[data-screenshot='sidebar'] {
+  position: static !important;
+  height: auto !important;
+}

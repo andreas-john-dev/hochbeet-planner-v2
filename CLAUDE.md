@@ -75,6 +75,7 @@ In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtur
 Neue Seiten in `e2e/tests/pages.ts` eintragen (mit `access`, bei Seiten, die Daten brauchen, mit `seed`): Tests und PR-Screenshots nutzen diese Liste.
 Der Workflow `screenshots.yml` kommentiert in jedem PR mit Frontend-Änderungen Desktop- und Mobil-Screenshots der geänderten Seiten
 (Vergleich mit `main`); die Bilder liegen im Branch `screenshots`, der nie gemergt wird.
+Screenshots (Tests und PR-Kommentar) laden `e2e/screenshot.css`: Fest positionierte Leisten tragen `data-screenshot`, damit sie in Ganzseiten-Aufnahmen an den Seitenrändern bleiben.
 Playwright-Projekte: `desktop-chrome`, `iphone` (iPhone-Viewport mit Chromium), `pixel`; die Uhr ist in `e2e/tests/fixtures.ts` auf den 7. Oktober 2026 fixiert.
 TypeScript bleibt vorerst auf 6.0, weil typescript-eslint TypeScript 7 noch nicht unterstützt.
 Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Version passende Doku in `node_modules/turbo/docs/` lesen.

@@ -16,7 +16,8 @@ export default defineConfig({
   },
   expect: {
     // Strict enough to notice small UI changes such as a new button in the sidebar.
-    toHaveScreenshot: { maxDiffPixelRatio: 0.001 },
+    // screenshot.css keeps fixed bars at the page edges in full-page screenshots.
+    toHaveScreenshot: { maxDiffPixelRatio: 0.001, stylePath: './screenshot.css' },
   },
   projects: [
     { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
