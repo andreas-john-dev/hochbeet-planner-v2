@@ -41,7 +41,9 @@ export function effectiveCatalog(
   const overrideOf = new Map<string, PlantOverride>(overrides.map((o) => [o.plantId, o.fields]));
   const globalPlants = globals.map((plant): CatalogPlant => {
     const override = overrideOf.get(plant.id);
-    return { ...plant, ...override, id: plant.id, source: 'GLOBAL', overridden: !!override };
+    if (!override) return { ...plant, source: 'GLOBAL', overridden: false };
+    const { id: _id, ...global } = plant;
+    return { ...plant, ...override, id: plant.id, source: 'GLOBAL', overridden: true, global };
   });
   const ownPlants = own
     .filter((item) => !item.archived && item.publicationStatus !== 'PUBLISHED')

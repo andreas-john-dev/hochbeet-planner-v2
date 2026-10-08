@@ -20,6 +20,7 @@ import { BedsPage } from '@/routes/BedsPage';
 import { CatalogPage } from '@/routes/CatalogPage';
 import { IconGalleryPage } from '@/routes/dev/IconGalleryPage';
 import { NotFoundPage } from '@/routes/NotFoundPage';
+import { PlantDetailPage } from '@/routes/PlantDetailPage';
 import { ProfilePage } from '@/routes/ProfilePage';
 
 export interface RouterContext {
@@ -114,6 +115,11 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appLayout, path: '/beete', component: BedsPage }),
     bedEditorRoute,
     createRoute({ getParentRoute: () => appLayout, path: '/katalog', component: CatalogPage }),
+    createRoute({
+      getParentRoute: () => appLayout,
+      path: '/katalog/$plantId',
+      component: PlantDetailPage,
+    }),
     createRoute({ getParentRoute: () => appLayout, path: '/profil', component: ProfilePage }),
     adminRoute,
   ]),

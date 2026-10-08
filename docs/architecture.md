@@ -321,6 +321,7 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 - **Effektive Sicht** (`src/catalog/effective.ts`) für `GET /catalog/plants`:
   - Globale Sorten mit Anpassung (`{...global, ...override}`) und dazu die eigenen, nicht archivierten Sorten, sortiert nach Namen.
   - Die Kennzeichnung aus dem Issue (`isOverridden`, `isCustom`) liefert der bestehende Contract `CatalogPlantSchema` als `overridden` und `source: 'GLOBAL' | 'OWN'`.
+  - Angepasste globale Sorten tragen zusätzlich `global` mit den unveränderten globalen Feldern (seit T-31). So markiert die App jedes geänderte Feld mit seinem Standardwert und berechnet die nächste Anpassung genau gegen den globalen Stand.
   - Globale Sorten cacht jede Lambda-Instanz 5 Minuten.
 - **Item-Formate unter `USER#<uid>`:**
   - Anpassung: `SK = OVERRIDE#<plantId>` mit `plantId` und `fields` (die geänderten Felder).
@@ -428,6 +429,15 @@ Das Frontend ist eine React-SPA, die auf Desktop und Smartphone gleich gut bedie
 | Auth | Amplify Library (`aws-amplify/auth`), Login, Registrierung, Passwort vergessen |
 | Datum | date-fns mit deutscher Locale |
 
+### Katalogansicht
+
+Umsetzung (Stand T-31):
+
+- **Liste (`/katalog`):** Sorten mit Icon, Familie, Bedarf und Kennzeichnung „Angepasst“ bzw. „Eigene Sorte“. Suche über Name und Familie, Filter nach Kategorie (Chips), Bedarf (Chips, abwählbar) und Familie (Auswahlliste). Logik rein in `apps/web/src/lib/catalog.ts` (`filterCatalog`, `families`).
+- **Detail (`/katalog/$plantId`):** alle Werte; geänderte Felder sind hervorgehoben und zeigen „angepasst (Standard: …)“ (`changedFields` vergleicht mit `global`). Gute und schlechte Nachbarn als Chips, die zur jeweiligen Sorte führen.
+- **„Für mich anpassen“** (nur globale Sorten): Dialog für Abstand in der Reihe, Reihenabstand, Bedarf, Familie und Standzeit. Beim Speichern bildet `overrideFor` die vollständige Anpassung aus allen Feldern, die vom globalen Stand abweichen; weicht nichts mehr ab, wird sie gelöscht statt gespeichert. „Zurücksetzen“ ruft `DELETE …/override` auf. Danach lädt `useAdjustPlant` den Katalog neu, sodass Editor und Warnungen sofort mit den effektiven Werten rechnen.
+- Nachbarlisten, Name, Farbe und Icon lassen sich per API anpassen, im Dialog aber noch nicht.
+
 ### Beet-Editor
 
 Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bleibt bei jedem Zoom scharf, und jede Pflanzung ist ein DOM-Knoten, den Playwright anklicken und ziehen kann.
@@ -528,9 +538,9 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
 - **Auth-Adapter:** Die App spricht Cognito nur über das Interface `AuthAdapter` (`apps/web/src/lib/auth/`) an. In prod steckt Amplify dahinter (`aws-amplify/auth`, SRP, ohne Hosted UI). Der Dev-Server liefert `config.json` aus `apps/web/config.dev.json` mit `"authMode": "mock"`; dann übernimmt ein lokaler Mock mit Testusern (`test@example.com`, `admin@example.com`, Passwort `Gemuese1!`, Bestätigungscode `123456`). Der Mock wird nur in diesem Fall nachgeladen und läuft in prod nie.
 - **Mock-API:** Mit `"apiMode": "mock"` in `config.dev.json` beantworten MSW-Handler (`apps/web/src/mocks/`) alle Aufrufe unter `/api/*` direkt im Browser.
   - `createMockFetch()` ruft dafür `getResponse()` von MSW auf und kommt ohne Service-Worker aus, also ohne Zusatzdatei im Build. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
-  - Die Handler bilden Garden- und Catalog-Service nach: gleiche Routen, gleiche Contract-Schemas, gleiche Fehlerform. Daten liegen pro Testuser im `localStorage`, der Katalog ist der Startkatalog.
+  - Die Handler bilden Garden- und Catalog-Service nach: gleiche Routen, gleiche Contract-Schemas, gleiche Fehlerform. Daten liegen pro Testuser im `localStorage`, der Katalog ist der Startkatalog plus die Anpassungen des Users.
   - Playwright startet jeden Test mit leerem Speicher und kann Daten per `addInitScript` vorbelegen.
-- **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`, `useSavePlanting`, `useDeletePlanting`). Nach Änderungen wird die Beetliste neu geladen.
+- **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`, `useSavePlanting`, `useDeletePlanting`, `useAdjustPlant`). Nach Änderungen wird die Beetliste neu geladen.
 - **Beetübersicht (`/beete`):**
   - Kartenraster mit maßstäblicher Mini-Vorschau. Sie zeigt die Standflächen der Pflanzungen, die in der laufenden Woche im Beet stehen, in der Farbe der Sorte.
   - Dialog „Beet anlegen“ bzw. „Beet bearbeiten“ mit Name, Breite, Tiefe und Reihenrichtung. Die Reihenrichtung ist als Skizze erklärt und folgt dem Standard (parallel zur kürzeren Kante), bis der User selbst wählt.

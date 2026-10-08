@@ -6,8 +6,11 @@ import {
   type ErrorResponse,
   type ListBedsResponse,
   type ListPlantsResponse,
+  type Plant,
   type Planting,
+  type PlantOverride,
   SaveBedRequestSchema,
+  SaveOverrideRequestSchema,
   SavePlantingRequestSchema,
 } from '@hochbeet/contracts';
 import { http, HttpResponse } from 'msw';
@@ -40,6 +43,14 @@ async function parse<T extends z.ZodType>(request: Request, schema: T) {
 const byName = (a: Bed, b: Bed) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id);
 const BED_NOT_FOUND = 'Dieses Beet gibt es nicht.';
 const PLANTING_NOT_FOUND = 'Diese Pflanzung gibt es nicht.';
+const PLANT_NOT_FOUND = 'Diese Sorte gibt es nicht.';
+
+/** A global plant as the user sees it, like the catalog service's effective catalogue. */
+function effective(plant: Plant, override: PlantOverride | undefined): CatalogPlant {
+  if (!override) return { ...plant, source: 'GLOBAL', overridden: false };
+  const { id: _id, ...global } = plant;
+  return { ...plant, ...override, id: plant.id, source: 'GLOBAL', overridden: true, global };
+}
 
 /**
  * MSW handlers that mimic the garden and catalog services for the dev server and
@@ -63,15 +74,40 @@ export function createHandlers(store: MockStore, newId: () => string = () => uli
   return [
     http.get(
       '/api/catalog/plants',
-      withUser(() =>
-        HttpResponse.json<ListPlantsResponse>({
-          plants: seedPlants.map((plant): CatalogPlant => ({
-            ...plant,
-            source: 'GLOBAL',
-            overridden: false,
-          })),
-        }),
-      ),
+      withUser(({ userId }) => {
+        const overrides = store.read(userId).overrides ?? {};
+        return HttpResponse.json<ListPlantsResponse>({
+          plants: seedPlants.map((plant) => effective(plant, overrides[plant.id])),
+        });
+      }),
+    ),
+
+    http.put(
+      '/api/catalog/plants/:id/override',
+      withUser(async ({ request, params, userId }) => {
+        const plant = seedPlants.find((p) => p.id === params.id);
+        if (!plant) return error(PLANT_NOT_FOUND, 404);
+        const parsed = await parse(request, SaveOverrideRequestSchema);
+        if (parsed.response) return parsed.response;
+        const garden = store.read(userId);
+        store.write(userId, {
+          ...garden,
+          overrides: { ...garden.overrides, [plant.id]: parsed.data },
+        });
+        return HttpResponse.json<CatalogPlant>(effective(plant, parsed.data));
+      }),
+    ),
+
+    http.delete(
+      '/api/catalog/plants/:id/override',
+      withUser(({ params, userId }) => {
+        const plant = seedPlants.find((p) => p.id === params.id);
+        if (!plant) return error(PLANT_NOT_FOUND, 404);
+        const garden = store.read(userId);
+        const { [plant.id]: _removed, ...overrides } = garden.overrides ?? {};
+        store.write(userId, { ...garden, overrides });
+        return new HttpResponse(null, { status: 204 });
+      }),
     ),
 
     http.get(

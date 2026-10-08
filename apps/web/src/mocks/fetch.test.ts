@@ -1,4 +1,9 @@
-import type { Bed, BedWithPlantingsResponse, ListBedsResponse } from '@hochbeet/contracts';
+import type {
+  Bed,
+  BedWithPlantingsResponse,
+  ListBedsResponse,
+  ListPlantsResponse,
+} from '@hochbeet/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createMockFetch } from './fetch';
 import { MockStore } from './store';
@@ -101,5 +106,44 @@ describe('mock API', () => {
     const response = await fetchFn('/api/catalog/plants', { headers: auth('a@example.com') });
     const { plants } = (await response.json()) as { plants: unknown[] };
     expect(plants).toHaveLength(56);
+  });
+
+  it('applies and resets personal adjustments per user', async () => {
+    const lettuce = '01M49THV00RK9E9PC83NEE87CJ'; // Kopfsalat, 25 cm
+    const plantsOf = async (email: string) =>
+      (
+        (await (
+          await fetchFn('/api/catalog/plants', { headers: auth(email) })
+        ).json()) as ListPlantsResponse
+      ).plants;
+
+    const saved = await fetchFn(`/api/catalog/plants/${lettuce}/override`, {
+      method: 'PUT',
+      headers: { ...auth('a@example.com'), ...json },
+      body: JSON.stringify({ spacingInRowCm: 40 }),
+    });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toMatchObject({
+      spacingInRowCm: 40,
+      overridden: true,
+      global: { spacingInRowCm: 25 },
+    });
+    expect((await plantsOf('a@example.com')).find((p) => p.id === lettuce)).toMatchObject({
+      spacingInRowCm: 40,
+      overridden: true,
+    });
+    expect((await plantsOf('b@example.com')).find((p) => p.id === lettuce)).toMatchObject({
+      spacingInRowCm: 25,
+      overridden: false,
+    });
+
+    const reset = await fetchFn(`/api/catalog/plants/${lettuce}/override`, {
+      method: 'DELETE',
+      headers: auth('a@example.com'),
+    });
+    expect(reset.status).toBe(204);
+    const plant = (await plantsOf('a@example.com')).find((p) => p.id === lettuce);
+    expect(plant).toMatchObject({ spacingInRowCm: 25, overridden: false });
+    expect(plant?.global).toBeUndefined();
   });
 });

@@ -153,6 +153,11 @@ export const CatalogPlantSchema = PlantSchema.extend({
   source: z.enum(['GLOBAL', 'OWN']),
   /** True when the user has a personal adjustment of this global plant. */
   overridden: z.boolean(),
+  /**
+   * The unchanged global values, only for adjusted global plants: the UI marks what differs
+   * and computes the next override against them.
+   */
+  global: PlantFieldsSchema.optional(),
   /** Only for own plants. */
   publication: z
     .object({
