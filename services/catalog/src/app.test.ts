@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApp } from './app';
 import type { UserCatalogItems } from './catalog/repository';
 import type { CatalogStore } from './catalog/service';
-import { createLogger } from './logger';
+import { createLogger } from '@hochbeet/service-kit';
 import { authorized, seedPlant, USER_A } from './test/fixtures';
 
 function setup(overrides: Partial<CatalogStore> = {}) {

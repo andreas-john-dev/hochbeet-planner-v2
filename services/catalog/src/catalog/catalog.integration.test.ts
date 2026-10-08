@@ -2,7 +2,7 @@ import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { ListPlantsResponse } from '@hochbeet/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
-import { createLogger } from '../logger';
+import { createLogger } from '@hochbeet/service-kit';
 import { writeSeed } from '../seed/handler';
 import { seedItems } from '../seed/items';
 import { overrideSk, plantSk, userPk } from '../table';

@@ -1,10 +1,11 @@
 {
-  "name": "@hochbeet/garden-service",
+  "name": "@hochbeet/service-kit",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "scripts": {
     "lint": "eslint .",
@@ -15,10 +16,7 @@
     "@aws-sdk/client-dynamodb": "^3.1147.0",
     "@aws-sdk/lib-dynamodb": "^3.1147.0",
     "@hochbeet/contracts": "workspace:*",
-    "@hochbeet/service-kit": "workspace:*",
-    "@hono/aws-lambda": "^1.0.1",
     "hono": "^4.13.13",
-    "ulid": "^3.0.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {

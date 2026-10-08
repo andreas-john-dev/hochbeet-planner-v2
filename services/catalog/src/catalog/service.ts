@@ -5,7 +5,7 @@ import {
   type PlantOverride,
 } from '@hochbeet/contracts';
 import { ulid } from 'ulid';
-import { ConflictError, type Issue, NotFoundError, ValidationError } from '../errors';
+import { ConflictError, type Issue, NotFoundError, ValidationError } from '@hochbeet/service-kit';
 import { effectiveCatalog, type OwnPlantItem } from './effective';
 import type { CatalogRepository } from './repository';
 

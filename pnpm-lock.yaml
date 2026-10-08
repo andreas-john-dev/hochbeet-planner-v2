@@ -159,6 +159,9 @@ importers:
       '@hochbeet/catalog-service':
         specifier: workspace:*
         version: link:../services/catalog
+      '@hochbeet/garden-service':
+        specifier: workspace:*
+        version: link:../services/garden
       aws-cdk:
         specifier: ^2.1144.0
         version: 2.1144.0
@@ -237,6 +240,28 @@ importers:
         specifier: ^19.3.0
         version: 19.3.0(react@19.3.0)
 
+  packages/service-kit:
+    dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.1147.0
+        version: 3.1147.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: ^3.1147.0
+        version: 3.1147.0(@aws-sdk/client-dynamodb@3.1147.0)
+      '@hochbeet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      testcontainers:
+        specifier: ^12.2.0
+        version: 12.2.0
+
   packages/tsconfig: {}
 
   services/catalog:
@@ -253,6 +278,9 @@ importers:
       '@hochbeet/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@hochbeet/service-kit':
+        specifier: workspace:*
+        version: link:../../packages/service-kit
       '@hono/aws-lambda':
         specifier: ^1.0.1
         version: 1.0.1(hono@4.13.13)
@@ -282,7 +310,36 @@ importers:
         specifier: ^12.2.0
         version: 12.2.0
 
-  services/garden: {}
+  services/garden:
+    dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.1147.0
+        version: 3.1147.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: ^3.1147.0
+        version: 3.1147.0(@aws-sdk/client-dynamodb@3.1147.0)
+      '@hochbeet/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@hochbeet/service-kit':
+        specifier: workspace:*
+        version: link:../../packages/service-kit
+      '@hono/aws-lambda':
+        specifier: ^1.0.1
+        version: 1.0.1(hono@4.13.13)
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      ulid:
+        specifier: ^3.0.2
+        version: 3.0.2
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      testcontainers:
+        specifier: ^12.2.0
+        version: 12.2.0
 
 packages:
 

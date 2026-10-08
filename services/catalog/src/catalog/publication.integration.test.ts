@@ -11,7 +11,7 @@ import type {
 import { evaluateBed } from '@hochbeet/garden-rules';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
-import { createLogger } from '../logger';
+import { createLogger } from '@hochbeet/service-kit';
 import { writeSeed } from '../seed/handler';
 import { seedItems } from '../seed/items';
 import { GLOBAL_PK, plantSk } from '../table';
