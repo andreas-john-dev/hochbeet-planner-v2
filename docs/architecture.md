@@ -384,6 +384,13 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
   - `GET /garden/beds/{bedId}` liefert Beet und Pflanzungen aus einer Query.
   - `PUT` ersetzt die Felder, inklusive Reihenrichtung und Erneuerungsdaten.
   - `DELETE` löscht erst alle Pflanzungen des Beets, dann das Beet. So lässt sich ein unterbrochener Löschvorgang einfach wiederholen. Gelöscht wird mit einzelnen `DeleteItem`-Aufrufen, jeweils 25 parallel; dafür braucht die Lambda kein `BatchWriteItem`.
+- **Pflanzungen:**
+  - `POST /garden/beds/{bedId}/plantings` legt eine Pflanzung mit neuer ULID an. Das Beet muss existieren und dem User gehören, sonst 404.
+  - `PUT /garden/beds/{bedId}/plantings/{id}` ersetzt eine bestehende Pflanzung, zum Beispiel beim Verschieben oder Entfernen ab einer Woche.
+  - `DELETE /garden/beds/{bedId}/plantings/{id}` löscht sie.
+  - Die API prüft nur die Struktur über `SavePlantingRequestSchema`: Raster-Vielfache von 5, Reihen mit Orientierung und Länge, Start vor Ende, Start und Entfernen jeweils am Montag.
+  - Fachliche Befunde wie „Beetrand“ berechnet der Client. Sie blockieren das Speichern nie, auch eine Pflanzung außerhalb des Beets wird gespeichert.
+  - Ob die Sorte existiert, prüft der Garden-Service nicht, weil Services sich nie gegenseitig aufrufen.
 - **Mandantentrennung:** Fremde und unbekannte Beete liefern 404. Weil der User Teil jedes Schlüssels ist, kann eine Query nie fremde Beete treffen.
 - **Tests:** Integrationstests gegen DynamoDB Local; die Hilfsfunktionen dafür stellt `@hochbeet/service-kit/testing` bereit.
 
@@ -392,7 +399,7 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
 `packages/service-kit` (`@hochbeet/service-kit`) enthält, was alle Lambdaliths teilen:
 
 - `createServiceApp(basePath, logger)` erzeugt eine Hono-App mit User-Kontext aus den JWT-Claims (401 ohne), einer JSON-Logzeile pro Request und deutschen Fehlerantworten. `ValidationError` wird zu 400, `NotFoundError` zu 404, `ConflictError` zu 409, alles andere zu 500.
-- `parseBody(c, schema)` prüft den Request-Body gegen ein Contract-Schema.
+- `parseBody(c, schema)` prüft den Request-Body gegen ein Contract-Schema. Zod läuft mit deutscher Locale (`z.locales.de()`); auch Meldungen ohne eigenen Text kommen also auf Deutsch.
 - Dazu kommen `userFromEvent`, `isAdmin` und `createLogger`.
 - `@hochbeet/service-kit/testing` bietet DynamoDB Local über Testcontainers (`startDynamoDbTable`) und `authorized()` für Claims in Tests.
 

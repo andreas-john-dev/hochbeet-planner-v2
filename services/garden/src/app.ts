@@ -2,7 +2,9 @@ import {
   type Bed,
   type BedWithPlantingsResponse,
   type ListBedsResponse,
+  type Planting,
   SaveBedRequestSchema,
+  SavePlantingRequestSchema,
 } from '@hochbeet/contracts';
 import { createServiceApp, type Logger, NotFoundError, parseBody } from '@hochbeet/service-kit';
 import { ulid } from 'ulid';
@@ -10,7 +12,14 @@ import type { GardenRepository } from './garden/repository';
 
 export type GardenStore = Pick<
   GardenRepository,
-  'listBeds' | 'getBedWithPlantings' | 'createBed' | 'replaceBed' | 'deleteBed' | 'putPlanting'
+  | 'listBeds'
+  | 'getBedWithPlantings'
+  | 'createBed'
+  | 'replaceBed'
+  | 'deleteBed'
+  | 'bedExists'
+  | 'putPlanting'
+  | 'deletePlanting'
 >;
 
 export interface AppDeps {
@@ -23,6 +32,7 @@ export interface AppDeps {
 export const BASE_PATH = '/api/garden';
 
 const BED_NOT_FOUND = 'Dieses Beet gibt es nicht.';
+const PLANTING_NOT_FOUND = 'Diese Pflanzung gibt es nicht.';
 
 const byName = (a: Bed, b: Bed) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id);
 
@@ -60,6 +70,37 @@ export function createApp({ store, logger, newId = () => ulid() }: AppDeps) {
     if (!(await store.deleteBed(c.get('user').id, c.req.param('bedId')))) {
       throw new NotFoundError(BED_NOT_FOUND);
     }
+    return c.body(null, 204);
+  });
+
+  // Plantings. The API checks only the structure (contract schema); rule findings such as
+  // "outside the bed" are computed by the client and never block saving.
+  app.post('/beds/:bedId/plantings', async (c) => {
+    const fields = await parseBody(c, SavePlantingRequestSchema);
+    const userId = c.get('user').id;
+    const bedId = c.req.param('bedId');
+    if (!(await store.bedExists(userId, bedId))) throw new NotFoundError(BED_NOT_FOUND);
+    const planting: Planting = { ...fields, id: newId(), bedId };
+    await store.putPlanting(userId, planting, 'create');
+    return c.json(planting, 201);
+  });
+
+  app.put('/beds/:bedId/plantings/:id', async (c) => {
+    const fields = await parseBody(c, SavePlantingRequestSchema);
+    const planting: Planting = { ...fields, id: c.req.param('id'), bedId: c.req.param('bedId') };
+    if (!(await store.putPlanting(c.get('user').id, planting, 'replace'))) {
+      throw new NotFoundError(PLANTING_NOT_FOUND);
+    }
+    return c.json(planting);
+  });
+
+  app.delete('/beds/:bedId/plantings/:id', async (c) => {
+    const deleted = await store.deletePlanting(
+      c.get('user').id,
+      c.req.param('bedId'),
+      c.req.param('id'),
+    );
+    if (!deleted) throw new NotFoundError(PLANTING_NOT_FOUND);
     return c.body(null, 204);
   });
 

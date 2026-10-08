@@ -2,6 +2,7 @@ import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import {
   DeleteCommand,
   type DynamoDBDocumentClient,
+  GetCommand,
   PutCommand,
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
@@ -56,28 +57,59 @@ export class GardenRepository {
 
   /** Replaces an existing bed; false if it does not exist (for this user). */
   async replaceBed(userId: string, bed: Bed): Promise<boolean> {
-    try {
-      await this.client.send(
+    return this.ifConditionHolds(() =>
+      this.client.send(
         new PutCommand({
           TableName: this.tableName,
           Item: { PK: userPk(userId), SK: bedSk(bed.id), ...bed },
           ConditionExpression: 'attribute_exists(PK)',
         }),
-      );
-      return true;
-    } catch (error) {
-      if (error instanceof ConditionalCheckFailedException) return false;
-      throw error;
-    }
+      ),
+    );
   }
 
-  /** Writes a planting of a bed; used by the planting endpoints and tests. */
-  async putPlanting(userId: string, planting: Planting): Promise<void> {
-    await this.client.send(
-      new PutCommand({
+  async bedExists(userId: string, bedId: string): Promise<boolean> {
+    const { Item } = await this.client.send(
+      new GetCommand({
         TableName: this.tableName,
-        Item: { PK: userPk(userId), SK: plantingSk(planting.bedId, planting.id), ...planting },
+        Key: { PK: userPk(userId), SK: bedSk(bedId) },
+        ProjectionExpression: 'PK',
       }),
+    );
+    return Item !== undefined;
+  }
+
+  /**
+   * Writes a planting of a bed. `create` refuses to overwrite, `replace` needs an existing
+   * planting; false if that condition fails.
+   */
+  async putPlanting(
+    userId: string,
+    planting: Planting,
+    mode: 'create' | 'replace' = 'create',
+  ): Promise<boolean> {
+    return this.ifConditionHolds(() =>
+      this.client.send(
+        new PutCommand({
+          TableName: this.tableName,
+          Item: { PK: userPk(userId), SK: plantingSk(planting.bedId, planting.id), ...planting },
+          ConditionExpression:
+            mode === 'create' ? 'attribute_not_exists(PK)' : 'attribute_exists(PK)',
+        }),
+      ),
+    );
+  }
+
+  /** Deletes one planting; false if it does not exist. */
+  async deletePlanting(userId: string, bedId: string, plantingId: string): Promise<boolean> {
+    return this.ifConditionHolds(() =>
+      this.client.send(
+        new DeleteCommand({
+          TableName: this.tableName,
+          Key: { PK: userPk(userId), SK: plantingSk(bedId, plantingId) },
+          ConditionExpression: 'attribute_exists(PK)',
+        }),
+      ),
     );
   }
 
@@ -98,6 +130,16 @@ export class GardenRepository {
     }
     await this.delete({ PK: userPk(userId), SK: bedSk(bedId) });
     return true;
+  }
+
+  private async ifConditionHolds(write: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await write();
+      return true;
+    } catch (error) {
+      if (error instanceof ConditionalCheckFailedException) return false;
+      throw error;
+    }
   }
 
   private async delete(key: Item) {
