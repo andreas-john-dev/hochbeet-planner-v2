@@ -22,6 +22,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@hochbeet/garden-rules": "workspace:*",
     "@smithy/types": "^4.19.0",
     "@types/aws-lambda": "^8.10.164",
     "aws-sdk-client-mock": "^4.1.0",

@@ -22,6 +22,10 @@ function setup(overrides: Partial<CatalogStore> = {}) {
     archiveOwnPlant: vi.fn(() => Promise.resolve(true)),
     putOverride: vi.fn(() => Promise.resolve()),
     deleteOverride: vi.fn(() => Promise.resolve()),
+    putGlobalPlant: vi.fn(() => Promise.resolve(true)),
+    listPendingPublications: vi.fn(() => Promise.resolve([])),
+    approvePublication: vi.fn(() => Promise.resolve(true)),
+    rejectPublication: vi.fn(() => Promise.resolve(true)),
     ...overrides,
   };
   return { app: createApp({ store: repository, logger }), repository, lines };
@@ -84,5 +88,32 @@ describe('catalog app', () => {
         status: 200,
       }),
     ]);
+  });
+
+  it.each([
+    ['GET', '/api/catalog/admin/publications'],
+    ['POST', '/api/catalog/admin/publications/X/approve'],
+    ['POST', '/api/catalog/admin/publications/X/reject'],
+    ['POST', '/api/catalog/admin/plants'],
+    ['PUT', '/api/catalog/admin/plants/X'],
+  ])('answers 403 to non-admins on %s %s', async (method, path) => {
+    const { app, repository } = setup();
+    const init = method === 'GET' ? { method } : { method, body: '{}' };
+    const response = await app.request(path, init, authorized(USER_A));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ message: 'Dieser Bereich ist nur für Admins.' });
+    expect(repository.listPendingPublications).not.toHaveBeenCalled();
+    expect(repository.putGlobalPlant).not.toHaveBeenCalled();
+  });
+
+  it('lets admins read the queue', async () => {
+    const { app } = setup();
+    const response = await app.request(
+      '/api/catalog/admin/publications',
+      {},
+      authorized(USER_A, '[admins]'),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ requests: [] });
   });
 });

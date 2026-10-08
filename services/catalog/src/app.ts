@@ -1,16 +1,19 @@
 import {
+  ApprovePublicationRequestSchema,
   type ErrorResponse,
   type ListPlantsResponse,
+  RejectPublicationRequestSchema,
   SaveOverrideRequestSchema,
   SavePlantRequestSchema,
 } from '@hochbeet/contracts';
 import { type Context, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { z } from 'zod';
+import { AdminService } from './catalog/admin';
 import { CatalogService, type CatalogStore } from './catalog/service';
-import { issuesOf, NotFoundError, ValidationError } from './errors';
+import { ConflictError, issuesOf, NotFoundError, ValidationError } from './errors';
 import { errorFields, type Logger } from './logger';
-import { type ApiEvent, userFromEvent, type User } from './user';
+import { type ApiEvent, isAdmin, userFromEvent, type User } from './user';
 
 export interface AppDeps {
   store: CatalogStore;
@@ -47,6 +50,7 @@ async function parseBody<T extends z.ZodType>(c: Context<Env>, schema: T): Promi
 export function createApp({ store, logger, now, newId }: AppDeps) {
   const app = new Hono<Env>().basePath(BASE_PATH);
   const catalog = new CatalogService(store, now, newId);
+  const admin = new AdminService(store, newId);
 
   // Request logging and the user context from the JWT claims of the API Gateway authorizer.
   app.use(async (c, next) => {
@@ -104,6 +108,41 @@ export function createApp({ store, logger, now, newId }: AppDeps) {
     return c.body(null, 204);
   });
 
+  app.post('/plants/:id/publication', async (c) => {
+    return c.json(await catalog.requestPublication(c.get('user').id, c.req.param('id')));
+  });
+
+  // Admin area: members of the Cognito group `admins` only.
+  app.use('/admin/*', async (c, next) => {
+    if (!isAdmin(c.get('user'))) {
+      throw new HTTPException(403, { message: 'Dieser Bereich ist nur für Admins.' });
+    }
+    await next();
+  });
+
+  app.get('/admin/publications', async (c) => c.json(await admin.queue()));
+
+  app.post('/admin/publications/:id/approve', async (c) => {
+    const request = await parseBody(c, ApprovePublicationRequestSchema);
+    return c.json(await admin.approve(c.req.param('id'), request));
+  });
+
+  app.post('/admin/publications/:id/reject', async (c) => {
+    const { comment } = await parseBody(c, RejectPublicationRequestSchema);
+    await admin.reject(c.req.param('id'), comment);
+    return c.body(null, 204);
+  });
+
+  app.post('/admin/plants', async (c) => {
+    const fields = await parseBody(c, SavePlantRequestSchema);
+    return c.json(await admin.createGlobalPlant(fields), 201);
+  });
+
+  app.put('/admin/plants/:id', async (c) => {
+    const fields = await parseBody(c, SavePlantRequestSchema);
+    return c.json(await admin.updateGlobalPlant(c.req.param('id'), fields));
+  });
+
   app.notFound((c) => c.json(errorBody('Diese Adresse gibt es nicht.'), 404));
 
   app.onError((error, c) => {
@@ -118,6 +157,7 @@ export function createApp({ store, logger, now, newId }: AppDeps) {
       return c.json(body, 400);
     }
     if (error instanceof NotFoundError) return c.json(errorBody(error.message), 404);
+    if (error instanceof ConflictError) return c.json(errorBody(error.message), 409);
     ((c.get('logger') as Logger | undefined) ?? logger).error(
       'unhandled error',
       errorFields(error),

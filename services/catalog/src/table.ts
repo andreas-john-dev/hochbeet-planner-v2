@@ -11,7 +11,11 @@ export const catalogTable = {
 
 export const GLOBAL_PK = 'GLOBAL';
 export const plantSk = (plantId: string) => `PLANT#${plantId}`;
-export const userPk = (userId: string) => `USER#${userId}`;
+export const USER_PREFIX = 'USER#';
+export const userPk = (userId: string) => `${USER_PREFIX}${userId}`;
 export const overrideSk = (plantId: string) => `OVERRIDE#${plantId}`;
 export const PLANT_PREFIX = 'PLANT#';
 export const OVERRIDE_PREFIX = 'OVERRIDE#';
+
+/** GSI1 partition of the admin queue; GSI1SK = `<requested at>#<plant id>`. */
+export const PUBLICATION_PENDING = 'PUBLICATION#PENDING';

@@ -335,6 +335,20 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
   - Eigene Sorten dürfen auf globale und eigene, nicht archivierte Sorten des Users verweisen.
   - Anpassungen globaler Sorten dürfen nur auf globale Sorten verweisen. Das ist die Regel „Nachbarlisten globaler Sorten nur auf globale Sorten“ für den persönlichen Overlay. Es geht dabei nichts verloren: Weil Nachbarn symmetrisch ausgewertet werden, trägt der User die Beziehung zu einer eigenen Sorte einfach an der eigenen Sorte ein.
   - Eine Sorte ist nie ihr eigener Nachbar. Verstöße liefern 400 mit `issues` je Listeneintrag.
+- **Publikation** (`POST /catalog/plants/{id}/publication`):
+  - Setzt eine eigene Sorte auf `PENDING`. Sie bekommt `requestedAt` und die GSI1-Schlüssel (`GSI1PK = PUBLICATION#PENDING`, `GSI1SK = <Zeitstempel>#<id>`).
+  - Erneutes Anfragen während `PENDING` ändert nichts. Für veröffentlichte Sorten gibt es 409.
+  - Nachbarn müssen global sein, sonst 400. Ein alter Ablehnungskommentar wird entfernt.
+  - Archivieren nimmt die Sorte aus der Warteschlange.
+- **Admin** (`/catalog/admin/*`, nur Gruppe `admins`, sonst 403):
+  - `GET publications` liefert die Warteschlange über `GSI1`, älteste zuerst.
+  - `approve` schreibt in einer Transaktion die globale Sorte mit derselben ID (plus Korrekturen) und setzt die eigene Sorte auf `PUBLISHED` (bedingt auf `PENDING`, sonst 409). Pflanzungen, die die ID verwenden, funktionieren ohne Migration weiter.
+  - `reject` setzt die Sorte zurück auf `PRIVATE` mit `rejectionComment`.
+  - `POST /admin/plants` legt globale Sorten mit neuer ULID an, `PUT /admin/plants/{id}` ersetzt sie und behält `seedHash`. Ändert sich der Seed dieser Sorte später, gewinnt also weiterhin der Seed.
+  - Globale Nachbarlisten dürfen nur auf globale Sorten zeigen.
+- **Nach der Freigabe:**
+  - Veröffentlichte eigene Sorten erscheinen in der Liste nur noch einmal, als globale Sorte.
+  - Ändert der ursprüngliche User sie mit `PUT /catalog/plants/{id}`, werden die vom globalen Stand abweichenden Felder als persönliche Anpassung gespeichert. Gibt es keine Abweichung, wird die Anpassung zurückgesetzt.
 - **Tests:**
   - Unit-Tests für Logik und App.
   - Integrationstest (`*.integration.test.ts`) gegen DynamoDB Local (`amazon/dynamodb-local:3.1.0`) über Testcontainers. Er braucht ein laufendes Docker.
@@ -480,7 +494,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-CFR1` (keine Geo-Sperre) | Distribution | Die App soll überall nutzbar sein. |
 | `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
 | `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
-| `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog-Lambdalith | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur Item-Operationen auf der Tabelle, kein Scan, keine Indizes). |
+| `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog-Lambdalith | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur Item-Operationen auf der Tabelle und `Query` auf `GSI1`, kein Scan, keine Index-Wildcard). |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
