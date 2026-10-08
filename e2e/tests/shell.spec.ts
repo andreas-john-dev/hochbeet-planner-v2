@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
-import { expect, open, signInAs, test } from './fixtures';
+import { expect, open, signInAs, test, USERS } from './fixtures';
+import { seedGarden } from './garden';
 import { appPages } from './pages';
 
 for (const colorScheme of ['light', 'dark'] as const) {
@@ -39,6 +40,12 @@ test('auth pages have no horizontal scrollbar at 375 px', async ({ page }) => {
 
 test('app pages have no horizontal scrollbar at 375 px', async ({ page }) => {
   await signInAs(page, 'admin');
+  // Pages that need data (the bed editor) all share the example garden.
+  await seedGarden(
+    page,
+    appPages.find((p) => p.seed)?.seed ?? { beds: [], plantings: [] },
+    USERS.admin.email,
+  );
   await page.setViewportSize({ width: 375, height: 812 });
   for (const { path, heading } of appPages.filter((p) => p.access !== 'public')) {
     await open(page, path, heading);

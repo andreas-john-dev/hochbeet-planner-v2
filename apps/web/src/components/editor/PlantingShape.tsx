@@ -6,19 +6,22 @@ import { iconSizeCm, plantPositions } from '@/lib/editor/plantings';
 
 /**
  * A planting in the editor: half-transparent footprint in the plant colour plus the plant
- * icon at every plant position. One DOM node per planting, addressable by `data-testid`.
+ * icon at every plant position. One focusable DOM node per planting, addressable by
+ * `data-testid`; the selected one gets a thicker outline in the primary colour.
  */
 export function PlantingShape({
   planting,
   plant,
   variant = 'planted',
   selected = false,
+  onFocus,
 }: {
   planting: Planting;
   plant: Plant;
   /** `preview`: the planting about to be placed, drawn lighter and dashed. */
   variant?: 'planted' | 'preview';
   selected?: boolean;
+  onFocus?: () => void;
 }) {
   const fp = footprint(planting, plant);
   const icon = resolveIconKey(plant);
@@ -40,17 +43,21 @@ export function PlantingShape({
   return (
     <g
       data-testid={preview ? 'placement-preview' : `planting-${planting.id}`}
+      data-planting-id={preview ? undefined : planting.id}
       data-plant-id={plant.id}
       data-kind={planting.kind}
       data-x={planting.x}
       data-y={planting.y}
       data-length-cm={planting.kind === 'ROW' ? planting.lengthCm : undefined}
       data-selected={selected || undefined}
-      role={preview ? undefined : 'img'}
+      role={preview ? undefined : 'button'}
+      tabIndex={preview ? undefined : 0}
       aria-label={preview ? undefined : label}
+      aria-pressed={preview ? undefined : selected}
       aria-hidden={preview || undefined}
       opacity={preview ? 0.75 : undefined}
-      className={preview ? 'pointer-events-none' : undefined}
+      className={preview ? 'pointer-events-none' : 'cursor-move outline-none'}
+      onFocus={onFocus}
     >
       {fp.kind === 'circle' ? (
         <circle cx={fp.cx} cy={fp.cy} r={fp.r} {...outline} />

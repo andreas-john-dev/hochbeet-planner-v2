@@ -438,7 +438,7 @@ Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bl
 - Beim Ziehen zeigt eine Vorschau die Warnungen live an, bevor man loslässt.
 - Der Wochen-Slider steuert, welche Pflanzungen sichtbar sind.
 
-Umsetzung (Stand T-25):
+Umsetzung (Stand T-26):
 
 - **Route:** `/beete/$bedId` (`BedEditorPage`); jede Beetkarte verlinkt dorthin. Unbekannte Beete zeigen „Beet nicht gefunden“. Clientfehler (4xx) wiederholt TanStack Query nicht (`shouldRetry` in `lib/api.ts`).
 - **Ansicht:** Der Viewport (`lib/editor/viewport.ts`) besteht aus Verschiebung in px und Maßstab in px pro cm. Er wird in einen `viewBox` umgerechnet, sodass alle Formen in cm gezeichnet werden. Beim ersten Messen passt er das Beet mit Rand ein. Zoom hält den Punkt unter Mauszeiger bzw. Fingern fest (Maßstab 0,05 bis 40 px/cm).
@@ -454,7 +454,21 @@ Umsetzung (Stand T-25):
 - **Tastatur:** Statt des Keyboard-Sensors von dnd-kit gibt es einen eigenen Platzier-Modus.
   - Enter auf einer Sorte setzt eine Vorschau in die Beetmitte und fokussiert das Beet. Pfeiltasten verschieben um 5 cm (mit Umschalt 25 cm), Enter oder ein Klick setzt, Escape bricht ab.
   - Grund: Der Keyboard-Sensor bewegt in Bildschirmpixeln, ausgehend von der Palette. Ein Cursor in Beet-cm passt besser zum Raster und lässt sich ansagen (Live-Region unter dem Beet).
-- **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe, Viewport, Pflanzart, Vorschau, Auswahl und die Entwurfslänge beim Ziehen am Griff. Undo/Redo kommt mit den Bearbeitungsfunktionen.
+- **Bearbeiten (Desktop):**
+  - Pflanzungen sind fokussierbare Buttons (`aria-pressed` = ausgewählt). Klick oder Fokus wählt aus, ein Klick ins Leere oder Escape hebt die Auswahl auf.
+  - Mit der Maus gezogen rastet die Pflanzung auf 5 cm ein. Pfeiltasten verschieben die fokussierte Pflanzung (mit Umschalt um 25 cm), Entf löscht sie. Per Touch bleibt Ziehen ein Verschieben der Ansicht; Long-Press kommt mit T-27.
+  - Jede ausgewählte Reihe hat ihren Griff.
+  - Nach dem Setzen wird nur eine Reihe ausgewählt (für den Griff); nach einer Einzelpflanze bleibt die Palette sichtbar.
+- **Detailpanel:** Es ersetzt die Palette, solange etwas ausgewählt ist.
+  - Inhalt: Sorte, Position, echte Daten mit KW und Herkunft des Endes (Standzeit, angepasst, entfernt).
+  - „Ende anpassen“: Datumsfeld; leer heißt Ende aus der Standzeit.
+  - „Entfernen ab KW …“ setzt `removedDate` auf den Montag der im Editor gewählten Woche (bis T-28 die aktuelle) und ist gesperrt, wenn die Pflanzung später beginnt. Eine entfernte Pflanzung lässt sich wieder ins Beet nehmen.
+  - „Pflanzung löschen“ löscht ohne Rückfrage, weil es sich rückgängig machen lässt.
+- **Undo/Redo:** Buttons „Rückgängig“/„Wiederholen“ sowie Strg+Z und Strg+Umschalt+Z (oder Strg+Y); in Textfeldern bleibt das native Undo.
+  - Jede Änderung ist ein Paar `{ before, after }` (`lib/editor/history.ts`, höchstens 100 Schritte je geöffnetem Beet, nicht gespeichert).
+  - Undo schickt den Zustand `before` an die API: PUT, DELETE oder POST für eine gelöschte Pflanzung. Weil der Server beim Anlegen eine neue ID vergibt, ersetzt `remapId` die alte ID in der ganzen Historie.
+  - Solange eine Anfrage läuft, sind Undo und Redo gesperrt, damit temporäre IDs erst aufgelöst werden.
+- **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe, Viewport, Pflanzart, Vorschau, Auswahl, den Entwurf beim Ziehen (Position oder Länge) und die Undo-Historie.
 - **Speichern:** Für Pflanzungen gibt es `useSavePlanting` und `useDeletePlanting` in `lib/garden.ts`. Sie ändern den Query-Cache optimistisch, rollen bei Fehlern zurück und laden danach neu. Neue Pflanzungen tragen bis zur Antwort eine temporäre ID (`tmp-…`); erst danach erscheint der Griff.
 
 ### Bedienung nach Gerät

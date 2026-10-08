@@ -3,13 +3,18 @@ import { USERS } from './fixtures';
 
 const MOCK_API_KEY = 'hochbeet-mock-api';
 
-/** Seeds the mock API with beds and plantings for the signed-in test user. */
-export async function seedGarden(page: Page, garden: { beds: unknown[]; plantings: unknown[] }) {
+export interface Garden {
+  beds: unknown[];
+  plantings: unknown[];
+}
+
+/** Seeds the mock API with beds and plantings for a test user (default: the normal user). */
+export async function seedGarden(page: Page, garden: Garden, email: string = USERS.user.email) {
   await page.addInitScript(
     ([key, user, data]) => {
       if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ [user]: data }));
     },
-    [MOCK_API_KEY, USERS.user.email, garden] as const,
+    [MOCK_API_KEY, email, garden] as const,
   );
 }
 
@@ -52,3 +57,49 @@ export const planting = (
   removedDate: null,
   ...extra,
 });
+
+export const EXAMPLE_BED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0S1A';
+export const exampleId = (n: number) => `01J9ZQ3W8D6V2K5M7N8P9R0T${String(n).padStart(2, '0')}`;
+
+// 2 × 1 m with 8 plantings that are all in the bed on 7 October 2026 (fixed clock).
+export const exampleGarden: Garden = {
+  beds: [bed(EXAMPLE_BED_ID, 'Hochbeet Süd', 200, 100)],
+  plantings: [
+    planting(exampleId(1), EXAMPLE_BED_ID, PLANTS.chives, { x: 15, y: 15 }),
+    planting(exampleId(2), EXAMPLE_BED_ID, PLANTS.thyme, { x: 15, y: 50 }),
+    planting(exampleId(3), EXAMPLE_BED_ID, PLANTS.parsley, { x: 15, y: 85 }),
+    planting(exampleId(4), EXAMPLE_BED_ID, PLANTS.kale, { x: 50, y: 50 }),
+    planting(exampleId(5), EXAMPLE_BED_ID, PLANTS.chard, {
+      kind: 'ROW',
+      x: 90,
+      y: 25,
+      orientation: 'H',
+      lengthCm: 30,
+      startDate: '2026-06-01',
+    }),
+    planting(exampleId(6), EXAMPLE_BED_ID, PLANTS.leek, {
+      kind: 'ROW',
+      x: 85,
+      y: 75,
+      orientation: 'H',
+      lengthCm: 45,
+      startDate: '2026-06-15',
+    }),
+    planting(exampleId(7), EXAMPLE_BED_ID, PLANTS.beetroot, {
+      kind: 'ROW',
+      x: 160,
+      y: 10,
+      orientation: 'V',
+      lengthCm: 80,
+      startDate: '2026-08-03',
+    }),
+    planting(exampleId(8), EXAMPLE_BED_ID, PLANTS.spinach, {
+      kind: 'ROW',
+      x: 185,
+      y: 10,
+      orientation: 'V',
+      lengthCm: 80,
+      startDate: '2026-09-07',
+    }),
+  ],
+};

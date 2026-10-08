@@ -2,7 +2,7 @@ import type { Bed, Plant, Planting } from '@hochbeet/contracts';
 import { useEffect, useRef, type RefObject } from 'react';
 import { useStore } from 'zustand';
 import { isTempId, moveByKey, newPlanting, snapToBed } from '@/lib/editor/placement';
-import type { EditorStore } from '@/lib/editor/store';
+import type { Draft, EditorStore } from '@/lib/editor/store';
 import { toCm, viewBox } from '@/lib/editor/viewport';
 import { BedGrid } from './BedGrid';
 import { PlantingShape } from './PlantingShape';
@@ -13,15 +13,34 @@ interface Pointer {
   y: number;
 }
 
-/** Pointer travel in px up to which a press counts as a click, not a pan. */
+/** A planting being dragged: where it was and where the pointer went down. */
+interface Move {
+  planting: Planting;
+  from: Pointer;
+}
+
+/** Pointer travel in px up to which a press counts as a click, not a pan or move. */
 const CLICK_TOLERANCE_PX = 5;
+
+const withDraft = (planting: Planting, draft: Draft | null): Planting => {
+  if (draft?.id !== planting.id) return planting;
+  const moved = { ...planting, x: draft.x ?? planting.x, y: draft.y ?? planting.y };
+  return moved.kind === 'ROW' ? { ...moved, lengthCm: draft.lengthCm ?? moved.lengthCm } : moved;
+};
+
+/** The planting id of an element inside a planting, if any. */
+const plantingIdOf = (target: EventTarget) =>
+  target instanceof Element
+    ? (target.closest('[data-planting-id]')?.getAttribute('data-planting-id') ?? null)
+    : null;
 
 /**
  * The bed as SVG in cm. Mouse wheel zooms around the cursor, dragging the background pans;
  * on touch screens two fingers pinch-zoom and one finger swipes.
  *
- * While a plant from the palette is chosen (`preview.source === 'cursor'`), the arrow keys
- * move it in 5 cm steps and Enter or a click places it; Escape cancels.
+ * Plantings are selected by click or focus and moved by dragging them with the mouse or
+ * with the arrow keys; Delete removes them. While a plant from the palette is chosen
+ * (`preview.source === 'cursor'`), the arrow keys move it and Enter or a click places it.
  */
 export function BedCanvas({
   bed,
@@ -31,7 +50,8 @@ export function BedCanvas({
   today,
   describedBy,
   onPlace,
-  onResizeRow,
+  onChange,
+  onDelete,
 }: {
   bed: Bed;
   plantings: readonly { planting: Planting; plant: Plant }[];
@@ -41,11 +61,15 @@ export function BedCanvas({
   /** Id of the element with the keyboard instructions. */
   describedBy?: string;
   onPlace: (plant: Plant, at: { x: number; y: number }) => void;
-  onResizeRow: (planting: Planting, lengthCm: number) => void;
+  onChange: (before: Planting, after: Planting) => void;
+  onDelete: (planting: Planting) => void;
 }) {
   const pointers = useRef(new Map<number, Pointer>());
   const pressedAt = useRef<Pointer | null>(null);
-  const { size, viewport, fitted, preview, kind, selectedId, draftLength } = useStore(store);
+  // Planting under the pointer at press time; with pointer capture, later events target the SVG.
+  const pressedId = useRef<string | null>(null);
+  const move = useRef<Move | null>(null);
+  const { size, viewport, fitted, preview, kind, selectedId, draft } = useStore(store);
 
   // Measure the drawing area and fit the bed once the size is known.
   useEffect(() => {
@@ -96,11 +120,20 @@ export function BedCanvas({
   };
 
   const cursorPreview = preview?.source === 'cursor' ? preview : null;
+  const plantingById = (id: string | null) =>
+    id === null ? undefined : plantings.find(({ planting }) => planting.id === id);
 
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     pointers.current.set(event.pointerId, local(event));
     pressedAt.current = pointers.current.size === 1 ? local(event) : null;
+    pressedId.current = plantingIdOf(event.target);
+    // Mouse and pen drag plantings; on touch screens one finger keeps panning (T-27).
+    const target = plantingById(pressedId.current);
+    move.current =
+      target && !cursorPreview && event.pointerType !== 'touch' && pointers.current.size === 1
+        ? { planting: target.planting, from: local(event) }
+        : null;
   };
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -117,7 +150,22 @@ export function BedCanvas({
     }
     const current = local(event);
     const state = store.getState();
-    if (pointers.current.size === 1) {
+    if (move.current) {
+      const { planting, from } = move.current;
+      if (!state.draft && Math.hypot(current.x - from.x, current.y - from.y) <= CLICK_TOLERANCE_PX)
+        return;
+      const at = snapToBed(
+        {
+          x: planting.x + (current.x - from.x) / state.viewport.scale,
+          y: planting.y + (current.y - from.y) / state.viewport.scale,
+        },
+        bed,
+      );
+      if (state.selectedId !== planting.id) state.select(planting.id);
+      if (state.draft?.x !== at.x || state.draft.y !== at.y) {
+        state.setDraft({ id: planting.id, ...at });
+      }
+    } else if (pointers.current.size === 1) {
       state.pan(current.x - previous.x, current.y - previous.y);
     } else if (pointers.current.size === 2) {
       // Pinch: zoom by the change of the finger distance around their midpoint.
@@ -135,16 +183,30 @@ export function BedCanvas({
 
   const onPointerEnd = (event: React.PointerEvent<SVGSVGElement>) => {
     pointers.current.delete(event.pointerId);
+    const state = store.getState();
+    const moved = move.current;
+    move.current = null;
+    if (moved && state.draft) {
+      const after = withDraft(moved.planting, state.draft);
+      state.setDraft(null);
+      if (
+        event.type === 'pointerup' &&
+        (after.x !== moved.planting.x || after.y !== moved.planting.y)
+      )
+        onChange(moved.planting, after);
+      pressedAt.current = null;
+      return;
+    }
     const start = pressedAt.current;
     pressedAt.current = null;
     if (event.type !== 'pointerup' || !start) return;
     const end = local(event);
     if (Math.hypot(end.x - start.x, end.y - start.y) > CLICK_TOLERANCE_PX) return;
-    // A click: places the chosen plant, otherwise clears the selection.
+    // A click: places the chosen plant, selects a planting or clears the selection.
     if (cursorPreview) {
       onPlace(cursorPreview.plant, snapToBed(clientToBed(event.clientX, event.clientY), bed));
     } else {
-      store.getState().select(null);
+      state.select(pressedId.current);
     }
   };
 
@@ -153,27 +215,44 @@ export function BedCanvas({
     if (event.key === 'Escape') {
       state.setPreview(null);
       state.select(null);
+      if (plantingIdOf(event.target)) svgRef.current?.focus();
       return;
     }
-    if (!cursorPreview) return;
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (cursorPreview) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onPlace(cursorPreview.plant, cursorPreview.at);
+        return;
+      }
+      const at = moveByKey(cursorPreview.at, event.key, event.shiftKey, bed);
+      if (!at) return;
       event.preventDefault();
-      onPlace(cursorPreview.plant, cursorPreview.at);
+      state.setPreview({ ...cursorPreview, at });
       return;
     }
-    const at = moveByKey(cursorPreview.at, event.key, event.shiftKey, bed);
+    // Keys on a focused planting: arrows move it, Delete removes it.
+    const focused = plantingById(plantingIdOf(event.target));
+    if (!focused) return;
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      onDelete(focused.planting);
+      svgRef.current?.focus();
+      return;
+    }
+    const at = moveByKey(focused.planting, event.key, event.shiftKey, bed);
     if (!at) return;
     event.preventDefault();
-    state.setPreview({ ...cursorPreview, at });
+    if (at.x !== focused.planting.x || at.y !== focused.planting.y) {
+      onChange(focused.planting, { ...focused.planting, ...at });
+    }
   };
 
-  const selected = plantings.find(({ planting }) => planting.id === selectedId);
+  const selected = plantingById(selectedId);
   const shown = plantings.map((entry) =>
-    entry === selected && entry.planting.kind === 'ROW' && draftLength !== null
-      ? { ...entry, planting: { ...entry.planting, lengthCm: draftLength } }
-      : entry,
+    entry === selected ? { ...entry, planting: withDraft(entry.planting, draft) } : entry,
   );
   const shownSelected = shown.find(({ planting }) => planting.id === selectedId);
+  const selectedRow = selected?.planting.kind === 'ROW' ? selected.planting : null;
 
   return (
     <svg
@@ -205,24 +284,32 @@ export function BedCanvas({
             planting={planting}
             plant={plant}
             selected={planting.id === selectedId}
+            onFocus={() => {
+              if (store.getState().selectedId !== planting.id) store.getState().select(planting.id);
+            }}
           />
         ))}
       </g>
-      {shownSelected?.planting.kind === 'ROW' && !isTempId(shownSelected.planting.id) && (
-        <RowHandle
-          row={shownSelected.planting}
-          plant={shownSelected.plant}
-          bed={bed}
-          scale={viewport.scale}
-          toCm={clientToBed}
-          onDraft={(lengthCm) => {
-            store.getState().setDraftLength(lengthCm);
-          }}
-          onCommit={(lengthCm) => {
-            onResizeRow(shownSelected.planting, lengthCm);
-          }}
-        />
-      )}
+      {selected &&
+        selectedRow &&
+        shownSelected?.planting.kind === 'ROW' &&
+        !isTempId(selectedRow.id) && (
+          <RowHandle
+            row={shownSelected.planting}
+            plant={selected.plant}
+            bed={bed}
+            scale={viewport.scale}
+            toCm={clientToBed}
+            onDraft={(lengthCm) => {
+              store
+                .getState()
+                .setDraft(lengthCm === null ? null : { id: selectedRow.id, lengthCm });
+            }}
+            onCommit={(lengthCm) => {
+              onChange(selectedRow, { ...selectedRow, lengthCm });
+            }}
+          />
+        )}
       {preview && (
         <PlantingShape
           planting={newPlanting({

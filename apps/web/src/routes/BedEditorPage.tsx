@@ -12,20 +12,22 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft, Maximize, MapPinOff, Minus, Plus } from 'lucide-react';
-import { useId, useRef, useState } from 'react';
+import { ArrowLeft, Maximize, MapPinOff, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
+import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { BedCanvas } from '@/components/editor/BedCanvas';
+import { PlantingDetails } from '@/components/editor/PlantingDetails';
 import { PlantPalette, type PaletteDragData } from '@/components/editor/PlantPalette';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { ApiError, apiErrorMessage } from '@/lib/api';
 import { activePlantings } from '@/lib/active-plantings';
-import { bedCentre, newPlanting, snapToBed } from '@/lib/editor/placement';
+import type { Change, Step } from '@/lib/editor/history';
+import { bedCentre, isTempId, newPlanting, snapToBed } from '@/lib/editor/placement';
 import { createEditorStore, type EditorStore } from '@/lib/editor/store';
 import { toCm } from '@/lib/editor/viewport';
-import { useBedWithPlantings, usePlants, useSavePlanting } from '@/lib/garden';
+import { useBedWithPlantings, useDeletePlanting, usePlants, useSavePlanting } from '@/lib/garden';
 
 const ZOOM_STEP = 1.4;
 
@@ -48,6 +50,72 @@ function BedEditor({ bedId }: { bedId: string }) {
   const [store] = useState(createEditorStore);
   const [today] = useState(() => new Date());
   const { range, week } = formatWeek(today);
+  const save = useSavePlanting(bedId);
+  const remove = useDeletePlanting(bedId);
+  const { history } = useStore(store);
+  // Undo and redo wait for running requests, so that temporary ids are resolved first.
+  const busy = save.isPending || remove.isPending;
+  const error = save.error ?? remove.error;
+
+  /** Sends what turns `current` into `target`: create, change or delete. */
+  const apply = ({ target, current }: Step) => {
+    if (target && current) {
+      save.mutate({ planting: target, isNew: false });
+    } else if (target) {
+      save.mutate(
+        { planting: target, isNew: true },
+        // The server assigns the real id; the history and the selection follow it.
+        {
+          onSuccess: (created) => {
+            store.getState().remapId(target.id, created.id);
+          },
+        },
+      );
+    } else if (current) {
+      remove.mutate(current.id);
+    }
+  };
+
+  /** A change made by the user: saved right away and undoable. */
+  const commit = (change: Change) => {
+    // A planting that is still being created cannot be changed yet.
+    if (change.before && isTempId(change.before.id)) return;
+    store.getState().record(change);
+    apply({ target: change.after, current: change.before });
+  };
+
+  const travel = (direction: 'undo' | 'redo') => {
+    if (busy) return;
+    const state = store.getState();
+    const step = direction === 'undo' ? state.undo() : state.redo();
+    if (!step) return;
+    state.select(step.target?.id ?? null);
+    apply(step);
+  };
+
+  // Ctrl+Z / Cmd+Z undoes, with Shift (or Ctrl+Y) redoes; text fields keep their own undo.
+  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key !== 'z' && key !== 'y') return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      target.closest('input, textarea, select, [contenteditable]')
+    )
+      return;
+    event.preventDefault();
+    travel(key === 'y' || event.shiftKey ? 'redo' : 'undo');
+  });
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => {
+      onShortcut(event);
+    };
+    window.addEventListener('keydown', listener);
+    return () => {
+      window.removeEventListener('keydown', listener);
+    };
+  }, []);
 
   const backLink = (
     <Link
@@ -93,42 +161,79 @@ function BedEditor({ bedId }: { bedId: string }) {
             {range} <span className="text-xs">{week}</span>
           </p>
         </div>
-        <div className="flex gap-2" role="toolbar" aria-label="Ansicht">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Verkleinern"
-            onClick={() => {
-              store.getState().zoomBy(1 / ZOOM_STEP);
-            }}
-          >
-            <Minus />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Vergrößern"
-            onClick={() => {
-              store.getState().zoomBy(ZOOM_STEP);
-            }}
-          >
-            <Plus />
-          </Button>
-          <Button
-            variant="outline"
-            className="h-11"
-            disabled={!bed}
-            onClick={() => {
-              if (bed) store.getState().fit(bed);
-            }}
-          >
-            <Maximize aria-hidden />
-            Auf Beet einpassen
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2" role="toolbar" aria-label="Bearbeiten">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Rückgängig"
+              title="Rückgängig (Strg+Z)"
+              aria-keyshortcuts="Control+Z"
+              disabled={busy || history.past.length === 0}
+              onClick={() => {
+                travel('undo');
+              }}
+            >
+              <Undo2 />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Wiederholen"
+              title="Wiederholen (Strg+Umschalt+Z)"
+              aria-keyshortcuts="Control+Shift+Z"
+              disabled={busy || history.future.length === 0}
+              onClick={() => {
+                travel('redo');
+              }}
+            >
+              <Redo2 />
+            </Button>
+          </div>
+          <div className="flex gap-2" role="toolbar" aria-label="Ansicht">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Verkleinern"
+              onClick={() => {
+                store.getState().zoomBy(1 / ZOOM_STEP);
+              }}
+            >
+              <Minus />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Vergrößern"
+              onClick={() => {
+                store.getState().zoomBy(ZOOM_STEP);
+              }}
+            >
+              <Plus />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11"
+              disabled={!bed}
+              onClick={() => {
+                if (bed) store.getState().fit(bed);
+              }}
+            >
+              <Maximize aria-hidden />
+              Auf Beet einpassen
+            </Button>
+          </div>
         </div>
       </div>
       {bed && plants.data ? (
-        <Workspace bed={bed} plants={plants.data} plantings={shown} store={store} today={today} />
+        <Workspace
+          bed={bed}
+          plants={plants.data}
+          plantings={shown}
+          store={store}
+          today={today}
+          onCommit={commit}
+        />
       ) : (
         <div
           className="bg-muted h-[60dvh] min-h-72 animate-pulse rounded-xl border md:h-[65dvh]"
@@ -137,6 +242,7 @@ function BedEditor({ bedId }: { bedId: string }) {
           <span className="sr-only">Beet wird geladen …</span>
         </div>
       )}
+      {error && <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>}
     </div>
   );
 }
@@ -167,18 +273,19 @@ function Workspace({
   plantings,
   store,
   today,
+  onCommit,
 }: {
   bed: Bed;
   plants: readonly Plant[];
   plantings: readonly { planting: Planting; plant: Plant }[];
   store: EditorStore;
   today: Date;
+  onCommit: (change: Change) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const hintId = useId();
-  const save = useSavePlanting(bed.id);
   const [dragged, setDragged] = useState<Plant | null>(null);
-  const { preview, kind } = useStore(store);
+  const { preview, kind, selectedId } = useStore(store);
   // A short move starts a drag; a plain click on a palette item picks the plant.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -186,22 +293,21 @@ function Workspace({
     const state = store.getState();
     const planting = newPlanting({ bed, plant, kind: state.kind, at, today });
     state.setPreview(null);
-    state.select(planting.id);
-    save.mutate(
-      { planting, isNew: true },
-      {
-        // Swap the temporary id for the one from the server so the row handle can save.
-        onSuccess: (created) => {
-          if (store.getState().selectedId === planting.id) store.getState().select(created.id);
-        },
-      },
-    );
+    // Rows get selected for their length handle; after a single plant the palette stays.
+    state.select(planting.kind === 'ROW' ? planting.id : null);
+    onCommit({ before: null, after: planting });
   };
 
-  const resizeRow = (planting: Planting, lengthCm: number) => {
-    if (planting.kind !== 'ROW') return;
-    save.mutate({ planting: { ...planting, lengthCm }, isNew: false });
+  const change = (before: Planting, after: Planting) => {
+    onCommit({ before, after });
   };
+
+  const remove = (planting: Planting) => {
+    store.getState().select(null);
+    onCommit({ before: planting, after: null });
+  };
+
+  const selected = plantings.find(({ planting }) => planting.id === selectedId);
 
   /** Grid point in the bed for a screen point, or null outside the drawing area. */
   const bedPointAt = (client: { x: number; y: number }) => {
@@ -275,12 +381,28 @@ function Workspace({
       }}
     >
       <div className="flex flex-col gap-4 md:h-[65dvh] md:flex-row">
-        <PlantPalette
-          plants={plants}
-          store={store}
-          onChoose={choose}
-          className="hidden w-72 shrink-0 md:flex"
-        />
+        {selected ? (
+          <PlantingDetails
+            // Fresh form state for another planting or after undo.
+            key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
+            planting={selected.planting}
+            plant={selected.plant}
+            week={today}
+            onChange={change}
+            onDelete={remove}
+            onClose={() => {
+              store.getState().select(null);
+            }}
+            className="hidden w-72 shrink-0 md:flex"
+          />
+        ) : (
+          <PlantPalette
+            plants={plants}
+            store={store}
+            onChoose={choose}
+            className="hidden w-72 shrink-0 md:flex"
+          />
+        )}
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="bg-card h-[60dvh] min-h-72 overflow-hidden rounded-xl border md:h-auto md:flex-1">
             <BedCanvas
@@ -291,15 +413,17 @@ function Workspace({
               today={today}
               describedBy={hintId}
               onPlace={place}
-              onResizeRow={resizeRow}
+              onChange={change}
+              onDelete={remove}
             />
           </div>
           <p id={hintId} className="text-muted-foreground text-xs" aria-live="polite">
             {placing
               ? `${placing.plant.name} als ${kind === 'ROW' ? 'Reihe' : 'Einzelpflanze'} bei ${String(placing.at.x)} × ${String(placing.at.y)} cm: Pfeiltasten verschieben (mit Umschalt 25 cm), Enter oder Klick setzt, Escape bricht ab.`
-              : 'Zoomen mit dem Mausrad oder zwei Fingern, verschieben durch Ziehen.'}
+              : selected
+                ? `${selected.plant.name} ausgewählt: ziehen oder Pfeiltasten verschieben, Entf löscht, Escape hebt die Auswahl auf.`
+                : 'Zoomen mit dem Mausrad oder zwei Fingern, verschieben durch Ziehen. Pflanzung anklicken zum Bearbeiten.'}
           </p>
-          {save.isError && <FormMessage tone="error">{apiErrorMessage(save.error)}</FormMessage>}
         </div>
       </div>
       <DragOverlay dropAnimation={null}>
