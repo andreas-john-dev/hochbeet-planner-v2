@@ -15,6 +15,7 @@ import { ForgotPasswordPage } from '@/routes/auth/ForgotPasswordPage';
 import { parseSignInSearch, parseSignUpSearch } from '@/routes/auth/search';
 import { SignInPage } from '@/routes/auth/SignInPage';
 import { SignUpPage } from '@/routes/auth/SignUpPage';
+import { BedEditorPage } from '@/routes/BedEditorPage';
 import { BedsPage } from '@/routes/BedsPage';
 import { CatalogPage } from '@/routes/CatalogPage';
 import { IconGalleryPage } from '@/routes/dev/IconGalleryPage';
@@ -93,6 +94,12 @@ const adminRoute = createRoute({
 
 /* eslint-enable @typescript-eslint/only-throw-error */
 
+const bedEditorRoute = createRoute({
+  getParentRoute: () => appLayout,
+  path: '/beete/$bedId',
+  component: BedEditorPage,
+});
+
 // Developer pages: public, no data.
 const iconGalleryRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -105,6 +112,7 @@ const routeTree = rootRoute.addChildren([
   appLayout.addChildren([
     indexRoute,
     createRoute({ getParentRoute: () => appLayout, path: '/beete', component: BedsPage }),
+    bedEditorRoute,
     createRoute({ getParentRoute: () => appLayout, path: '/katalog', component: CatalogPage }),
     createRoute({ getParentRoute: () => appLayout, path: '/profil', component: ProfilePage }),
     adminRoute,

@@ -64,7 +64,8 @@ Anmeldung über `useAuth()` aus `src/lib/auth/context.ts`; API-Aufrufe nur über
 Dev-Server und Playwright nutzen Mock-Auth (`apps/web/config.dev.json`): `test@example.com` bzw. `admin@example.com`, Passwort `Gemuese1!`, Code `123456`.
 Auch die API ist dort gemockt (`"apiMode": "mock"`): MSW-Handler in `apps/web/src/mocks/` bilden die Services nach, Daten im `localStorage` pro Testuser. Neue Endpunkte dort mit ergänzen.
 Daten im Frontend über `useApi()` und die Query-Hooks in `src/lib/garden.ts`.
-In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten; Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.
+Beet-Editor unter `/beete/$bedId`: SVG in cm über einen `viewBox`, Viewport-Mathematik in `src/lib/editor/`, Zustand-Store je Beet; jede Pflanzung hat `data-testid="planting-<id>"`.
+In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten, Beete und Pflanzungen mit `seedGarden()` aus `e2e/tests/garden.ts` vorbelegen; Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.
 Neue Seiten in `e2e/tests/pages.ts` eintragen (mit `access`): Tests und PR-Screenshots nutzen diese Liste.
 Der Workflow `screenshots.yml` kommentiert in jedem PR mit Frontend-Änderungen Desktop- und Mobil-Screenshots der geänderten Seiten
 (Vergleich mit `main`); die Bilder liegen im Branch `screenshots`, der nie gemergt wird.

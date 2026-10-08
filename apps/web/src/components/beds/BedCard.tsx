@@ -1,4 +1,5 @@
 import type { Bed } from '@hochbeet/contracts';
+import { Link } from '@tanstack/react-router';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -21,14 +22,24 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
   const active = activePlantings(plantings, plants.data ?? [], today).length;
 
   return (
-    <Card className="flex flex-col gap-3 p-4" aria-labelledby={`bed-${bed.id}-name`} role="article">
+    <Card
+      className="relative flex flex-col gap-3 p-4"
+      aria-labelledby={`bed-${bed.id}-name`}
+      role="article"
+    >
       <div className="grid h-32 place-items-center">
         <BedPreview bed={bed} plantings={plantings} plants={plants.data ?? []} date={today} />
       </div>
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
           <h2 id={`bed-${bed.id}-name`} className="truncate font-semibold">
-            {bed.name}
+            <Link
+              to="/beete/$bedId"
+              params={{ bedId: bed.id }}
+              className="after:absolute after:inset-0 hover:underline"
+            >
+              {bed.name}
+            </Link>
           </h2>
           <p className="text-muted-foreground text-sm">
             {bed.widthCm} × {bed.depthCm} cm · {directionLabel[bed.mainRowDirection]}
@@ -39,7 +50,8 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
               : `${String(active)} ${active === 1 ? 'Pflanzung' : 'Pflanzungen'} in dieser Woche`}
           </p>
         </div>
-        <div className="-mr-2 flex shrink-0">
+        {/* Above the stretched link of the name, so they stay clickable. */}
+        <div className="relative z-10 -mr-2 flex shrink-0">
           <Button
             variant="ghost"
             size="icon"

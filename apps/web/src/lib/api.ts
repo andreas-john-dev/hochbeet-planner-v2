@@ -9,6 +9,12 @@ export class ApiError extends Error {
   }
 }
 
+/** Query retry policy: client errors (4xx) are final, everything else gets three more tries. */
+export function shouldRetry(failureCount: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
+  return failureCount < 3;
+}
+
 export type TokenProvider = () => Promise<string | null>;
 
 /**

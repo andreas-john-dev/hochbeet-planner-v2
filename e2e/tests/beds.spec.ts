@@ -1,48 +1,5 @@
-import type { Page } from '@playwright/test';
-import { expect, open, signInAs, test, USERS } from './fixtures';
-
-const MOCK_API_KEY = 'hochbeet-mock-api';
-
-/** Seeds the mock API with beds and plantings for the signed-in test user. */
-async function seedGarden(page: Page, garden: { beds: unknown[]; plantings: unknown[] }) {
-  await page.addInitScript(
-    ([key, user, data]) => {
-      if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ [user]: data }));
-    },
-    [MOCK_API_KEY, USERS.user.email, garden] as const,
-  );
-}
-
-// Seed plants that are still in the bed on 7 October 2026 (fixed clock).
-const KALE = '01M49THV00A6TVTS7JDM60G9YY'; // Grünkohl, 30 weeks
-const CHARD = '01M49THV00PAF8V0RQKEJ6T6FT'; // Mangold, 20 weeks
-const ROSEMARY = '01M49THV0088BETVBD9HZY3BH3'; // Rosmarin, perennial
-const bed = (id: string, name: string, widthCm: number, depthCm: number) => ({
-  id,
-  name,
-  widthCm,
-  depthCm,
-  mainRowDirection: widthCm >= depthCm ? 'V' : 'H',
-  soilRenewals: [],
-});
-
-const planting = (
-  id: string,
-  bedId: string,
-  plantId: string,
-  extra: Record<string, unknown> = {},
-) => ({
-  id,
-  bedId,
-  plantId,
-  kind: 'SINGLE',
-  x: 0,
-  y: 0,
-  startDate: '2026-05-04',
-  endDate: null,
-  removedDate: null,
-  ...extra,
-});
+import { expect, open, signInAs, test } from './fixtures';
+import { bed, planting, PLANTS, seedGarden } from './garden';
 
 test.describe('bed overview', () => {
   test.beforeEach(async ({ page }) => {
@@ -139,8 +96,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
         bed('01J9ZQ3W8D6V2K5M7N8P9R0S1C', 'Balkonkasten', 100, 30),
       ],
       plantings: [
-        planting('01J9ZQ3W8D6V2K5M7N8P9R0S2A', southId, KALE, { x: 40, y: 50 }),
-        planting('01J9ZQ3W8D6V2K5M7N8P9R0S2B', southId, CHARD, {
+        planting('01J9ZQ3W8D6V2K5M7N8P9R0S2A', southId, PLANTS.kale, { x: 40, y: 50 }),
+        planting('01J9ZQ3W8D6V2K5M7N8P9R0S2B', southId, PLANTS.chard, {
           kind: 'ROW',
           x: 95,
           y: 30,
@@ -148,7 +105,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
           lengthCm: 80,
           startDate: '2026-06-01',
         }),
-        planting('01J9ZQ3W8D6V2K5M7N8P9R0S2C', herbsId, ROSEMARY, { x: 60, y: 60 }),
+        planting('01J9ZQ3W8D6V2K5M7N8P9R0S2C', herbsId, PLANTS.rosemary, { x: 60, y: 60 }),
       ],
     });
     await page.emulateMedia({ colorScheme });
