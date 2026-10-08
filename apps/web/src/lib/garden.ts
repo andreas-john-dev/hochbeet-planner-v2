@@ -77,9 +77,9 @@ function applyChange(data: BedWithPlantingsResponse, change: PlantingChange) {
  * Shared optimistic update for planting changes: the editor shows the change at once and
  * rolls back if the request fails. Afterwards the bed is reloaded from the server.
  */
-function useOptimisticPlantingChange<TVariables>(
+function useOptimisticPlantingChange<TVariables, TResult>(
   bedId: string,
-  request: (variables: TVariables) => Promise<unknown>,
+  request: (variables: TVariables) => Promise<TResult>,
   toChange: (variables: TVariables) => PlantingChange,
 ) {
   const queryClient = useQueryClient();

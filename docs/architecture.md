@@ -423,7 +423,7 @@ Das Frontend ist eine React-SPA, die auf Desktop und Smartphone gleich gut bedie
 | Server-State | TanStack Query mit optimistischen Updates |
 | Editor-State | Zustand, inklusive Undo/Redo |
 | Formulare | react-hook-form + Zod aus `packages/contracts` |
-| Drag & Drop | dnd-kit (Pointer-, Touch- und Keyboard-Sensor) |
+| Drag & Drop | dnd-kit (Pointer-Sensor), Tastatur über einen eigenen Platzier-Modus |
 | Zoom/Pan | Pinch-Zoom und Verschieben per Geste |
 | Auth | Amplify Library (`aws-amplify/auth`), Login, Registrierung, Passwort vergessen |
 | Datum | date-fns mit deutscher Locale |
@@ -438,15 +438,24 @@ Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bl
 - Beim Ziehen zeigt eine Vorschau die Warnungen live an, bevor man loslässt.
 - Der Wochen-Slider steuert, welche Pflanzungen sichtbar sind.
 
-Umsetzung (Stand T-24):
+Umsetzung (Stand T-25):
 
 - **Route:** `/beete/$bedId` (`BedEditorPage`); jede Beetkarte verlinkt dorthin. Unbekannte Beete zeigen „Beet nicht gefunden“. Clientfehler (4xx) wiederholt TanStack Query nicht (`shouldRetry` in `lib/api.ts`).
 - **Ansicht:** Der Viewport (`lib/editor/viewport.ts`) besteht aus Verschiebung in px und Maßstab in px pro cm. Er wird in einen `viewBox` umgerechnet, sodass alle Formen in cm gezeichnet werden. Beim ersten Messen passt er das Beet mit Rand ein. Zoom hält den Punkt unter Mauszeiger bzw. Fingern fest (Maßstab 0,05 bis 40 px/cm).
 - **Raster:** Die Rasterweite wird aus 5, 10, 25, 50 und 100 cm so gewählt, dass Linien mindestens 8 px auseinanderliegen. Hauptlinien kommen alle 50 bzw. 100 cm; Linien haben unabhängig vom Zoom eine feste Strichstärke.
-- **Pflanzungen:** Jede Pflanzung ist ein `<g data-testid="planting-<id>">` mit Standfläche und einem Icon je Pflanze. Bei Reihen gilt das für jede Pflanze im Abstand in der Reihe. Die Icons sind 8 bis 24 cm groß. Gezeigt werden die Pflanzungen der laufenden Woche, bis der Wochen-Slider kommt.
+- **Pflanzungen:** Jede Pflanzung ist ein `<g data-testid="planting-<id>">` (mit `data-plant-id`, `data-kind`, `data-x`, `data-y` und bei Reihen `data-length-cm`) mit Standfläche und einem Icon je Pflanze. Bei Reihen gilt das für jede Pflanze im Abstand in der Reihe. Die Icons sind 8 bis 24 cm groß. Gezeigt werden die Pflanzungen der laufenden Woche, bis der Wochen-Slider kommt.
 - **Gesten:** Mausrad zoomt, Ziehen verschiebt, zwei Finger zoomen und verschieben (Pointer Events, `touch-action: none`). Zusätzlich gibt es Buttons für Vergrößern, Verkleinern und Einpassen.
-- **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe und Viewport. Undo/Redo kommt mit den Bearbeitungsfunktionen.
-- **Speichern:** Für Pflanzungen gibt es `useSavePlanting` und `useDeletePlanting` in `lib/garden.ts`. Sie ändern den Query-Cache optimistisch, rollen bei Fehlern zurück und laden danach neu.
+- **Pflanzen hinzufügen (Desktop):**
+  - Die Seitenleiste „Pflanzen hinzufügen“ (ab `md`) bietet Suche, Kategorie-Filter, Icons und den Umschalter Einzelpflanze/Reihe.
+  - Sorten werden mit dnd-kit (Pointer-Sensor, ab 5 px Bewegung) ins Beet gezogen. Die Vorschau rastet auf 5 cm ein und bleibt im Beet.
+  - Eine Reihe läuft in der Hauptreihenrichtung des Beets, zunächst bis zum Rand, höchstens 50 cm. Danach ist sie ausgewählt, und ihr Griff (`role="slider"`) zieht sie in 5-cm-Schritten auf Länge, auch mit den Pfeiltasten.
+  - Pflanzdatum ist der Montag der aktuellen Woche (bis zum Wochen-Slider in T-28), das Ende kommt aus dem Lebenszyklus der Sorte.
+  - Die Logik liegt rein in `lib/editor/placement.ts` und `lib/editor/palette.ts`.
+- **Tastatur:** Statt des Keyboard-Sensors von dnd-kit gibt es einen eigenen Platzier-Modus.
+  - Enter auf einer Sorte setzt eine Vorschau in die Beetmitte und fokussiert das Beet. Pfeiltasten verschieben um 5 cm (mit Umschalt 25 cm), Enter oder ein Klick setzt, Escape bricht ab.
+  - Grund: Der Keyboard-Sensor bewegt in Bildschirmpixeln, ausgehend von der Palette. Ein Cursor in Beet-cm passt besser zum Raster und lässt sich ansagen (Live-Region unter dem Beet).
+- **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe, Viewport, Pflanzart, Vorschau, Auswahl und die Entwurfslänge beim Ziehen am Griff. Undo/Redo kommt mit den Bearbeitungsfunktionen.
+- **Speichern:** Für Pflanzungen gibt es `useSavePlanting` und `useDeletePlanting` in `lib/garden.ts`. Sie ändern den Query-Cache optimistisch, rollen bei Fehlern zurück und laden danach neu. Neue Pflanzungen tragen bis zur Antwort eine temporäre ID (`tmp-…`); erst danach erscheint der Griff.
 
 ### Bedienung nach Gerät
 
