@@ -44,5 +44,11 @@
     "heading": "Administration",
     "access": "admin",
     "navLabel": "Admin"
+  },
+  {
+    "id": "dev-icons",
+    "path": "/dev/icons",
+    "heading": "Icon-Galerie",
+    "access": "public"
   }
 ]
