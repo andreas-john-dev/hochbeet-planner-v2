@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { BASE_PATH } from '@hochbeet/catalog-service';
+import { BASE_PATH, catalogTable } from '@hochbeet/catalog-service';
 import { Duration, RemovalPolicy, Stack, type StackProps, Validations } from 'aws-cdk-lib';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
@@ -52,6 +52,11 @@ export class CatalogStatelessStack extends Stack {
       bundling: { format: OutputFormat.ESM, minify: true, sourceMap: true },
     });
     // Item access on the table only, no scans and no index wildcard.
+    const tableArn = this.formatArn({
+      service: 'dynamodb',
+      resource: 'table',
+      resourceName: tableName,
+    });
     this.handler.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -61,9 +66,14 @@ export class CatalogStatelessStack extends Stack {
           'dynamodb:UpdateItem',
           'dynamodb:DeleteItem',
         ],
-        resources: [
-          this.formatArn({ service: 'dynamodb', resource: 'table', resourceName: tableName }),
-        ],
+        resources: [tableArn],
+      }),
+    );
+    // The admin queue reads the publication index.
+    this.handler.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['dynamodb:Query'],
+        resources: [`${tableArn}/index/${catalogTable.publicationIndex.name}`],
       }),
     );
 

@@ -13,6 +13,8 @@ import { z } from 'zod';
 export const OwnPlantItemSchema = PlantSchema.extend({
   publicationStatus: PublicationStatusSchema.default('PRIVATE'),
   rejectionComment: z.string().optional(),
+  /** ISO timestamp of the publication request while the plant is PENDING. */
+  requestedAt: z.string().optional(),
   archived: z.boolean().default(false),
 });
 export type OwnPlantItem = z.infer<typeof OwnPlantItemSchema>;
@@ -29,6 +31,7 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
 /**
  * The user's effective catalogue: every global plant with the user's override applied
  * (`{ ...global, ...override }`), plus the user's own plants that are not archived.
+ * Published own plants are global now and appear only once, as global plants.
  */
 export function effectiveCatalog(
   globals: readonly Plant[],
@@ -41,9 +44,15 @@ export function effectiveCatalog(
     return { ...plant, ...override, id: plant.id, source: 'GLOBAL', overridden: !!override };
   });
   const ownPlants = own
-    .filter((item) => !item.archived)
+    .filter((item) => !item.archived && item.publicationStatus !== 'PUBLISHED')
     .map(
-      ({ publicationStatus, rejectionComment, archived: _archived, ...plant }): CatalogPlant => ({
+      ({
+        publicationStatus,
+        rejectionComment,
+        requestedAt: _requestedAt,
+        archived: _archived,
+        ...plant
+      }): CatalogPlant => ({
         ...plant,
         source: 'OWN',
         overridden: false,

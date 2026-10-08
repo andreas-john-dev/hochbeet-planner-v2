@@ -23,3 +23,11 @@ export class NotFoundError extends Error {
 
 export const issuesOf = (error: z.ZodError): Issue[] =>
   error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message }));
+
+/** 409: the request no longer fits the current state, e.g. an already handled publication. */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}

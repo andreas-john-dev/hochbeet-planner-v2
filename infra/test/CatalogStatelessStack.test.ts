@@ -47,7 +47,8 @@ describe('CatalogStatelessStack', () => {
     });
   });
 
-  it('lets the function only read and write items of the catalog table', () => {
+  it('lets the function only read and write items of the catalog table and its queue index', () => {
+    const tableArn = Match.arrayWith([ssmParam('hochbeet/prod/catalog/table-name')]);
     template.hasResourceProperties('AWS::IAM::Policy', {
       PolicyDocument: {
         Statement: [
@@ -60,8 +61,16 @@ describe('CatalogStatelessStack', () => {
               'dynamodb:DeleteItem',
             ],
             Effect: 'Allow',
+            Resource: { 'Fn::Join': ['', tableArn] },
+          },
+          {
+            Action: 'dynamodb:Query',
+            Effect: 'Allow',
             Resource: {
-              'Fn::Join': ['', Match.arrayWith([ssmParam('hochbeet/prod/catalog/table-name')])],
+              'Fn::Join': [
+                '',
+                Match.arrayWith([ssmParam('hochbeet/prod/catalog/table-name'), '/index/GSI1']),
+              ],
             },
           },
         ],
