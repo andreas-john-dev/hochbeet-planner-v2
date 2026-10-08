@@ -1,11 +1,12 @@
 import type { Category, Feeder } from '@hochbeet/contracts';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Link } from '@tanstack/react-router';
-import { Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useId, useState } from 'react';
 import { SourceBadge } from '@/components/catalog/SourceBadge';
 import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   CATEGORY_LABEL,
@@ -62,7 +63,14 @@ export function CatalogPage() {
       <PageHeader
         title="Pflanzenkatalog"
         description="Gemüse, Obst und Kräuter mit Abständen, Standzeit und Nachbarn."
-      />
+      >
+        <Button asChild className="h-11 md:h-10">
+          <Link to="/katalog/neu">
+            <Plus aria-hidden />
+            Eigene Sorte anlegen
+          </Link>
+        </Button>
+      </PageHeader>
       <div className="flex flex-col gap-3" role="search" aria-label="Sorten filtern">
         <div className="relative">
           <label htmlFor={searchId} className="sr-only">

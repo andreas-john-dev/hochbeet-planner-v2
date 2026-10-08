@@ -36,6 +36,13 @@ describe('mock API', () => {
       ).json()) as ListBedsResponse
     ).beds;
 
+  const plantsOf = async (email: string) =>
+    (
+      (await (
+        await fetchFn('/api/catalog/plants', { headers: auth(email) })
+      ).json()) as ListPlantsResponse
+    ).plants;
+
   beforeEach(() => {
     localStorage.clear();
     fetchFn = createMockFetch(new MockStore(localStorage));
@@ -110,12 +117,6 @@ describe('mock API', () => {
 
   it('applies and resets personal adjustments per user', async () => {
     const lettuce = '01M49THV00RK9E9PC83NEE87CJ'; // Kopfsalat, 25 cm
-    const plantsOf = async (email: string) =>
-      (
-        (await (
-          await fetchFn('/api/catalog/plants', { headers: auth(email) })
-        ).json()) as ListPlantsResponse
-      ).plants;
 
     const saved = await fetchFn(`/api/catalog/plants/${lettuce}/override`, {
       method: 'PUT',
@@ -145,5 +146,61 @@ describe('mock API', () => {
     const plant = (await plantsOf('a@example.com')).find((p) => p.id === lettuce);
     expect(plant).toMatchObject({ spacingInRowCm: 25, overridden: false });
     expect(plant?.global).toBeUndefined();
+  });
+
+  it('creates own plants, checks neighbours and asks for publication', async () => {
+    const email = 'a@example.com';
+    const onion = '01M49THV006G34Z07ZJ8N4X0KS';
+    const fields = {
+      name: 'Haferwurzel',
+      category: 'GEMUESE',
+      family: 'Korbblütler',
+      feeder: 'SCHWACH',
+      spacingInRowCm: 10,
+      rowSpacingCm: 25,
+      lifecycle: { type: 'ANNUAL', cultureWeeks: 20 },
+      goodNeighbors: [] as string[],
+      badNeighbors: [] as string[],
+      color: '#c9a66b',
+      icon: 'category-gemuese',
+    };
+    const send = (path: string, method: string, body?: unknown) =>
+      fetchFn(path, {
+        method,
+        headers: { ...auth(email), ...json },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+
+    const unknown = await send('/api/catalog/plants', 'POST', {
+      ...fields,
+      goodNeighbors: ['01J9ZQ3W8D6V2K5M7N8P9R0XXX'],
+    });
+    expect(unknown.status).toBe(400);
+
+    const created = (await (await send('/api/catalog/plants', 'POST', fields)).json()) as {
+      id: string;
+    };
+    const own = await send('/api/catalog/plants', 'POST', {
+      ...fields,
+      name: 'Zweite',
+      goodNeighbors: [created.id],
+    });
+    expect(own.status).toBe(201);
+    const second = (await own.json()) as { id: string };
+    // Publication needs global neighbours only.
+    expect((await send(`/api/catalog/plants/${second.id}/publication`, 'POST')).status).toBe(400);
+
+    await send(`/api/catalog/plants/${created.id}`, 'PUT', { ...fields, goodNeighbors: [onion] });
+    const requested = await send(`/api/catalog/plants/${created.id}/publication`, 'POST');
+    expect(await requested.json()).toMatchObject({
+      source: 'OWN',
+      goodNeighbors: [onion],
+      publication: { status: 'PENDING' },
+    });
+
+    await send(`/api/catalog/plants/${second.id}`, 'DELETE');
+    const names = (await plantsOf(email)).filter((p) => p.source === 'OWN').map((p) => p.name);
+    expect(names).toEqual(['Haferwurzel']);
+    expect(await plantsOf('b@example.com')).toHaveLength(56);
   });
 });

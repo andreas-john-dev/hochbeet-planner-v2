@@ -11,6 +11,7 @@ import {
   overrideFor,
   parseAdjustForm,
   plantFields,
+  publicationState,
 } from './catalog';
 
 const catalog: CatalogPlant[] = seedPlants.map((p) => ({
@@ -117,5 +118,21 @@ describe('adjust form', () => {
     const form = { ...adjustForm(plant('Kopfsalat')), lifecycleType: 'PERENNIAL' as const };
     const parsed = parseAdjustForm(form);
     expect('fields' in parsed && parsed.fields.lifecycle).toEqual({ type: 'PERENNIAL' });
+  });
+});
+
+describe('publication state', () => {
+  it('shows a rejection as its own state', () => {
+    const own = (publication: CatalogPlant['publication']): CatalogPlant => ({
+      ...plant('Kopfsalat'),
+      source: 'OWN',
+      publication,
+    });
+    expect(publicationState(own({ status: 'PRIVATE' }))).toBe('PRIVATE');
+    expect(publicationState(own({ status: 'PENDING' }))).toBe('PENDING');
+    expect(publicationState(own({ status: 'PRIVATE', rejectionComment: 'Doppelt' }))).toBe(
+      'REJECTED',
+    );
+    expect(publicationState(own({ status: 'PUBLISHED' }))).toBe('PUBLISHED');
   });
 });

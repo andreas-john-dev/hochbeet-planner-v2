@@ -21,6 +21,7 @@ import { CatalogPage } from '@/routes/CatalogPage';
 import { IconGalleryPage } from '@/routes/dev/IconGalleryPage';
 import { NotFoundPage } from '@/routes/NotFoundPage';
 import { PlantDetailPage } from '@/routes/PlantDetailPage';
+import { PlantFormPage } from '@/routes/PlantFormPage';
 import { ProfilePage } from '@/routes/ProfilePage';
 
 export interface RouterContext {
@@ -117,8 +118,18 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appLayout, path: '/katalog', component: CatalogPage }),
     createRoute({
       getParentRoute: () => appLayout,
+      path: '/katalog/neu',
+      component: PlantFormPage,
+    }),
+    createRoute({
+      getParentRoute: () => appLayout,
       path: '/katalog/$plantId',
       component: PlantDetailPage,
+    }),
+    createRoute({
+      getParentRoute: () => appLayout,
+      path: '/katalog/$plantId/bearbeiten',
+      component: PlantFormPage,
     }),
     createRoute({ getParentRoute: () => appLayout, path: '/profil', component: ProfilePage }),
     adminRoute,

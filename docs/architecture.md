@@ -438,6 +438,13 @@ Umsetzung (Stand T-31):
 - **„Für mich anpassen“** (nur globale Sorten): Dialog für Abstand in der Reihe, Reihenabstand, Bedarf, Familie und Standzeit. Beim Speichern bildet `overrideFor` die vollständige Anpassung aus allen Feldern, die vom globalen Stand abweichen; weicht nichts mehr ab, wird sie gelöscht statt gespeichert. „Zurücksetzen“ ruft `DELETE …/override` auf. Danach lädt `useAdjustPlant` den Katalog neu, sodass Editor und Warnungen sofort mit den effektiven Werten rechnen.
 - Nachbarlisten, Name, Farbe und Icon lassen sich per API anpassen, im Dialog aber noch nicht.
 
+Eigene Sorten (Stand T-32):
+
+- **Formular** unter `/katalog/neu` und `/katalog/$plantId/bearbeiten` (nur eigene Sorten): alle Felder; Familie mit Vorschlägen aus dem Katalog; Standzeit als Auswahl mit Erklärung (eine Kultur, mehrere Jahre, Dauerkultur); Farbe; Icon aus `packages/plant-icons` oder das Kategorie-Icon, das dann der Kategorie folgt. Nachbarn werden per Suche hinzugefügt und als Chips entfernt; eine Sorte kann nicht zugleich guter und schlechter Nachbar sein. Logik in `apps/web/src/lib/plant-form.ts`.
+- **Status** auf der Detailseite: privat, angefragt, veröffentlicht oder abgelehnt mit Kommentar der Admins. Abgelehnt ist im Contract `PRIVATE` mit `rejectionComment` (`publicationState()` in `lib/catalog.ts`).
+- **„Für alle vorschlagen“** ruft `POST …/publication` auf; nach einer Ablehnung heißt der Knopf „Erneut vorschlagen“. Weil veröffentlichte Sorten nur auf globale Sorten verweisen dürfen, ist der Knopf gesperrt, solange eigene Sorten unter den Nachbarn stehen, und die App nennt sie.
+- Eigene Sorten erscheinen sofort in Katalog und Palette des Editors und lassen sich wie globale Sorten pflanzen.
+
 ### Beet-Editor
 
 Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bleibt bei jedem Zoom scharf, und jede Pflanzung ist ein DOM-Knoten, den Playwright anklicken und ziehen kann.
@@ -538,9 +545,9 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
 - **Auth-Adapter:** Die App spricht Cognito nur über das Interface `AuthAdapter` (`apps/web/src/lib/auth/`) an. In prod steckt Amplify dahinter (`aws-amplify/auth`, SRP, ohne Hosted UI). Der Dev-Server liefert `config.json` aus `apps/web/config.dev.json` mit `"authMode": "mock"`; dann übernimmt ein lokaler Mock mit Testusern (`test@example.com`, `admin@example.com`, Passwort `Gemuese1!`, Bestätigungscode `123456`). Der Mock wird nur in diesem Fall nachgeladen und läuft in prod nie.
 - **Mock-API:** Mit `"apiMode": "mock"` in `config.dev.json` beantworten MSW-Handler (`apps/web/src/mocks/`) alle Aufrufe unter `/api/*` direkt im Browser.
   - `createMockFetch()` ruft dafür `getResponse()` von MSW auf und kommt ohne Service-Worker aus, also ohne Zusatzdatei im Build. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
-  - Die Handler bilden Garden- und Catalog-Service nach: gleiche Routen, gleiche Contract-Schemas, gleiche Fehlerform. Daten liegen pro Testuser im `localStorage`, der Katalog ist der Startkatalog plus die Anpassungen des Users.
+  - Die Handler bilden Garden- und Catalog-Service nach: gleiche Routen, gleiche Contract-Schemas, gleiche Fehlerform. Daten liegen pro Testuser im `localStorage`, der Katalog ist der Startkatalog plus Anpassungen und eigene Sorten des Users.
   - Playwright startet jeden Test mit leerem Speicher und kann Daten per `addInitScript` vorbelegen.
-- **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`, `useSavePlanting`, `useDeletePlanting`, `useAdjustPlant`). Nach Änderungen wird die Beetliste neu geladen.
+- **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`, `useSavePlanting`, `useDeletePlanting`, `useAdjustPlant`, `useSaveOwnPlant`, `useRequestPublication`). Nach Änderungen wird die Beetliste neu geladen.
 - **Beetübersicht (`/beete`):**
   - Kartenraster mit maßstäblicher Mini-Vorschau. Sie zeigt die Standflächen der Pflanzungen, die in der laufenden Woche im Beet stehen, in der Farbe der Sorte.
   - Dialog „Beet anlegen“ bzw. „Beet bearbeiten“ mit Name, Breite, Tiefe und Reihenrichtung. Die Reihenrichtung ist als Skizze erklärt und folgt dem Standard (parallel zur kürzeren Kante), bis der User selbst wählt.

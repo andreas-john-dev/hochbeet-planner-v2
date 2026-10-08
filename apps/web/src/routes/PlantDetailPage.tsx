@@ -1,9 +1,10 @@
 import type { CatalogPlant, PlantFields } from '@hochbeet/contracts';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft, RotateCcw, SearchX, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Pencil, RotateCcw, SearchX, SlidersHorizontal } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { AdjustPlantDialog } from '@/components/catalog/AdjustPlantDialog';
+import { PublicationPanel } from '@/components/catalog/PublicationPanel';
 import { SourceBadge } from '@/components/catalog/SourceBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
@@ -128,8 +129,18 @@ function PlantDetails({
             )}
           </div>
         )}
+        {plant.source === 'OWN' && (
+          <Button asChild variant="outline" className="h-11 basis-full sm:basis-auto md:h-9">
+            <Link to="/katalog/$plantId/bearbeiten" params={{ plantId: plant.id }}>
+              <Pencil aria-hidden />
+              Bearbeiten
+            </Link>
+          </Button>
+        )}
       </header>
       {reset.isError && <FormMessage tone="error">{apiErrorMessage(reset.error)}</FormMessage>}
+
+      {plant.source === 'OWN' && <PublicationPanel plant={plant} catalog={catalog} />}
 
       <section aria-labelledby="plant-values" className="flex flex-col gap-2">
         <h2 id="plant-values" className="text-lg font-semibold">
