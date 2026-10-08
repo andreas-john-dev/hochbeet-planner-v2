@@ -461,6 +461,16 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
 ### Anmeldung
 
 - **Auth-Adapter:** Die App spricht Cognito nur über das Interface `AuthAdapter` (`apps/web/src/lib/auth/`) an. In prod steckt Amplify dahinter (`aws-amplify/auth`, SRP, ohne Hosted UI). Der Dev-Server liefert `config.json` aus `apps/web/config.dev.json` mit `"authMode": "mock"`; dann übernimmt ein lokaler Mock mit Testusern (`test@example.com`, `admin@example.com`, Passwort `Gemuese1!`, Bestätigungscode `123456`). Der Mock wird nur in diesem Fall nachgeladen und läuft in prod nie.
+- **Mock-API:** Mit `"apiMode": "mock"` in `config.dev.json` beantworten MSW-Handler (`apps/web/src/mocks/`) alle Aufrufe unter `/api/*` direkt im Browser.
+  - `createMockFetch()` ruft dafür `getResponse()` von MSW auf und kommt ohne Service-Worker aus, also ohne Zusatzdatei im Build. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
+  - Die Handler bilden Garden- und Catalog-Service nach: gleiche Routen, gleiche Contract-Schemas, gleiche Fehlerform. Daten liegen pro Testuser im `localStorage`, der Katalog ist der Startkatalog.
+  - Playwright startet jeden Test mit leerem Speicher und kann Daten per `addInitScript` vorbelegen.
+- **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`). Nach Änderungen wird die Beetliste neu geladen.
+- **Beetübersicht (`/beete`):**
+  - Kartenraster mit maßstäblicher Mini-Vorschau. Sie zeigt die Standflächen der Pflanzungen, die in der laufenden Woche im Beet stehen, in der Farbe der Sorte.
+  - Dialog „Beet anlegen“ bzw. „Beet bearbeiten“ mit Name, Breite, Tiefe und Reihenrichtung. Die Reihenrichtung ist als Skizze erklärt und folgt dem Standard (parallel zur kürzeren Kante), bis der User selbst wählt.
+  - Löschen fragt nach und weist darauf hin, dass die Pflanzungen mitgelöscht werden.
+  - Ohne Beete erscheint ein leerer Zustand mit der Einladung zum ersten Beet.
 - **Seiten:** `/anmelden`, `/registrieren` (mit Bestätigungscode) und `/passwort-vergessen`, mit react-hook-form, Zod und deutschen Fehlermeldungen. Die Passwortregeln spiegeln die Policy des User Pools. Fehler bei der Anmeldung verraten nicht, ob ein Konto existiert.
 - **Geschützte Routen:** Alles außer den drei Auth-Seiten und der Entwicklerseite `/dev/icons` verlangt eine Anmeldung. Ohne Login leitet der Router auf `/anmelden?redirect=<Pfad>` um und kehrt danach dorthin zurück; Weiterleitungen gehen nur auf Pfade der App. `/admin` und der Navigationseintrag erscheinen nur für die Gruppe `admins` (Claim `cognito:groups` im ID-Token). Das ist reine Bedienführung; geschützt werden die Admin-Daten im Catalog-Service.
 - **API-Client:** `createApiClient()` in `apps/web/src/lib/api.ts` sendet das ID-Token als `Authorization: Bearer …` an `/api/...`.
