@@ -76,6 +76,7 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 - `packages/garden-rules` ist reines TypeScript ohne AWS- oder React-Abhängigkeiten; Typen kommen aus `packages/contracts` (`import type`).
 - Neue Regeln in `packages/garden-rules/src/rules/` als `(ctx: RuleContext) => Finding[]` und in `src/engine.ts` eintragen; Testdaten mit den Buildern aus `src/test-utils.ts`. Einstiegspunkt für App und Services ist nur `evaluateBed()`. Der Performance-Test (200 Pflanzungen < 50 ms) muss grün bleiben.
 - `packages/catalog-seed`: Sorten in `src/data.ts` mit fester ULID, die nie geändert wird; Kurzformen der Nachbarlisten löst `resolveSeed()` auf. Ändert sich der Widerspruchsreport, mit `pnpm --filter @hochbeet/catalog-seed test -u` neu schreiben.
+- `packages/plant-icons`: ein Icon pro Sorte in `src/icons/*.ts` (48 × 48, flach, höchstens drei Farben); neue Sorten brauchen ein Icon, sonst schlägt der Test fehl. In der App `<PlantIcon plant={…} />` aus `@hochbeet/plant-icons/react`; Galerie unter `/dev/icons`.
 - `packages/contracts`: Grundtypen in `primitives.ts`, Domäne in `domain.ts`, Requests/Responses je Service in `api/`. Typen immer per `z.infer` aus den Schemas ableiten, nie doppelt schreiben.
 - Längen immer in cm, Positionen auf dem 5-cm-Raster. Daten als ISO-Strings, Wochen nach ISO-8601, Rechnen mit date-fns (Locale `de`).
 - Die `userId` kommt im Backend ausschließlich aus dem `sub`-Claim des JWT.

@@ -38,6 +38,7 @@ export const appPages: readonly AppPage[] = [
     access: 'admin',
     navLabel: 'Admin',
   },
+  { id: 'dev-icons', path: '/dev/icons', heading: 'Icon-Galerie', access: 'public' },
 ];
 
 export const protectedPages = appPages.filter((p) => p.access !== 'public');

@@ -38,9 +38,18 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.3.0
         version: 5.3.0
+      '@hochbeet/catalog-seed':
+        specifier: workspace:*
+        version: link:../../packages/catalog-seed
+      '@hochbeet/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@hochbeet/garden-rules':
         specifier: workspace:*
         version: link:../../packages/garden-rules
+      '@hochbeet/plant-icons':
+        specifier: workspace:*
+        version: link:../../packages/plant-icons
       '@hookform/resolvers':
         specifier: ^5.9.1
         version: 5.9.1(react-hook-form@7.89.0(@types/react@19.3.0)(react@19.3.0))(zod@4.6.5)
@@ -198,7 +207,27 @@ importers:
         specifier: ^4.10.2
         version: 4.10.2
 
-  packages/plant-icons: {}
+  packages/plant-icons:
+    dependencies:
+      '@hochbeet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@hochbeet/catalog-seed':
+        specifier: workspace:*
+        version: link:../catalog-seed
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
 
   packages/tsconfig: {}
 

@@ -203,6 +203,16 @@ Umsetzung in `packages/catalog-seed`:
 - Icon-Schlüssel sind der Sortenname in Kleinbuchstaben mit Bindestrichen, Umlaute ausgeschrieben, z. B. `rote-bete`, `fruehlingszwiebel`. `packages/plant-icons` liefert die passenden SVGs.
 - Tests prüfen das Zod-Schema, die Nachbar-Referenzen und die Kurzformen. Widersprüche (gut auf einer, schlecht auf der anderen Seite) listet der Testreport `packages/catalog-seed/report/contradictions.md`. Die Tabelle wendet „Warnung sticht“ bereits an und enthält aktuell keine.
 
+### Pflanzen-Icons
+
+`packages/plant-icons` enthält ein handgezeichnetes Icon pro Sorte des Startkatalogs und je ein Kategorie-Icon (`category-gemuese`, `category-obst`, `category-kraut`).
+
+- Stil: `viewBox` 0 0 48 48, flache Formen ohne Verläufe, höchstens drei Farben pro Icon, lesbar ab 24 px. Mindestens eine Farbe hat zu beiden Seitenhintergründen (hell und dunkel) einen Kontrast von 3:1. Tests prüfen das für jedes Icon.
+- Icons sind Daten statt SVG-Dateien: eine Liste von Pfaden mit Füllung oder Linie (`src/icons/*.ts`, Hilfsfunktionen in `src/shapes.ts`). Das hält sie typsicher und prüfbar.
+- `@hochbeet/plant-icons` exportiert die Daten ohne React (`ICONS`, `PLANT_ICON_KEYS` für die Icon-Auswahl eigener Sorten, `resolveIconKey()`), `@hochbeet/plant-icons/react` die Komponenten.
+- `<PlantIcon plant size />` nimmt die Sorte (`icon`, `category`, `name`) statt einer `plantId`. Abweichung vom Issue: Das Paket kennt den Katalog des Users nicht; die Sorte zur `plantId` holt der Aufrufer aus dem Katalog. Unbekannte Icon-Schlüssel fallen auf das Kategorie-Icon zurück. Der Sortenname ist das zugängliche Label; `decorative` blendet das Icon für Screenreader aus, wenn der Name daneben steht.
+- Die Galerie `/dev/icons` zeigt alle Icons in 24, 32 und 48 px. Sie ist öffentlich und braucht keine Daten; Playwright-Screenshots in Hell und Dunkel sichern sie ab.
+
 ## Systemarchitektur
 
 ```mermaid
@@ -365,7 +375,7 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
 
 - **Auth-Adapter:** Die App spricht Cognito nur über das Interface `AuthAdapter` (`apps/web/src/lib/auth/`) an. In prod steckt Amplify dahinter (`aws-amplify/auth`, SRP, ohne Hosted UI). Der Dev-Server liefert `config.json` aus `apps/web/config.dev.json` mit `"authMode": "mock"`; dann übernimmt ein lokaler Mock mit Testusern (`test@example.com`, `admin@example.com`, Passwort `Gemuese1!`, Bestätigungscode `123456`). Der Mock wird nur in diesem Fall nachgeladen und läuft in prod nie.
 - **Seiten:** `/anmelden`, `/registrieren` (mit Bestätigungscode) und `/passwort-vergessen`, mit react-hook-form, Zod und deutschen Fehlermeldungen. Die Passwortregeln spiegeln die Policy des User Pools. Fehler bei der Anmeldung verraten nicht, ob ein Konto existiert.
-- **Geschützte Routen:** Alles außer den drei Auth-Seiten verlangt eine Anmeldung. Ohne Login leitet der Router auf `/anmelden?redirect=<Pfad>` um und kehrt danach dorthin zurück; Weiterleitungen gehen nur auf Pfade der App. `/admin` und der Navigationseintrag erscheinen nur für die Gruppe `admins` (Claim `cognito:groups` im ID-Token). Das ist reine Bedienführung; geschützt werden die Admin-Daten im Catalog-Service.
+- **Geschützte Routen:** Alles außer den drei Auth-Seiten und der Entwicklerseite `/dev/icons` verlangt eine Anmeldung. Ohne Login leitet der Router auf `/anmelden?redirect=<Pfad>` um und kehrt danach dorthin zurück; Weiterleitungen gehen nur auf Pfade der App. `/admin` und der Navigationseintrag erscheinen nur für die Gruppe `admins` (Claim `cognito:groups` im ID-Token). Das ist reine Bedienführung; geschützt werden die Admin-Daten im Catalog-Service.
 - **API-Client:** `createApiClient()` in `apps/web/src/lib/api.ts` sendet das ID-Token als `Authorization: Bearer …` an `/api/...`.
 
 ## IaC
