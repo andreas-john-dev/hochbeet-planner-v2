@@ -131,6 +131,7 @@ export function PlantingDetails({
             <p className="text-sm">Entfernt ab {formatDate(planting.removedDate)}.</p>
             <Button
               variant="outline"
+              className="h-11 md:h-10"
               onClick={() => {
                 onChange(planting, { ...planting, removedDate: null });
               }}
@@ -143,6 +144,7 @@ export function PlantingDetails({
           <>
             <Button
               variant="outline"
+              className="h-11 md:h-10"
               disabled={removal === null}
               onClick={() => {
                 if (removal) onChange(planting, { ...planting, removedDate: removal });
@@ -160,7 +162,7 @@ export function PlantingDetails({
         )}
         <Button
           variant="outline"
-          className="text-red-700 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+          className="h-11 text-red-700 hover:text-red-800 md:h-10 dark:text-red-400 dark:hover:text-red-300"
           onClick={() => {
             onDelete(planting);
           }}

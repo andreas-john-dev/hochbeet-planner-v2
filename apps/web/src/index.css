@@ -68,6 +68,8 @@
   }
   html {
     color-scheme: light;
+    /* Pan and pinch stay, double-tap zoom goes: taps in the editor must not zoom the page. */
+    touch-action: manipulation;
   }
   html.dark {
     color-scheme: dark;

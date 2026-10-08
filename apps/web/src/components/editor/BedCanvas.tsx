@@ -1,7 +1,7 @@
 import type { Bed, Plant, Planting } from '@hochbeet/contracts';
 import { useEffect, useRef, type RefObject } from 'react';
 import { useStore } from 'zustand';
-import { isTempId, moveByKey, newPlanting, snapToBed } from '@/lib/editor/placement';
+import { isTempId, LONG_PRESS_MS, moveByKey, newPlanting, snapToBed } from '@/lib/editor/placement';
 import type { Draft, EditorStore } from '@/lib/editor/store';
 import { toCm, viewBox } from '@/lib/editor/viewport';
 import { BedGrid } from './BedGrid';
@@ -17,6 +17,8 @@ interface Pointer {
 interface Move {
   planting: Planting;
   from: Pointer;
+  /** Set for a long press: when and where the finger went down, and what was selected. */
+  touch?: { pressedAt: number; start: Pointer; selectedBefore: string | null };
 }
 
 /** Pointer travel in px up to which a press counts as a click, not a pan or move. */
@@ -69,6 +71,9 @@ export function BedCanvas({
   // Planting under the pointer at press time; with pointer capture, later events target the SVG.
   const pressedId = useRef<string | null>(null);
   const move = useRef<Move | null>(null);
+  const longPress = useRef<number | null>(null);
+  // Event time of the last press; finger moves are judged by when they happened.
+  const pressTime = useRef(0);
   const { size, viewport, fitted, preview, kind, selectedId, draft } = useStore(store);
 
   // Measure the drawing area and fit the bed once the size is known.
@@ -86,6 +91,27 @@ export function BedCanvas({
       observer.disconnect();
     };
   }, [store, bed, svgRef]);
+
+  const cancelLongPress = () => {
+    if (longPress.current !== null) window.clearTimeout(longPress.current);
+    longPress.current = null;
+  };
+  useEffect(() => cancelLongPress, []);
+
+  // The bed handles touch itself (pan, pinch, long press). Without this, the browser's own
+  // long-press gesture (context menu, selection) runs as well and, on Android, can swallow
+  // the next tap. Pointer events still arrive; only mouse emulation and native gestures stop.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onTouchStart = (event: TouchEvent) => {
+      event.preventDefault();
+    };
+    svg.addEventListener('touchstart', onTouchStart, { passive: false });
+    return () => {
+      svg.removeEventListener('touchstart', onTouchStart);
+    };
+  }, [svgRef]);
 
   // Wheel zoom needs a non-passive listener to stop the page from scrolling.
   useEffect(() => {
@@ -128,12 +154,34 @@ export function BedCanvas({
     pointers.current.set(event.pointerId, local(event));
     pressedAt.current = pointers.current.size === 1 ? local(event) : null;
     pressedId.current = plantingIdOf(event.target);
-    // Mouse and pen drag plantings; on touch screens one finger keeps panning (T-27).
+    pressTime.current = event.timeStamp;
+    cancelLongPress();
+    move.current = null;
     const target = plantingById(pressedId.current);
-    move.current =
-      target && !cursorPreview && event.pointerType !== 'touch' && pointers.current.size === 1
-        ? { planting: target.planting, from: local(event) }
-        : null;
+    if (!target || cursorPreview || pointers.current.size !== 1) return;
+    if (event.pointerType !== 'touch') {
+      // Mouse and pen drag plantings right away.
+      move.current = { planting: target.planting, from: local(event) };
+      return;
+    }
+    // On touch screens one finger pans; holding still on a planting picks it up instead.
+    const pointerId = event.pointerId;
+    longPress.current = window.setTimeout(() => {
+      longPress.current = null;
+      const at = pointers.current.get(pointerId);
+      const start = pressedAt.current;
+      if (!at || !start || pointers.current.size !== 1) return;
+      const state = store.getState();
+      move.current = {
+        planting: target.planting,
+        from: at,
+        touch: { pressedAt: pressTime.current, start, selectedBefore: state.selectedId },
+      };
+      pressedAt.current = null;
+      state.select(target.planting.id);
+      // Not every phone can vibrate (iOS Safari has no Vibration API).
+      if ('vibrate' in navigator) navigator.vibrate(10);
+    }, LONG_PRESS_MS);
   };
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -150,6 +198,27 @@ export function BedCanvas({
     }
     const current = local(event);
     const state = store.getState();
+    // Moving before the long press is over, or a second finger, means pan or pinch.
+    const start = pressedAt.current;
+    if (
+      longPress.current !== null &&
+      (pointers.current.size > 1 ||
+        (start && Math.hypot(current.x - start.x, current.y - start.y) > CLICK_TOLERANCE_PX))
+    ) {
+      cancelLongPress();
+    }
+    // A busy main thread can run the long-press timer before already received moves: if the
+    // finger had moved before the hold time was over, it was a swipe after all.
+    const touch = move.current?.touch;
+    if (
+      touch &&
+      !state.draft &&
+      event.timeStamp - touch.pressedAt < LONG_PRESS_MS &&
+      Math.hypot(current.x - touch.start.x, current.y - touch.start.y) > CLICK_TOLERANCE_PX
+    ) {
+      move.current = null;
+      state.select(touch.selectedBefore);
+    }
     if (move.current) {
       const { planting, from } = move.current;
       if (!state.draft && Math.hypot(current.x - from.x, current.y - from.y) <= CLICK_TOLERANCE_PX)
@@ -183,6 +252,7 @@ export function BedCanvas({
 
   const onPointerEnd = (event: React.PointerEvent<SVGSVGElement>) => {
     pointers.current.delete(event.pointerId);
+    cancelLongPress();
     const state = store.getState();
     const moved = move.current;
     move.current = null;
@@ -202,11 +272,16 @@ export function BedCanvas({
     if (event.type !== 'pointerup' || !start) return;
     const end = local(event);
     if (Math.hypot(end.x - start.x, end.y - start.y) > CLICK_TOLERANCE_PX) return;
-    // A click: places the chosen plant, selects a planting or clears the selection.
+    // A click or tap: places the chosen plant (on touch screens it only moves the preview,
+    // which is then confirmed), opens a planting or clears the selection.
     if (cursorPreview) {
-      onPlace(cursorPreview.plant, snapToBed(clientToBed(event.clientX, event.clientY), bed));
+      const at = snapToBed(clientToBed(event.clientX, event.clientY), bed);
+      if (event.pointerType === 'touch') state.setPreview({ ...cursorPreview, at });
+      else onPlace(cursorPreview.plant, at);
+    } else if (pressedId.current) {
+      state.inspect(pressedId.current);
     } else {
-      state.select(pressedId.current);
+      state.select(null);
     }
   };
 
@@ -262,7 +337,7 @@ export function BedCanvas({
           ? viewBox(viewport, size)
           : `0 0 ${String(bed.widthCm)} ${String(bed.depthCm)}`
       }
-      className={`bg-card focus-visible:ring-ring block h-full w-full touch-none outline-none select-none focus-visible:ring-2 focus-visible:ring-inset ${cursorPreview ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
+      className={`bg-card focus-visible:ring-ring block h-full w-full touch-none outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-inset ${cursorPreview ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
       role="group"
       tabIndex={0}
       aria-label={`Beet ${bed.name}, ${String(bed.widthCm)} × ${String(bed.depthCm)} cm`}
@@ -273,6 +348,10 @@ export function BedCanvas({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
+      // No context menu or text callout after a long press.
+      onContextMenu={(event) => {
+        event.preventDefault();
+      }}
       onKeyDown={onKeyDown}
       style={{ visibility: fitted ? 'visible' : 'hidden' }}
     >
