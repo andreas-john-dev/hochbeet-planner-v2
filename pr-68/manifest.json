@@ -1,0 +1,54 @@
+[
+  {
+    "id": "anmelden",
+    "path": "/anmelden",
+    "heading": "Anmelden",
+    "access": "public"
+  },
+  {
+    "id": "registrieren",
+    "path": "/registrieren",
+    "heading": "Registrieren",
+    "access": "public"
+  },
+  {
+    "id": "passwort-vergessen",
+    "path": "/passwort-vergessen",
+    "heading": "Passwort vergessen",
+    "access": "public"
+  },
+  {
+    "id": "beete",
+    "path": "/beete",
+    "heading": "Meine Beete",
+    "access": "user",
+    "navLabel": "Beete"
+  },
+  {
+    "id": "katalog",
+    "path": "/katalog",
+    "heading": "Pflanzenkatalog",
+    "access": "user",
+    "navLabel": "Katalog"
+  },
+  {
+    "id": "profil",
+    "path": "/profil",
+    "heading": "Profil",
+    "access": "user",
+    "navLabel": "Profil"
+  },
+  {
+    "id": "admin",
+    "path": "/admin",
+    "heading": "Administration",
+    "access": "admin",
+    "navLabel": "Admin"
+  },
+  {
+    "id": "dev-icons",
+    "path": "/dev/icons",
+    "heading": "Icon-Galerie",
+    "access": "public"
+  }
+]
