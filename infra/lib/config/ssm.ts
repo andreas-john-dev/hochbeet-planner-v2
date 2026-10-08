@@ -4,4 +4,5 @@ import type { StageConfig } from './stages';
 export const ssmParameters = (stage: StageConfig) => ({
   userPoolId: `/hochbeet/${stage.name}/shared/user-pool-id`,
   userPoolClientId: `/hochbeet/${stage.name}/shared/user-pool-client-id`,
+  catalogTableName: `/hochbeet/${stage.name}/catalog/table-name`,
 });

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { App, Validations } from 'aws-cdk-lib';
 import { AwsSolutionsChecks } from 'cdk-nag';
+import { CatalogStatefulStack } from '../lib/catalog/CatalogStatefulStack';
 import { CLOUDFRONT_CERTIFICATE_REGION, stages } from '../lib/config/stages';
 import { CertificateStack } from '../lib/frontend/CertificateStack';
 import { FrontendStack } from '../lib/frontend/FrontendStack';
@@ -16,6 +17,7 @@ for (const stage of stages) {
     env,
     stage,
   });
+  new CatalogStatefulStack(app, `${stage.stackPrefix}-CatalogStateful`, { env, stage });
   const certificate = new CertificateStack(app, `${stage.stackPrefix}-Certificate`, {
     env: { account: env.account, region: CLOUDFRONT_CERTIFICATE_REGION },
     stage,
