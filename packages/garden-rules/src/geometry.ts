@@ -1,5 +1,8 @@
 import type { Bed, Direction, Plant, Planting } from '@hochbeet/contracts';
-import { GRID_CM } from '@hochbeet/contracts';
+import { GRID_CM as CONTRACT_GRID_CM } from '@hochbeet/contracts';
+
+// Local copy: module re-exports are read through getters, which is measurable in hot loops.
+const GRID_CM = CONTRACT_GRID_CM;
 
 /** Footprint of a single plant: circle around its position. All values in cm. */
 export interface CircleFootprint {
@@ -94,21 +97,44 @@ export const cellKey = (cell: GridCell) => `${String(cell.col)}:${String(cell.ro
  * Basis of the crop rotation check, which compares predecessors per cell.
  */
 export function gridCells(fp: Footprint): GridCell[] {
-  const box = bounds(fp);
   const cells: GridCell[] = [];
-  for (let col = Math.floor(box.x0 / GRID_CM); col * GRID_CM < box.x1; col++) {
-    for (let row = Math.floor(box.y0 / GRID_CM); row * GRID_CM < box.y1; row++) {
-      const cell: StripFootprint = {
-        kind: 'strip',
-        x0: col * GRID_CM,
-        y0: row * GRID_CM,
-        x1: (col + 1) * GRID_CM,
-        y1: (row + 1) * GRID_CM,
-      };
-      if (gap(fp, cell) < 0) cells.push({ col, row });
+  forEachGridCell(fp, (col, row) => cells.push({ col, row }));
+  return cells;
+}
+
+/**
+ * Numeric key of a cell, cheaper than `cellKey` for large indexes. Stays a small integer
+ * (below 2^22), which V8 hashes fast; valid for |col|, |row| < 1024, i.e. ±51 m.
+ */
+export const cellIndex = (col: number, row: number) => (col + 1024) * 2048 + (row + 1024);
+
+/** Calls `visit` for every cell `gridCells` would return, without allocating cell objects. */
+export function forEachGridCell(fp: Footprint, visit: (col: number, row: number) => void) {
+  const box = bounds(fp);
+  const firstCol = Math.floor(box.x0 / GRID_CM);
+  const firstRow = Math.floor(box.y0 / GRID_CM);
+  for (let col = firstCol; col * GRID_CM < box.x1; col++) {
+    for (let row = firstRow; row * GRID_CM < box.y1; row++) {
+      // Touching a cell's edge does not count; the areas must overlap.
+      if (fp.kind === 'strip' ? stripCoversCell(fp, col, row) : circleCoversCell(fp, col, row)) {
+        visit(col, row);
+      }
     }
   }
-  return cells;
+}
+
+function stripCoversCell(s: StripFootprint, col: number, row: number): boolean {
+  const x0 = col * GRID_CM;
+  const y0 = row * GRID_CM;
+  return s.x0 < x0 + GRID_CM && s.x1 > x0 && s.y0 < y0 + GRID_CM && s.y1 > y0;
+}
+
+function circleCoversCell(c: CircleFootprint, col: number, row: number): boolean {
+  const x0 = col * GRID_CM;
+  const y0 = row * GRID_CM;
+  const dx = c.cx - clamp(c.cx, x0, x0 + GRID_CM);
+  const dy = c.cy - clamp(c.cy, y0, y0 + GRID_CM);
+  return dx * dx + dy * dy < c.r * c.r;
 }
 
 /** Row direction of a planting: its orientation for rows, the bed's main direction otherwise. */

@@ -6,7 +6,6 @@ import {
   format,
   formatISO,
   getISOWeek,
-  getYear,
   isSameMonth,
   isSameYear,
   parseISO,
@@ -116,7 +115,8 @@ export function hasSoilRenewalBetween(
   to: IsoDate,
 ): boolean {
   if (to < from) return false;
-  for (let year = getYear(toDate(from)); year <= getYear(toDate(to)); year++) {
+  // ISO dates start with the year; no date parsing needed (hot path of crop rotation).
+  for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year++) {
     if (soilRenewalsIn(bed, year).some((date) => from <= date && date <= to)) return true;
   }
   return false;
