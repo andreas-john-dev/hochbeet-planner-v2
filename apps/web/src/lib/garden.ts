@@ -4,6 +4,8 @@ import type {
   BedWithPlantingsResponse,
   ListBedsResponse,
   ListPlantsResponse,
+  Planting,
+  PlantingFields,
 } from '@hochbeet/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api-context';
@@ -59,4 +61,79 @@ export function useDeleteBed() {
     mutationFn: (id: string) => api<undefined>(`/api/garden/beds/${id}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.beds }),
   });
+}
+
+type PlantingChange = { type: 'save'; planting: Planting } | { type: 'delete'; plantingId: string };
+
+/** Applies a change to the cached bed, as the server will after the request. */
+function applyChange(data: BedWithPlantingsResponse, change: PlantingChange) {
+  const others = data.plantings.filter(
+    (p) => p.id !== (change.type === 'save' ? change.planting.id : change.plantingId),
+  );
+  return { ...data, plantings: change.type === 'save' ? [...others, change.planting] : others };
+}
+
+/**
+ * Shared optimistic update for planting changes: the editor shows the change at once and
+ * rolls back if the request fails. Afterwards the bed is reloaded from the server.
+ */
+function useOptimisticPlantingChange<TVariables>(
+  bedId: string,
+  request: (variables: TVariables) => Promise<unknown>,
+  toChange: (variables: TVariables) => PlantingChange,
+) {
+  const queryClient = useQueryClient();
+  const key = queryKeys.bed(bedId);
+  return useMutation({
+    mutationFn: request,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<BedWithPlantingsResponse>(key);
+      if (previous) {
+        queryClient.setQueryData(key, applyChange(previous, toChange(variables)));
+      }
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) queryClient.setQueryData(key, context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
+}
+
+/** Saves a planting: PUT for an existing id, POST for a new one (the id is then temporary). */
+export function useSavePlanting(bedId: string) {
+  const api = useApi();
+  return useOptimisticPlantingChange(
+    bedId,
+    ({ planting, isNew }: { planting: Planting; isNew: boolean }) => {
+      const fields: PlantingFields = toFields(planting);
+      return isNew
+        ? api<Planting>(`/api/garden/beds/${bedId}/plantings`, {
+            method: 'POST',
+            body: JSON.stringify(fields),
+          })
+        : api<Planting>(`/api/garden/beds/${bedId}/plantings/${planting.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(fields),
+          });
+    },
+    ({ planting }) => ({ type: 'save', planting }),
+  );
+}
+
+export function useDeletePlanting(bedId: string) {
+  const api = useApi();
+  return useOptimisticPlantingChange(
+    bedId,
+    (plantingId: string) =>
+      api<undefined>(`/api/garden/beds/${bedId}/plantings/${plantingId}`, { method: 'DELETE' }),
+    (plantingId) => ({ type: 'delete', plantingId }),
+  );
+}
+
+/** The fields the API takes for a planting (without id and bedId). */
+export function toFields(planting: Planting): PlantingFields {
+  const { id: _id, bedId: _bedId, ...fields } = planting;
+  return fields;
 }

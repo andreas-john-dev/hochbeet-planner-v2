@@ -39,6 +39,7 @@ async function parse<T extends z.ZodType>(request: Request, schema: T) {
 
 const byName = (a: Bed, b: Bed) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id);
 const BED_NOT_FOUND = 'Dieses Beet gibt es nicht.';
+const PLANTING_NOT_FOUND = 'Diese Pflanzung gibt es nicht.';
 
 /**
  * MSW handlers that mimic the garden and catalog services for the dev server and
@@ -144,6 +145,41 @@ export function createHandlers(store: MockStore, newId: () => string = () => uli
         const planting: Planting = { ...parsed.data, id: newId(), bedId: params.bedId ?? '' };
         store.write(userId, { ...garden, plantings: [...garden.plantings, planting] });
         return HttpResponse.json(planting, { status: 201 });
+      }),
+    ),
+
+    http.put(
+      '/api/garden/beds/:bedId/plantings/:id',
+      withUser(async ({ request, params, userId }) => {
+        const parsed = await parse(request, SavePlantingRequestSchema);
+        if (parsed.response) return parsed.response;
+        const garden = store.read(userId);
+        const exists = garden.plantings.some((p) => p.id === params.id && p.bedId === params.bedId);
+        if (!exists) return error(PLANTING_NOT_FOUND, 404);
+        const planting: Planting = {
+          ...parsed.data,
+          id: params.id ?? '',
+          bedId: params.bedId ?? '',
+        };
+        store.write(userId, {
+          ...garden,
+          plantings: garden.plantings.map((p) => (p.id === planting.id ? planting : p)),
+        });
+        return HttpResponse.json(planting);
+      }),
+    ),
+
+    http.delete(
+      '/api/garden/beds/:bedId/plantings/:id',
+      withUser(({ params, userId }) => {
+        const garden = store.read(userId);
+        const exists = garden.plantings.some((p) => p.id === params.id && p.bedId === params.bedId);
+        if (!exists) return error(PLANTING_NOT_FOUND, 404);
+        store.write(userId, {
+          ...garden,
+          plantings: garden.plantings.filter((p) => p.id !== params.id),
+        });
+        return new HttpResponse(null, { status: 204 });
       }),
     ),
   ];

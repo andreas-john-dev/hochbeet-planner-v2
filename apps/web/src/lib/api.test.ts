@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, createApiClient } from './api';
+import { ApiError, createApiClient, shouldRetry } from './api';
 
 describe('createApiClient', () => {
   it('sends the ID token and parses JSON', async () => {
@@ -29,5 +29,18 @@ describe('createApiClient', () => {
     await expect(
       createApiClient(() => Promise.resolve('t'), fetchFn)('/api/catalog/plants'),
     ).rejects.toEqual(new ApiError(403, { message: 'nope' }));
+  });
+});
+
+describe('shouldRetry', () => {
+  it('does not retry client errors', () => {
+    expect(shouldRetry(0, new ApiError(404, null))).toBe(false);
+    expect(shouldRetry(0, new ApiError(403, null))).toBe(false);
+  });
+
+  it('retries server and network errors three times', () => {
+    expect(shouldRetry(0, new ApiError(503, null))).toBe(true);
+    expect(shouldRetry(2, new TypeError('Failed to fetch'))).toBe(true);
+    expect(shouldRetry(3, new TypeError('Failed to fetch'))).toBe(false);
   });
 });

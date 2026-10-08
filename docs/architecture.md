@@ -438,6 +438,16 @@ Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bl
 - Beim Ziehen zeigt eine Vorschau die Warnungen live an, bevor man loslässt.
 - Der Wochen-Slider steuert, welche Pflanzungen sichtbar sind.
 
+Umsetzung (Stand T-24):
+
+- **Route:** `/beete/$bedId` (`BedEditorPage`); jede Beetkarte verlinkt dorthin. Unbekannte Beete zeigen „Beet nicht gefunden“. Clientfehler (4xx) wiederholt TanStack Query nicht (`shouldRetry` in `lib/api.ts`).
+- **Ansicht:** Der Viewport (`lib/editor/viewport.ts`) besteht aus Verschiebung in px und Maßstab in px pro cm. Er wird in einen `viewBox` umgerechnet, sodass alle Formen in cm gezeichnet werden. Beim ersten Messen passt er das Beet mit Rand ein. Zoom hält den Punkt unter Mauszeiger bzw. Fingern fest (Maßstab 0,05 bis 40 px/cm).
+- **Raster:** Die Rasterweite wird aus 5, 10, 25, 50 und 100 cm so gewählt, dass Linien mindestens 8 px auseinanderliegen. Hauptlinien kommen alle 50 bzw. 100 cm; Linien haben unabhängig vom Zoom eine feste Strichstärke.
+- **Pflanzungen:** Jede Pflanzung ist ein `<g data-testid="planting-<id>">` mit Standfläche und einem Icon je Pflanze. Bei Reihen gilt das für jede Pflanze im Abstand in der Reihe. Die Icons sind 8 bis 24 cm groß. Gezeigt werden die Pflanzungen der laufenden Woche, bis der Wochen-Slider kommt.
+- **Gesten:** Mausrad zoomt, Ziehen verschiebt, zwei Finger zoomen und verschieben (Pointer Events, `touch-action: none`). Zusätzlich gibt es Buttons für Vergrößern, Verkleinern und Einpassen.
+- **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe und Viewport. Undo/Redo kommt mit den Bearbeitungsfunktionen.
+- **Speichern:** Für Pflanzungen gibt es `useSavePlanting` und `useDeletePlanting` in `lib/garden.ts`. Sie ändern den Query-Cache optimistisch, rollen bei Fehlern zurück und laden danach neu.
+
 ### Bedienung nach Gerät
 
 | Aktion | Desktop | Smartphone |
@@ -465,7 +475,7 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
   - `createMockFetch()` ruft dafür `getResponse()` von MSW auf und kommt ohne Service-Worker aus, also ohne Zusatzdatei im Build. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
   - Die Handler bilden Garden- und Catalog-Service nach: gleiche Routen, gleiche Contract-Schemas, gleiche Fehlerform. Daten liegen pro Testuser im `localStorage`, der Katalog ist der Startkatalog.
   - Playwright startet jeden Test mit leerem Speicher und kann Daten per `addInitScript` vorbelegen.
-- **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`). Nach Änderungen wird die Beetliste neu geladen.
+- **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`, `useSavePlanting`, `useDeletePlanting`). Nach Änderungen wird die Beetliste neu geladen.
 - **Beetübersicht (`/beete`):**
   - Kartenraster mit maßstäblicher Mini-Vorschau. Sie zeigt die Standflächen der Pflanzungen, die in der laufenden Woche im Beet stehen, in der Farbe der Sorte.
   - Dialog „Beet anlegen“ bzw. „Beet bearbeiten“ mit Name, Breite, Tiefe und Reihenrichtung. Die Reihenrichtung ist als Skizze erklärt und folgt dem Standard (parallel zur kürzeren Kante), bis der User selbst wählt.
