@@ -438,7 +438,7 @@ Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bl
 - Beim Ziehen zeigt eine Vorschau die Warnungen live an, bevor man loslässt.
 - Der Wochen-Slider steuert, welche Pflanzungen sichtbar sind.
 
-Umsetzung (Stand T-29):
+Umsetzung (Stand T-30):
 
 - **Route:** `/beete/$bedId` (`BedEditorPage`); jede Beetkarte verlinkt dorthin. Unbekannte Beete zeigen „Beet nicht gefunden“. Clientfehler (4xx) wiederholt TanStack Query nicht (`shouldRetry` in `lib/api.ts`).
 - **Ansicht:** Der Viewport (`lib/editor/viewport.ts`) besteht aus Verschiebung in px und Maßstab in px pro cm. Er wird in einen `viewBox` umgerechnet, sodass alle Formen in cm gezeichnet werden. Beim ersten Messen passt er das Beet mit Rand ein. Zoom hält den Punkt unter Mauszeiger bzw. Fingern fest (Maßstab 0,05 bis 40 px/cm).
@@ -462,6 +462,11 @@ Umsetzung (Stand T-29):
     - Befunde außerhalb der gewählten Woche sind blasser.
     - Ein Klick hebt die betroffenen Pflanzungen mit einem Ring hervor und springt in ihre erste Woche (oder bleibt in der aktuellen, wenn der Befund dort gilt). Ein zweiter Klick oder Escape hebt die Markierung auf.
   - **Übersicht:** Jede Beetkarte zeigt die Warnungen der laufenden Saison als Zähler.
+- **Saisongrenze:** In den Beet-Einstellungen („Beet bearbeiten“ auf der Karte oder im Editor-Kopf) steht der Abschnitt „Erde erneuert“ (`components/beds/SoilRenewalsField.tsx`, Logik in `lib/soil-renewals.ts`).
+  - Die Übersicht je Jahr zeigt das Vorjahr, das laufende und das nächste Jahr sowie jedes Jahr mit eigenen Terminen. Ohne eigenen Termin steht dort „1. März (Standard)“ mit „Anpassen“, das den Standard als eigenen Termin übernimmt.
+  - Eigene Termine sind Datumsfelder mit „Entfernen“; „Erneuerung hinzufügen“ legt einen weiteren an. Leere Felder werden verworfen, doppelte Daten abgelehnt.
+  - Eigene Termine eines Jahres ersetzen den 1. März dieses Jahres (wie in `soilRenewalsIn`). Der Dialog weist darauf hin.
+  - Die Erneuerungen des Slider-Jahres erscheinen als Markierungen auf dem Wochen-Slider (`data-testid="renewal-mark"`, Text „Erde erneuert am …“).
 - **Pflanzen hinzufügen (Desktop):**
   - Die Seitenleiste „Pflanzen hinzufügen“ (ab `md`) bietet Suche, Kategorie-Filter, Icons und den Umschalter Einzelpflanze/Reihe.
   - Sorten werden mit dnd-kit (Pointer-Sensor, ab 5 px Bewegung) ins Beet gezogen. Die Vorschau rastet auf 5 cm ein und bleibt im Beet.

@@ -1,5 +1,5 @@
 import type { Bed, Plant, Planting } from '@hochbeet/contracts';
-import { type Finding, isActiveInWeek } from '@hochbeet/garden-rules';
+import { type Finding, isActiveInWeek, soilRenewalsIn } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import {
   DndContext,
@@ -14,9 +14,10 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import { parseISO } from 'date-fns';
-import { ArrowLeft, Maximize, MapPinOff, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
+import { ArrowLeft, Maximize, MapPinOff, Minus, Plus, Redo2, Settings2, Undo2 } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
+import { BedFormDialog } from '@/components/beds/BedFormDialog';
 import { BedCanvas } from '@/components/editor/BedCanvas';
 import { FindingsList } from '@/components/editor/FindingsList';
 import { PlantingDetails } from '@/components/editor/PlantingDetails';
@@ -58,6 +59,7 @@ function BedEditor({ bedId }: { bedId: string }) {
   const plants = usePlants();
   const [today] = useState(() => new Date());
   const [store] = useState(() => createEditorStore(today));
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const save = useSavePlanting(bedId);
   const remove = useDeletePlanting(bedId);
   const { history, week } = useStore(store);
@@ -190,6 +192,18 @@ function BedEditor({ bedId }: { bedId: string }) {
             <Button
               variant="outline"
               size="icon"
+              aria-label="Beet bearbeiten"
+              title="Beet bearbeiten: Name, Maße, Erneuerung der Erde"
+              disabled={!bed}
+              onClick={() => {
+                setSettingsOpen(true);
+              }}
+            >
+              <Settings2 />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
               aria-label="Rückgängig"
               title="Rückgängig (Strg+Z)"
               aria-keyshortcuts="Control+Z"
@@ -252,6 +266,7 @@ function BedEditor({ bedId }: { bedId: string }) {
       <WeekSlider
         week={week}
         today={today}
+        renewals={bed ? soilRenewalsIn(bed, Number(week.slice(0, 4))) : []}
         onChange={(next) => {
           store.getState().setWeek(next);
         }}
@@ -276,6 +291,7 @@ function BedEditor({ bedId }: { bedId: string }) {
         </div>
       )}
       {error && <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>}
+      {bed && <BedFormDialog bed={bed} open={settingsOpen} onOpenChange={setSettingsOpen} />}
     </div>
   );
 }

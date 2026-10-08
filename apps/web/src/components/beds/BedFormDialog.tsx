@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { type Bed, BedFieldsSchema, type Direction } from '@hochbeet/contracts';
 import { defaultMainRowDirection } from '@hochbeet/garden-rules';
 import * as RadioGroup from '@radix-ui/react-radio-group';
+import { formatISO } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import type { z } from 'zod';
@@ -19,7 +20,9 @@ import { Label } from '@/components/ui/label';
 import { apiErrorMessage } from '@/lib/api';
 import { useSaveBed } from '@/lib/garden';
 import { cn } from '@/lib/utils';
+import { checkRenewals } from '@/lib/soil-renewals';
 import { RowDirectionSketch } from './RowDirectionSketch';
+import { type RenewalEntry, SoilRenewalsField } from './SoilRenewalsField';
 
 const bedFormSchema = BedFieldsSchema.omit({ soilRenewals: true });
 type BedForm = z.infer<typeof bedFormSchema>;
@@ -32,8 +35,8 @@ const directions: { value: Direction; label: string; hint: string }[] = [
 const NEW_BED: BedForm = { name: '', widthCm: 200, depthCm: 100, mainRowDirection: 'V' };
 
 /**
- * Create or edit a bed: name, size and main row direction. Until the user picks a direction,
- * it follows the default: parallel to the shorter edge, so rows run across the bed.
+ * Create or edit a bed: name, size, main row direction and soil renewals. Until the user picks
+ * a direction, it follows the default: parallel to the shorter edge, so rows run across the bed.
  */
 export function BedFormDialog({
   bed,
@@ -68,6 +71,11 @@ export function BedFormDialog({
 function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) {
   const save = useSaveBed();
   const [directionChosen, setDirectionChosen] = useState(!!bed);
+  const [today] = useState(() => formatISO(new Date(), { representation: 'date' }));
+  const [renewals, setRenewals] = useState<RenewalEntry[]>(() =>
+    (bed?.soilRenewals ?? []).map((value, key) => ({ key, value })),
+  );
+  const [renewalError, setRenewalError] = useState<string | undefined>();
   const form = useForm<BedForm>({
     resolver: zodResolver(bedFormSchema),
     defaultValues: bed ?? NEW_BED,
@@ -84,10 +92,13 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
   }, [directionChosen, suggested, form]);
 
   const onSubmit = form.handleSubmit(async (fields) => {
-    await save.mutateAsync({
-      id: bed?.id,
-      fields: { ...fields, soilRenewals: bed?.soilRenewals ?? [] },
-    });
+    const checked = checkRenewals(renewals.map((r) => r.value));
+    if ('error' in checked) {
+      setRenewalError(checked.error);
+      return;
+    }
+    setRenewalError(undefined);
+    await save.mutateAsync({ id: bed?.id, fields: { ...fields, soilRenewals: checked.renewals } });
     onDone();
   });
 
@@ -175,6 +186,12 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
           1 m Beet also 1 m lang. Neue Reihen übernehmen diese Richtung.
         </p>
       </fieldset>
+      <SoilRenewalsField
+        entries={renewals}
+        today={today}
+        error={renewalError}
+        onChange={setRenewals}
+      />
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           Abbrechen
