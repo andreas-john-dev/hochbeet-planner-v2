@@ -74,7 +74,7 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 
 - TypeScript strict, kein `any`. Zod-Schemas in `packages/contracts` sind die einzige Quelle für API-Typen.
 - `packages/garden-rules` ist reines TypeScript ohne AWS- oder React-Abhängigkeiten; Typen kommen aus `packages/contracts` (`import type`).
-- Neue Regeln in `packages/garden-rules/src/rules/` als `(ctx: RuleContext) => Finding[]`; Testdaten mit den Buildern aus `src/test-utils.ts`.
+- Neue Regeln in `packages/garden-rules/src/rules/` als `(ctx: RuleContext) => Finding[]` und in `src/engine.ts` eintragen; Testdaten mit den Buildern aus `src/test-utils.ts`. Einstiegspunkt für App und Services ist nur `evaluateBed()`. Der Performance-Test (200 Pflanzungen < 50 ms) muss grün bleiben.
 - `packages/contracts`: Grundtypen in `primitives.ts`, Domäne in `domain.ts`, Requests/Responses je Service in `api/`. Typen immer per `z.infer` aus den Schemas ableiten, nie doppelt schreiben.
 - Längen immer in cm, Positionen auf dem 5-cm-Raster. Daten als ISO-Strings, Wochen nach ISO-8601, Rechnen mit date-fns (Locale `de`).
 - Die `userId` kommt im Backend ausschließlich aus dem `sub`-Claim des JWT.

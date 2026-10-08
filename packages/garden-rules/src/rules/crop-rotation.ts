@@ -1,27 +1,16 @@
 import type { IsoDate } from '@hochbeet/contracts';
 import type { ResolvedPlanting, RuleContext } from '../context';
 import type { Finding } from '../findings';
-import { cellKey, gridCells } from '../geometry';
+import { cellIndex, forEachGridCell } from '../geometry';
 import { hasSoilRenewalBetween } from '../time';
 
-const sameFamily = (a: ResolvedPlanting, b: ResolvedPlanting) =>
-  a.plant.family.trim().toLowerCase() === b.plant.family.trim().toLowerCase();
+/** Family compared ignoring case and surrounding spaces. */
+const familyKey = (item: ResolvedPlanting) => item.plant.family.trim().toLowerCase();
 
 interface Ended {
   item: ResolvedPlanting;
   end: IsoDate;
-}
-
-/** Plantings on a cell that ended on or before `start`; perennials without end never qualify. */
-function endedBefore(
-  items: readonly ResolvedPlanting[],
-  start: IsoDate,
-  except: ResolvedPlanting,
-): Ended[] {
-  return items.flatMap((item) => {
-    const { end } = item.interval;
-    return item !== except && end !== null && end <= start ? [{ item, end }] : [];
-  });
+  family: string;
 }
 
 /**
@@ -31,33 +20,55 @@ function endedBefore(
  * but only on the cells it covers: one cell is enough for a warning.
  */
 export function cropRotationRule({ bed, plantings }: RuleContext): Finding[] {
-  const cellsOf = new Map(plantings.map((item) => [item, gridCells(item.footprint).map(cellKey)]));
-  const onCell = new Map<string, ResolvedPlanting[]>();
+  const cellsOf = new Map(
+    plantings.map((item) => {
+      const cells: number[] = [];
+      forEachGridCell(item.footprint, (col, row) => cells.push(cellIndex(col, row)));
+      return [item, cells];
+    }),
+  );
+
+  // Per cell: plantings that have an end (perennials never become predecessors), latest first.
+  const endedOnCell = new Map<number, Ended[]>();
   for (const [item, cells] of cellsOf) {
+    const { end } = item.interval;
+    if (end === null) continue;
+    // One entry per planting, shared by all its cells, so sets below deduplicate plantings.
+    const entry: Ended = { item, end, family: familyKey(item) };
     for (const cell of cells) {
-      const list = onCell.get(cell);
-      if (list) list.push(item);
-      else onCell.set(cell, [item]);
+      const list = endedOnCell.get(cell);
+      if (list) list.push(entry);
+      else endedOnCell.set(cell, [entry]);
     }
   }
+  for (const list of endedOnCell.values())
+    list.sort((a, b) => (a.end < b.end ? 1 : a.end > b.end ? -1 : 0));
 
   const findings: Finding[] = [];
   for (const [successor, cells] of cellsOf) {
     const start = successor.interval.start;
-    const offenders = new Set<ResolvedPlanting>();
 
+    // Direct predecessors over all cells: on each cell the entries ending last on or before
+    // the start (several if they end on the same day).
+    const direct = new Set<Ended>();
     for (const cell of cells) {
-      const predecessors = endedBefore(onCell.get(cell) ?? [], start, successor);
-      if (predecessors.length === 0) continue;
-      const lastEnd = predecessors.reduce((max, { end }) => (end > max ? end : max), '');
-      for (const { item, end } of predecessors) {
-        if (
-          end === lastEnd &&
-          sameFamily(item, successor) &&
-          !hasSoilRenewalBetween(bed, end, start)
-        ) {
-          offenders.add(item);
-        }
+      const list = endedOnCell.get(cell);
+      if (!list) continue;
+      let lastEnd: IsoDate | undefined;
+      for (const entry of list) {
+        if (entry.end > start || entry.item === successor) continue;
+        if (lastEnd !== undefined && entry.end !== lastEnd) break;
+        lastEnd = entry.end;
+        direct.add(entry);
+      }
+    }
+
+    // Family and soil renewal are checked once per pair, not per cell.
+    const family = familyKey(successor);
+    const offenders: ResolvedPlanting[] = [];
+    for (const entry of direct) {
+      if (entry.family === family && !hasSoilRenewalBetween(bed, entry.end, start)) {
+        offenders.push(entry.item);
       }
     }
 
