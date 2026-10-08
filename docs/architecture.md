@@ -288,6 +288,15 @@ Die Services rufen sich nicht gegenseitig auf. Der Garden-Service prüft nur die
 
 Ein GSI (`GSI1PK = PUBLICATION#PENDING`, `GSI1SK = <angefragt am>`) liefert die Admin-Warteschlange. Die effektive Sicht eines Users entsteht aus zwei Queries; die globalen Sorten werden in der Lambda für einige Minuten gecacht.
 
+Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTable`); der Stack legt die Tabelle daraus an.
+
+**Seed:** Die Custom Resource `Custom::CatalogSeed` in `Prod-CatalogStateful` spielt den Startkatalog als globale Sorten ein (`PK = GLOBAL`, `SK = PLANT#<id>`). Der Handler liegt in `services/catalog/src/seed/handler.ts` und wird mit esbuild gebündelt.
+
+- Jede Sorte trägt `seedHash`, einen Hash ihres Seed-Inhalts. Geschrieben wird per `PutItem` mit der Bedingung `attribute_not_exists(PK) OR seedHash <> :seedHash`, also nur fehlende oder im Seed geänderte Sorten.
+- Die Custom Resource hat die Eigenschaft `SeedVersion` (Hash über alle Sorten). Nur wenn sich der Seed ändert, läuft sie beim Deploy erneut; ein zweites Deploy ohne Änderung ruft sie gar nicht auf. Feste IDs als Schlüssel verhindern Duplikate.
+- Sorten, deren Seed sich nicht geändert hat, bleiben unangetastet, auch wenn ein Admin sie korrigiert hat. Ändert sich der Seed einer Sorte, überschreibt der Seed sie.
+- Beim Löschen des Stacks bleiben Tabelle und Daten erhalten.
+
 | Methode | Pfad | Zweck |
 | --- | --- | --- |
 | GET | `/catalog/plants` | Effektive Sorten des Users (global + Anpassungen + eigene) |
@@ -421,6 +430,7 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 | --- | --- | --- |
 | `/hochbeet/<stage>/shared/user-pool-id` | `Prod-SharedStateful` | ID des User Pools |
 | `/hochbeet/<stage>/shared/user-pool-client-id` | `Prod-SharedStateful` | ID des SPA-Clients |
+| `/hochbeet/<stage>/catalog/table-name` | `Prod-CatalogStateful` | Name der Catalog-Tabelle |
 
 ### Cognito-Konfiguration
 
@@ -441,6 +451,8 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-CFR1` (keine Geo-Sperre) | Distribution | Die App soll überall nutzbar sein. |
 | `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
 | `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
+| `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
+| `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
 
 ## Testing & CI/CD

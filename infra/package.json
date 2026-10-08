@@ -16,7 +16,9 @@
     "constructs": "^10.8.1"
   },
   "devDependencies": {
+    "@hochbeet/catalog-service": "workspace:*",
     "aws-cdk": "^2.1144.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "web": "workspace:*"
   }

@@ -7,3 +7,10 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+
+# aws-sdk-client-mock imports @smithy/types without declaring it; without this it resolves
+# an old hoisted version whose types do not match the AWS SDK v3 clients.
+packageExtensions:
+  aws-sdk-client-mock:
+    peerDependencies:
+      '@smithy/types': '*'
