@@ -17,6 +17,7 @@ import { SignInPage } from '@/routes/auth/SignInPage';
 import { SignUpPage } from '@/routes/auth/SignUpPage';
 import { BedsPage } from '@/routes/BedsPage';
 import { CatalogPage } from '@/routes/CatalogPage';
+import { IconGalleryPage } from '@/routes/dev/IconGalleryPage';
 import { NotFoundPage } from '@/routes/NotFoundPage';
 import { ProfilePage } from '@/routes/ProfilePage';
 
@@ -92,6 +93,13 @@ const adminRoute = createRoute({
 
 /* eslint-enable @typescript-eslint/only-throw-error */
 
+// Developer pages: public, no data.
+const iconGalleryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dev/icons',
+  component: IconGalleryPage,
+});
+
 const routeTree = rootRoute.addChildren([
   authLayout.addChildren([signInRoute, signUpRoute, forgotPasswordRoute]),
   appLayout.addChildren([
@@ -101,6 +109,7 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appLayout, path: '/profil', component: ProfilePage }),
     adminRoute,
   ]),
+  iconGalleryRoute,
 ]);
 
 export function createAppRouter(auth: AuthStore, history?: RouterHistory) {
