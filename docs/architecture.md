@@ -290,7 +290,7 @@ Ein GSI (`GSI1PK = PUBLICATION#PENDING`, `GSI1SK = <angefragt am>`) liefert die 
 
 Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTable`); der Stack legt die Tabelle daraus an.
 
-**Seed:** Die Custom Resource `Custom::CatalogSeed` in `Prod-CatalogStateful` spielt den Startkatalog als globale Sorten ein (`PK = GLOBAL`, `SK = PLANT#<id>`). Der Handler liegt in `services/catalog/src/seed/handler.ts` und wird mit esbuild gebündelt.
+**Seed:** Die Custom Resource `Custom::CatalogSeed` in `Prod-CatalogStateful` spielt den Startkatalog als globale Sorten ein (`PK = GLOBAL`, `SK = PLANT#<id>`). Der Handler liegt in `services/catalog/src/seed/handler.ts` und wird mit esbuild gebündelt. esbuild ist eine Dev-Dependency im Repo-Root: `NodejsFunction` ruft `pnpm exec esbuild` im Verzeichnis der Lockfile auf, also im Root.
 
 - Jede Sorte trägt `seedHash`, einen Hash ihres Seed-Inhalts. Geschrieben wird per `PutItem` mit der Bedingung `attribute_not_exists(PK) OR seedHash <> :seedHash`, also nur fehlende oder im Seed geänderte Sorten.
 - Die Custom Resource hat die Eigenschaft `SeedVersion` (Hash über alle Sorten). Nur wenn sich der Seed ändert, läuft sie beim Deploy erneut; ein zweites Deploy ohne Änderung ruft sie gar nicht auf. Feste IDs als Schlüssel verhindern Duplikate.

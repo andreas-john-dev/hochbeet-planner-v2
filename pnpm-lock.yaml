@@ -19,6 +19,9 @@ importers:
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)
@@ -159,9 +162,6 @@ importers:
       aws-cdk:
         specifier: ^2.1144.0
         version: 2.1144.0
-      esbuild:
-        specifier: ^0.28.2
-        version: 0.28.2
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
