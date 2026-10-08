@@ -18,7 +18,7 @@ test('protected deep links survive a reload and keep the target', async ({ page 
 });
 
 test('unknown deep links are served by the SPA (no CloudFront 403/404)', async ({ page }) => {
-  const response = await page.goto('/beete/123');
+  const response = await page.goto('/gibt-es-nicht/123');
   expect(response?.status()).toBe(200);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Seite nicht gefunden' })).toBeVisible();
