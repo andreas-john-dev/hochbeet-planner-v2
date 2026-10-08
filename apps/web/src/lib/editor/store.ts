@@ -1,5 +1,15 @@
 import type { Plant } from '@hochbeet/contracts';
 import { createStore } from 'zustand/vanilla';
+import {
+  emptyHistory,
+  record,
+  redo,
+  remapId,
+  undo,
+  type Change,
+  type History,
+  type Step,
+} from './history';
 import type { PlantingKind } from './placement';
 import { fitToBed, panBy, type Point, type Size, type Viewport, zoomAt } from './viewport';
 
@@ -25,12 +35,28 @@ export interface EditorState {
    */
   preview: Preview | null;
   setPreview: (preview: Preview | null) => void;
-  /** The planting with the row handle, e.g. the one just placed. */
+  /** The planting shown in the detail panel and with the row handle. */
   selectedId: string | null;
   select: (id: string | null) => void;
-  /** Row length while its handle is being dragged, before it is saved. */
-  draftLength: number | null;
-  setDraftLength: (lengthCm: number | null) => void;
+  /** Position or row length while a planting is dragged, before it is saved. */
+  draft: Draft | null;
+  setDraft: (draft: Draft | null) => void;
+
+  /** Undo/redo of planting changes made in this editor. */
+  history: History;
+  record: (change: Change) => void;
+  /** Moves the last change to the redo stack and returns what to send, or null. */
+  undo: () => Step | null;
+  redo: () => Step | null;
+  /** The server gave a (re)created planting a new id. */
+  remapId: (from: string, to: string) => void;
+}
+
+export interface Draft {
+  id: string;
+  x?: number;
+  y?: number;
+  lengthCm?: number;
 }
 
 export interface Preview {
@@ -71,11 +97,34 @@ export function createEditorStore() {
     },
     selectedId: null,
     select: (selectedId) => {
-      set({ selectedId, draftLength: null });
+      set({ selectedId, draft: null });
     },
-    draftLength: null,
-    setDraftLength: (draftLength) => {
-      set({ draftLength });
+    draft: null,
+    setDraft: (draft) => {
+      set({ draft });
+    },
+    history: emptyHistory,
+    record: (change) => {
+      set({ history: record(get().history, change) });
+    },
+    undo: () => {
+      const result = undo(get().history);
+      if (!result) return null;
+      set({ history: result.history });
+      return result.step;
+    },
+    redo: () => {
+      const result = redo(get().history);
+      if (!result) return null;
+      set({ history: result.history });
+      return result.step;
+    },
+    remapId: (from, to) => {
+      const { history, selectedId } = get();
+      set({
+        history: remapId(history, from, to),
+        selectedId: selectedId === from ? to : selectedId,
+      });
     },
   }));
 }

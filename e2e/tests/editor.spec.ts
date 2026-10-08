@@ -66,7 +66,9 @@ test.describe('bed editor', () => {
 
     await expect(page.locator('[data-testid^="planting-"]')).toHaveCount(8);
     for (let n = 1; n <= 8; n++) await expect(page.getByTestId(`planting-${id(n)}`)).toBeVisible();
-    await expect(page.getByRole('img', { name: 'Rote Bete, Reihe mit 9 Pflanzen' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Rote Bete, Reihe mit 9 Pflanzen' }),
+    ).toBeVisible();
 
     await page.getByRole('link', { name: 'Alle Beete' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Meine Beete' })).toBeVisible();

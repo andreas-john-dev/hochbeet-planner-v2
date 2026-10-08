@@ -66,6 +66,7 @@ Auch die API ist dort gemockt (`"apiMode": "mock"`): MSW-Handler in `apps/web/sr
 Daten im Frontend über `useApi()` und die Query-Hooks in `src/lib/garden.ts`.
 Beet-Editor unter `/beete/$bedId`: SVG in cm über einen `viewBox`, Viewport-Mathematik in `src/lib/editor/`, Zustand-Store je Beet; jede Pflanzung hat `data-testid="planting-<id>"` plus `data-x`/`data-y`/`data-length-cm`;
 Platzierlogik rein in `src/lib/editor/placement.ts`, Drag & Drop mit `@dnd-kit/core` nur in `BedEditorPage`.
+Änderungen an Pflanzungen im Editor laufen über `commit({ before, after })` in `BedEditorPage`, damit sie in der Undo-Historie (`src/lib/editor/history.ts`) landen.
 In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten, Beete und Pflanzungen mit `seedGarden()` aus `e2e/tests/garden.ts` vorbelegen; Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.
 Neue Seiten in `e2e/tests/pages.ts` eintragen (mit `access`): Tests und PR-Screenshots nutzen diese Liste.
 Der Workflow `screenshots.yml` kommentiert in jedem PR mit Frontend-Änderungen Desktop- und Mobil-Screenshots der geänderten Seiten
