@@ -15,7 +15,10 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
-      <aside className="bg-sidebar sticky top-0 hidden h-dvh flex-col border-r p-4 md:flex">
+      <aside
+        data-screenshot="sidebar"
+        className="bg-sidebar sticky top-0 hidden h-dvh flex-col border-r p-4 md:flex"
+      >
         <Link to="/beete" className="rounded-md px-2 py-2">
           <Logo />
         </Link>
@@ -59,6 +62,7 @@ export function AppShell() {
 
       <nav
         aria-label="Hauptnavigation"
+        data-screenshot="bottom-nav"
         className="bg-background/95 fixed inset-x-0 bottom-0 z-10 grid auto-cols-fr grid-flow-col border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
         {items.map(({ to, label, icon: Icon }) => (
