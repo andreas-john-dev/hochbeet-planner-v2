@@ -1,11 +1,13 @@
 import type {
   Bed,
   BedFields,
+  CatalogPlant,
   BedWithPlantingsResponse,
   ListBedsResponse,
   ListPlantsResponse,
   Planting,
   PlantingFields,
+  PlantOverride,
 } from '@hochbeet/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api-context';
@@ -39,6 +41,25 @@ export function usePlants() {
     queryKey: queryKeys.plants,
     queryFn: async () => (await api<ListPlantsResponse>('/api/catalog/plants')).plants,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Personal adjustment of a global plant: null resets it to the global values. Afterwards the
+ * catalogue is reloaded, so the editor's rules use the new values at once.
+ */
+export function useAdjustPlant(plantId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (override: PlantOverride | null) =>
+      override
+        ? api<CatalogPlant>(`/api/catalog/plants/${plantId}/override`, {
+            method: 'PUT',
+            body: JSON.stringify(override),
+          })
+        : api<undefined>(`/api/catalog/plants/${plantId}/override`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.plants }),
   });
 }
 

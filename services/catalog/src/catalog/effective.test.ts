@@ -28,6 +28,9 @@ describe('effectiveCatalog', () => {
       source: 'GLOBAL',
       overridden: true,
     });
+    // The unchanged global values come along, so the UI can mark what differs.
+    const { id: _id, ...globalFields } = tomato;
+    expect(plant?.global).toEqual(globalFields);
   });
 
   it('ignores overrides of plants that are no longer global', () => {

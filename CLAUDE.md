@@ -64,6 +64,7 @@ Anmeldung über `useAuth()` aus `src/lib/auth/context.ts`; API-Aufrufe nur über
 Dev-Server und Playwright nutzen Mock-Auth (`apps/web/config.dev.json`): `test@example.com` bzw. `admin@example.com`, Passwort `Gemuese1!`, Code `123456`.
 Auch die API ist dort gemockt (`"apiMode": "mock"`): MSW-Handler in `apps/web/src/mocks/` bilden die Services nach, Daten im `localStorage` pro Testuser. Neue Endpunkte dort mit ergänzen.
 Daten im Frontend über `useApi()` und die Query-Hooks in `src/lib/garden.ts`.
+Katalog unter `/katalog` und `/katalog/$plantId`: Filter, Labels und Anpassungs-Diff (`overrideFor`, `changedFields` gegen `plant.global`) in `src/lib/catalog.ts`.
 Beet-Editor unter `/beete/$bedId`: SVG in cm über einen `viewBox`, Viewport-Mathematik in `src/lib/editor/`, Zustand-Store je Beet; jede Pflanzung hat `data-testid="planting-<id>"` plus `data-x`/`data-y`/`data-length-cm`;
 Platzierlogik rein in `src/lib/editor/placement.ts`, Drag & Drop mit `@dnd-kit/core` nur in `BedEditorPage`.
 Die gewählte Woche steht als `week` (Montag) im Editor-Store; Zeitachse und Geister in `src/lib/editor/timeline.ts`.

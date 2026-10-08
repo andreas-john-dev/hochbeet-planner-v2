@@ -48,6 +48,12 @@ export const appPages: readonly AppPage[] = [
     access: 'user',
     navLabel: 'Katalog',
   },
+  {
+    id: 'katalog-sorte',
+    path: '/katalog/01M49THV00RK9E9PC83NEE87CJ',
+    heading: 'Kopfsalat',
+    access: 'user',
+  },
   { id: 'profil', path: '/profil', heading: 'Profil', access: 'user', navLabel: 'Profil' },
   {
     id: 'admin',

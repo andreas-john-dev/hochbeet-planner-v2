@@ -1,9 +1,11 @@
-import type { Bed, Planting } from '@hochbeet/contracts';
+import type { Bed, Planting, PlantOverride } from '@hochbeet/contracts';
 
-/** Garden data of one mock user. */
+/** Data of one mock user: the garden and the personal adjustments of global plants. */
 export interface MockGarden {
   beds: Bed[];
   plantings: Planting[];
+  /** Overrides by plant id; missing in data seeded before adjustments existed. */
+  overrides?: Record<string, PlantOverride>;
 }
 
 const STORAGE_KEY = 'hochbeet-mock-api';
