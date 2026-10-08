@@ -1,10 +1,13 @@
 import type { ErrorResponse } from '@hochbeet/contracts';
 import { type Context, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { ConflictError, issuesOf, NotFoundError, ValidationError } from './errors';
 import { errorFields, type Logger } from './logger';
 import { type ApiEvent, userFromEvent, type User } from './user';
+
+// German default messages for schema errors without their own message ("Ungültige Option ...").
+z.config(z.locales.de());
 
 /** Hono environment of every service: Lambda event binding, signed-in user and logger. */
 export interface ServiceEnv {
