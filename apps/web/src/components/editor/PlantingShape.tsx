@@ -14,13 +14,19 @@ export function PlantingShape({
   plant,
   variant = 'planted',
   selected = false,
+  relation,
   onFocus,
 }: {
   planting: Planting;
   plant: Plant;
-  /** `preview`: the planting about to be placed, drawn lighter and dashed. */
-  variant?: 'planted' | 'preview';
+  /**
+   * `preview`: the planting about to be placed, drawn lighter and dashed.
+   * `ghost`: a predecessor or successor at the same place in another week, drawn faintly.
+   */
+  variant?: 'planted' | 'preview' | 'ghost';
   selected?: boolean;
+  /** For ghosts: before or after the planting of the shown week. */
+  relation?: 'before' | 'after';
   onFocus?: () => void;
 }) {
   const fp = footprint(planting, plant);
@@ -28,12 +34,15 @@ export function PlantingShape({
   const size = iconSizeCm(plant);
   const positions = plantPositions(planting, plant);
   const preview = variant === 'preview';
+  const ghost = variant === 'ghost';
+  // Previews and ghosts are pictures only: not focusable, not clickable.
+  const inert = preview || ghost;
   const outline = {
     fill: plant.color,
     fillOpacity: 0.3,
     stroke: selected ? 'var(--primary)' : plant.color,
     strokeWidth: selected ? 2.5 : 1.5,
-    strokeDasharray: preview ? '4 3' : undefined,
+    strokeDasharray: preview ? '4 3' : ghost ? '2 3' : undefined,
     vectorEffect: 'non-scaling-stroke' as const,
   };
   const label =
@@ -42,21 +51,24 @@ export function PlantingShape({
       : plant.name;
   return (
     <g
-      data-testid={preview ? 'placement-preview' : `planting-${planting.id}`}
-      data-planting-id={preview ? undefined : planting.id}
+      data-testid={
+        preview ? 'placement-preview' : ghost ? `ghost-${planting.id}` : `planting-${planting.id}`
+      }
+      data-planting-id={inert ? undefined : planting.id}
+      data-ghost={relation}
       data-plant-id={plant.id}
       data-kind={planting.kind}
       data-x={planting.x}
       data-y={planting.y}
       data-length-cm={planting.kind === 'ROW' ? planting.lengthCm : undefined}
       data-selected={selected || undefined}
-      role={preview ? undefined : 'button'}
-      tabIndex={preview ? undefined : 0}
-      aria-label={preview ? undefined : label}
-      aria-pressed={preview ? undefined : selected}
-      aria-hidden={preview || undefined}
-      opacity={preview ? 0.75 : undefined}
-      className={preview ? 'pointer-events-none' : 'cursor-move outline-none'}
+      role={inert ? undefined : 'button'}
+      tabIndex={inert ? undefined : 0}
+      aria-label={inert ? undefined : label}
+      aria-pressed={inert ? undefined : selected}
+      aria-hidden={inert || undefined}
+      opacity={preview ? 0.75 : ghost ? 0.3 : undefined}
+      className={inert ? 'pointer-events-none' : 'cursor-move outline-none'}
       onFocus={onFocus}
     >
       {fp.kind === 'circle' ? (

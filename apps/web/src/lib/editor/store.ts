@@ -1,4 +1,5 @@
-import type { Plant } from '@hochbeet/contracts';
+import type { IsoDate, Plant } from '@hochbeet/contracts';
+import { weekStart } from '@hochbeet/garden-rules';
 import { createStore } from 'zustand/vanilla';
 import {
   emptyHistory,
@@ -25,6 +26,10 @@ export interface EditorState {
   /** Zooms around the centre of the drawing area, e.g. for the + and − buttons. */
   zoomBy: (factor: number) => void;
   pan: (dxPx: number, dyPx: number) => void;
+
+  /** Monday of the week the editor shows; new plantings start there. */
+  week: IsoDate;
+  setWeek: (week: IsoDate | Date) => void;
 
   /** Single plant or row, chosen in the palette. */
   kind: PlantingKind;
@@ -72,8 +77,12 @@ export interface Preview {
 }
 
 /** Editor state of one open bed: view, placement and selection. Plantings come from TanStack Query. */
-export function createEditorStore() {
+export function createEditorStore(today: Date = new Date()) {
   return createStore<EditorState>()((set, get) => ({
+    week: weekStart(today),
+    setWeek: (week) => {
+      set({ week: weekStart(week) });
+    },
     size: { width: 0, height: 0 },
     viewport: { x: 0, y: 0, scale: 1 },
     fitted: false,

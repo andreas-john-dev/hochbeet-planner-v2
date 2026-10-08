@@ -438,18 +438,23 @@ Das Beet wird als SVG mit echtem cm-Maßstab gerendert, nicht als Canvas. SVG bl
 - Beim Ziehen zeigt eine Vorschau die Warnungen live an, bevor man loslässt.
 - Der Wochen-Slider steuert, welche Pflanzungen sichtbar sind.
 
-Umsetzung (Stand T-27):
+Umsetzung (Stand T-28):
 
 - **Route:** `/beete/$bedId` (`BedEditorPage`); jede Beetkarte verlinkt dorthin. Unbekannte Beete zeigen „Beet nicht gefunden“. Clientfehler (4xx) wiederholt TanStack Query nicht (`shouldRetry` in `lib/api.ts`).
 - **Ansicht:** Der Viewport (`lib/editor/viewport.ts`) besteht aus Verschiebung in px und Maßstab in px pro cm. Er wird in einen `viewBox` umgerechnet, sodass alle Formen in cm gezeichnet werden. Beim ersten Messen passt er das Beet mit Rand ein. Zoom hält den Punkt unter Mauszeiger bzw. Fingern fest (Maßstab 0,05 bis 40 px/cm).
 - **Raster:** Die Rasterweite wird aus 5, 10, 25, 50 und 100 cm so gewählt, dass Linien mindestens 8 px auseinanderliegen. Hauptlinien kommen alle 50 bzw. 100 cm; Linien haben unabhängig vom Zoom eine feste Strichstärke.
-- **Pflanzungen:** Jede Pflanzung ist ein `<g data-testid="planting-<id>">` (mit `data-plant-id`, `data-kind`, `data-x`, `data-y` und bei Reihen `data-length-cm`) mit Standfläche und einem Icon je Pflanze. Bei Reihen gilt das für jede Pflanze im Abstand in der Reihe. Die Icons sind 8 bis 24 cm groß. Gezeigt werden die Pflanzungen der laufenden Woche, bis der Wochen-Slider kommt.
+- **Pflanzungen:** Jede Pflanzung ist ein `<g data-testid="planting-<id>">` (mit `data-plant-id`, `data-kind`, `data-x`, `data-y` und bei Reihen `data-length-cm`) mit Standfläche und einem Icon je Pflanze. Bei Reihen gilt das für jede Pflanze im Abstand in der Reihe. Die Icons sind 8 bis 24 cm groß. Gezeigt werden die Pflanzungen der gewählten Woche.
 - **Gesten:** Mausrad zoomt, Ziehen verschiebt, zwei Finger zoomen und verschieben (Pointer Events, `touch-action: none`). Zusätzlich gibt es Buttons für Vergrößern, Verkleinern und Einpassen.
+- **Wochen-Slider (`components/editor/WeekSlider.tsx`):**
+  - Die gewählte Woche (Montag als ISO-Datum) liegt im Editor-Store und startet mit der aktuellen Woche.
+  - Der Slider deckt alle Montage im Jahr der gewählten Woche ab und ist mit Monatsnamen beschriftet (auf dem Smartphone nur die Anfangsbuchstaben). Daneben stehen „4. – 10. Mai 2026 · KW 19“ und die Buttons Woche zurück, Woche vor und „Heute“. Über den Jahreswechsel hinweg wechselt der Slider ins andere Jahr.
+  - Die Woche bestimmt die sichtbaren Pflanzungen, den Start neuer Pflanzungen und „Entfernen ab“.
+  - **Geister** (`ghosts()` in `lib/editor/timeline.ts`): Für jede Pflanzung der Woche erscheinen der direkte Vorgänger an derselben Stelle und der direkte Nachfolger blass (30 % Deckkraft) und gestrichelt. Der Vorgänger endet spätestens am Start der Pflanzung, der Nachfolger beginnt frühestens an ihrem Ende und nach der Woche. Dabei überlappen sich die Standflächen. Geister sind nicht anklickbar (`data-testid="ghost-<id>"`, `data-ghost="before" | "after"`). Dauerkulturen ohne Ende haben keinen Nachfolger.
 - **Pflanzen hinzufügen (Desktop):**
   - Die Seitenleiste „Pflanzen hinzufügen“ (ab `md`) bietet Suche, Kategorie-Filter, Icons und den Umschalter Einzelpflanze/Reihe.
   - Sorten werden mit dnd-kit (Pointer-Sensor, ab 5 px Bewegung) ins Beet gezogen. Die Vorschau rastet auf 5 cm ein und bleibt im Beet.
   - Eine Reihe läuft in der Hauptreihenrichtung des Beets, zunächst bis zum Rand, höchstens 50 cm. Danach ist sie ausgewählt, und ihr Griff (`role="slider"`) zieht sie in 5-cm-Schritten auf Länge, auch mit den Pfeiltasten.
-  - Pflanzdatum ist der Montag der aktuellen Woche (bis zum Wochen-Slider in T-28), das Ende kommt aus dem Lebenszyklus der Sorte.
+  - Pflanzdatum ist der Montag der gewählten Woche, das Ende kommt aus dem Lebenszyklus der Sorte.
   - Die Logik liegt rein in `lib/editor/placement.ts` und `lib/editor/palette.ts`.
 - **Tastatur:** Statt des Keyboard-Sensors von dnd-kit gibt es einen eigenen Platzier-Modus.
   - Enter auf einer Sorte setzt eine Vorschau in die Beetmitte und fokussiert das Beet. Pfeiltasten verschieben um 5 cm (mit Umschalt 25 cm), Enter oder ein Klick setzt, Escape bricht ab.
@@ -462,7 +467,7 @@ Umsetzung (Stand T-27):
 - **Detailpanel:** Es ersetzt die Palette, solange etwas ausgewählt ist.
   - Inhalt: Sorte, Position, echte Daten mit KW und Herkunft des Endes (Standzeit, angepasst, entfernt).
   - „Ende anpassen“: Datumsfeld; leer heißt Ende aus der Standzeit.
-  - „Entfernen ab KW …“ setzt `removedDate` auf den Montag der im Editor gewählten Woche (bis T-28 die aktuelle) und ist gesperrt, wenn die Pflanzung später beginnt. Eine entfernte Pflanzung lässt sich wieder ins Beet nehmen.
+  - „Entfernen ab KW …“ setzt `removedDate` auf den Montag der im Editor gewählten Woche und ist gesperrt, wenn die Pflanzung später beginnt. Eine entfernte Pflanzung lässt sich wieder ins Beet nehmen.
   - „Pflanzung löschen“ löscht ohne Rückfrage, weil es sich rückgängig machen lässt.
 - **Undo/Redo:** Buttons „Rückgängig“/„Wiederholen“ sowie Strg+Z und Strg+Umschalt+Z (oder Strg+Y); in Textfeldern bleibt das native Undo.
   - Jede Änderung ist ein Paar `{ before, after }` (`lib/editor/history.ts`, höchstens 100 Schritte je geöffnetem Beet, nicht gespeichert).
