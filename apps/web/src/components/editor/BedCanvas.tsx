@@ -3,6 +3,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import { useStore } from 'zustand';
 import { isTempId, LONG_PRESS_MS, moveByKey, newPlanting, snapToBed } from '@/lib/editor/placement';
 import type { Draft, EditorStore } from '@/lib/editor/store';
+import type { Ghost } from '@/lib/editor/timeline';
 import { toCm, viewBox } from '@/lib/editor/viewport';
 import { BedGrid } from './BedGrid';
 import { PlantingShape } from './PlantingShape';
@@ -50,6 +51,7 @@ export function BedCanvas({
   store,
   svgRef,
   today,
+  ghosts = [],
   describedBy,
   onPlace,
   onChange,
@@ -59,7 +61,10 @@ export function BedCanvas({
   plantings: readonly { planting: Planting; plant: Plant }[];
   store: EditorStore;
   svgRef: RefObject<SVGSVGElement | null>;
+  /** Start of new plantings: a day in the week the editor shows. */
   today: Date;
+  /** Predecessors and successors at the same place, drawn faintly. */
+  ghosts?: readonly Ghost[];
   /** Id of the element with the keyboard instructions. */
   describedBy?: string;
   onPlace: (plant: Plant, at: { x: number; y: number }) => void;
@@ -356,6 +361,17 @@ export function BedCanvas({
       style={{ visibility: fitted ? 'visible' : 'hidden' }}
     >
       <BedGrid bed={bed} scale={viewport.scale} />
+      <g data-testid="ghosts">
+        {ghosts.map(({ planting, plant, relation }) => (
+          <PlantingShape
+            key={planting.id}
+            planting={planting}
+            plant={plant}
+            variant="ghost"
+            relation={relation}
+          />
+        ))}
+      </g>
       <g data-testid="plantings">
         {shown.map(({ planting, plant }) => (
           <PlantingShape

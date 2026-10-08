@@ -1,5 +1,4 @@
 import type { Bed, Plant, Planting } from '@hochbeet/contracts';
-import { formatWeek } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import {
   DndContext,
@@ -13,12 +12,14 @@ import {
 } from '@dnd-kit/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
+import { parseISO } from 'date-fns';
 import { ArrowLeft, Maximize, MapPinOff, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { BedCanvas } from '@/components/editor/BedCanvas';
 import { PlantingDetails } from '@/components/editor/PlantingDetails';
 import { PlantPalette, type PaletteDragData } from '@/components/editor/PlantPalette';
+import { WeekSlider } from '@/components/editor/WeekSlider';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import { activePlantings } from '@/lib/active-plantings';
 import type { Change, Step } from '@/lib/editor/history';
 import { bedCentre, isTempId, newPlanting, snapToBed } from '@/lib/editor/placement';
 import { createEditorStore, type EditorStore } from '@/lib/editor/store';
+import { ghosts, withPlants, type Ghost } from '@/lib/editor/timeline';
 import { toCm } from '@/lib/editor/viewport';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/media-query';
 import { useBedWithPlantings, useDeletePlanting, usePlants, useSavePlanting } from '@/lib/garden';
@@ -50,12 +52,12 @@ function bedIdParam(params: unknown): string {
 function BedEditor({ bedId }: { bedId: string }) {
   const details = useBedWithPlantings(bedId);
   const plants = usePlants();
-  const [store] = useState(createEditorStore);
   const [today] = useState(() => new Date());
-  const { range, week } = formatWeek(today);
+  const [store] = useState(() => createEditorStore(today));
   const save = useSavePlanting(bedId);
   const remove = useDeletePlanting(bedId);
-  const { history } = useStore(store);
+  const { history, week } = useStore(store);
+  const weekDate = parseISO(week);
   const queryClient = useQueryClient();
   // Undo and redo run one after another, each after all running requests have finished,
   // so that temporary ids are resolved first and no key press gets lost.
@@ -164,7 +166,8 @@ function BedEditor({ bedId }: { bedId: string }) {
   }
 
   const bed = details.data?.bed;
-  const shown = activePlantings(details.data?.plantings ?? [], plants.data ?? [], today);
+  const shown = activePlantings(details.data?.plantings ?? [], plants.data ?? [], weekDate);
+  const faint = ghosts(withPlants(details.data?.plantings ?? [], plants.data ?? []), week);
 
   return (
     <div className="flex flex-col gap-4">
@@ -175,8 +178,7 @@ function BedEditor({ bedId }: { bedId: string }) {
             {bed?.name ?? 'Beet'}
           </h1>
           <p className="text-muted-foreground text-sm">
-            {bed && `${String(bed.widthCm)} × ${String(bed.depthCm)} cm · `}
-            {range} <span className="text-xs">{week}</span>
+            {bed && `${String(bed.widthCm)} × ${String(bed.depthCm)} cm`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -243,13 +245,21 @@ function BedEditor({ bedId }: { bedId: string }) {
           </div>
         </div>
       </div>
+      <WeekSlider
+        week={week}
+        today={today}
+        onChange={(next) => {
+          store.getState().setWeek(next);
+        }}
+      />
       {bed && plants.data ? (
         <Workspace
           bed={bed}
           plants={plants.data}
           plantings={shown}
+          ghosts={faint}
           store={store}
-          today={today}
+          week={weekDate}
           onCommit={commit}
         />
       ) : (
@@ -315,15 +325,18 @@ function Workspace({
   bed,
   plants,
   plantings,
+  ghosts,
   store,
-  today,
+  week,
   onCommit,
 }: {
   bed: Bed;
   plants: readonly Plant[];
   plantings: readonly { planting: Planting; plant: Plant }[];
+  ghosts: readonly Ghost[];
   store: EditorStore;
-  today: Date;
+  /** The week the editor shows; new plantings start on its Monday. */
+  week: Date;
   onCommit: (change: Change) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -338,7 +351,7 @@ function Workspace({
 
   const place = (plant: Plant, at: { x: number; y: number }) => {
     const state = store.getState();
-    const planting = newPlanting({ bed, plant, kind: state.kind, at, today });
+    const planting = newPlanting({ bed, plant, kind: state.kind, at, today: week });
     state.setPreview(null);
     // Rows get selected for their length handle; after a single plant the palette stays.
     state.select(planting.kind === 'ROW' ? planting.id : null);
@@ -442,7 +455,7 @@ function Workspace({
               key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
               planting={selected.planting}
               plant={selected.plant}
-              week={today}
+              week={week}
               onChange={change}
               onDelete={remove}
               onClose={() => {
@@ -465,7 +478,8 @@ function Workspace({
               plantings={plantings}
               store={store}
               svgRef={svgRef}
-              today={today}
+              today={week}
+              ghosts={ghosts}
               describedBy={hintId}
               onPlace={place}
               onChange={change}
@@ -535,7 +549,7 @@ function Workspace({
                 key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
                 planting={selected.planting}
                 plant={selected.plant}
-                week={today}
+                week={week}
                 onChange={change}
                 onDelete={remove}
                 onClose={() => {

@@ -72,6 +72,10 @@ test.describe('editor on the phone', () => {
     await signInAs(page, 'user');
     await seedGarden(page, garden);
     await open(page, `/beete/${BED_ID}`, 'Hochbeet Süd');
+    // On small phones the bed starts below the fold; scroll it into the middle like a user.
+    await page.getByTestId('bed-canvas').evaluate((el) => {
+      el.scrollIntoView({ block: 'center' });
+    });
   });
 
   test('places a plant by tap and confirms the preview', async ({ page }) => {
