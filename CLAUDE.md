@@ -38,7 +38,7 @@ pnpm install
 pnpm build                       # Builds (aktuell nur apps/web via Vite)
 pnpm lint                        # ESLint (Flat Config aus packages/eslint-config)
 pnpm typecheck                   # tsc --noEmit je Paket
-pnpm test                        # Unit- und Integrationstests (Vitest), ohne e2e
+pnpm test                        # Unit- und Integrationstests (Vitest), ohne e2e; Service-Integrationstests brauchen Docker
 pnpm synth                       # cdk synth inkl. cdk-nag über Turborepo; baut apps/web vorher (läuft auch in der CI)
 pnpm format                      # Prettier schreiben; pnpm format:check prüft nur
 pnpm exec vitest                 # Alle Vitest-Projekte in einem Prozess (Watch-Modus)
@@ -80,6 +80,7 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 - `packages/contracts`: Grundtypen in `primitives.ts`, Domäne in `domain.ts`, Requests/Responses je Service in `api/`. Typen immer per `z.infer` aus den Schemas ableiten, nie doppelt schreiben.
 - Längen immer in cm, Positionen auf dem 5-cm-Raster. Daten als ISO-Strings, Wochen nach ISO-8601, Rechnen mit date-fns (Locale `de`).
 - Die `userId` kommt im Backend ausschließlich aus dem `sub`-Claim des JWT.
+- Services: Hono-Lambdalith je Service, Routen unter `/api/<service>`; User aus `userFromEvent()` (Claims des JWT-Authorizers). Integrationstests (`*.integration.test.ts`) laufen gegen DynamoDB Local via Testcontainers; in Cloud-Sessions vorher `dockerd` starten.
 - Warnungen werden nie gespeichert und blockieren nie das Speichern.
 - UI-Texte und Fehlermeldungen auf Deutsch; Code, Bezeichner, Kommentare und Commits auf Englisch (Conventional Commits).
 - Region `eu-central-1`, Stage-Konfiguration in `infra/lib/config/stages.ts` (zunächst nur `prod`).

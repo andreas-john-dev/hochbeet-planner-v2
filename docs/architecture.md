@@ -135,7 +135,7 @@ Umsetzung (`packages/garden-rules/src/engine.ts`):
 - `evaluateBed` verbindet die Pflanzungen einmal mit ihren Sorten und ruft alle Regeln auf. Die Befunde kommen in fester Reihenfolge: Warnungen, dann dezente Hinweise, dann positive Hinweise; innerhalb davon nach Regel, Pflanzungs-IDs und Zeitraum.
 - Mit `week` wird trotzdem die ganze Historie ausgewertet (die Fruchtfolge braucht Vorgänger); zurück kommen nur Befunde, deren Zeitraum die ISO-Woche berührt.
 - Property-Tests (fast-check) sichern zu: Das Ergebnis hängt nicht von der Reihenfolge der Pflanzungen oder Sorten ab, Nachbarlisten wirken symmetrisch, Befunde sind wohlgeformt, und der Wochenfilter liefert genau die passende Teilmenge.
-- Leistung: 200 Pflanzungen in einem 6 × 3 m Beet über zwei Saisons brauchen im Median etwa 15 ms (Vorgabe: unter 50 ms; `engine.perf.test.ts`). Die Fruchtfolge nutzt dafür einen Zellindex mit kleinen ganzzahligen Schlüsseln und prüft Familie und Erneuerung nur einmal pro Paar.
+- Leistung: 200 Pflanzungen in einem 6 × 3 m Beet über zwei Saisons brauchen im Median etwa 15 ms (Vorgabe: unter 50 ms; `engine.perf.test.ts` misst die CPU-Zeit des Prozesses, damit parallel laufende Test-Suites das Ergebnis nicht verfälschen). Die Fruchtfolge nutzt dafür einen Zellindex mit kleinen ganzzahligen Schlüsseln und prüft Familie und Erneuerung nur einmal pro Paar.
 
 ## Zeitmodell
 
@@ -311,6 +311,24 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 | POST | `/catalog/admin/publications/{id}/reject` | Ablehnen mit Kommentar (Admin) |
 | POST/PUT | `/catalog/admin/plants[/{id}]` | Globale Sorten pflegen (Admin) |
 
+**Umsetzung (`services/catalog`):**
+
+- **Lambdalith:** Hono-App in `src/app.ts`, Lambda-Einstieg `src/handler.ts`. Alle Routen liegen unter `/api/catalog` (`BASE_PATH`), weil CloudFront den vollen Pfad an die HTTP API weiterreicht.
+- **Authentifizierung:** Die HTTP API prüft das Cognito-ID-Token mit einem JWT-Authorizer (Issuer = User Pool, Audience = SPA-Client). Ohne gültiges Token antwortet API Gateway mit 401.
+- **User-Kontext:** Eine Middleware liest `sub` und `cognito:groups` aus den geprüften Claims (`requestContext.authorizer.jwt.claims`). Fehlen sie, antwortet auch die App mit 401.
+- **Logging:** Pro Request schreibt die App eine JSON-Logzeile mit `requestId`, `userId`, Methode, Pfad, Status und Dauer.
+- **Fehler:** Antworten haben immer die Form `ErrorResponse` mit deutscher `message`. Interne Fehler werden geloggt und nach außen nur allgemein gemeldet.
+- **Effektive Sicht** (`src/catalog/effective.ts`) für `GET /catalog/plants`:
+  - Globale Sorten mit Anpassung (`{...global, ...override}`) und dazu die eigenen, nicht archivierten Sorten, sortiert nach Namen.
+  - Die Kennzeichnung aus dem Issue (`isOverridden`, `isCustom`) liefert der bestehende Contract `CatalogPlantSchema` als `overridden` und `source: 'GLOBAL' | 'OWN'`.
+  - Globale Sorten cacht jede Lambda-Instanz 5 Minuten.
+- **Item-Formate unter `USER#<uid>`:**
+  - Anpassung: `SK = OVERRIDE#<plantId>` mit `plantId` und `fields` (die geänderten Felder).
+  - Eigene Sorte: `SK = PLANT#<id>` mit den Sortenfeldern sowie `publicationStatus` (Standard `PRIVATE`), optional `rejectionComment` und `archived`.
+- **Tests:**
+  - Unit-Tests für Logik und App.
+  - Integrationstest (`*.integration.test.ts`) gegen DynamoDB Local (`amazon/dynamodb-local:3.1.0`) über Testcontainers. Er braucht ein laufendes Docker.
+
 ### Garden-Service
 
 | PK | SK | Inhalt |
@@ -431,6 +449,7 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 | `/hochbeet/<stage>/shared/user-pool-id` | `Prod-SharedStateful` | ID des User Pools |
 | `/hochbeet/<stage>/shared/user-pool-client-id` | `Prod-SharedStateful` | ID des SPA-Clients |
 | `/hochbeet/<stage>/catalog/table-name` | `Prod-CatalogStateful` | Name der Catalog-Tabelle |
+| `/hochbeet/<stage>/catalog/api-domain` | `Prod-CatalogStateless` | Domain der Catalog-HTTP-API, Origin für `/api/catalog/*` in CloudFront |
 
 ### Cognito-Konfiguration
 
@@ -451,6 +470,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-CFR1` (keine Geo-Sperre) | Distribution | Die App soll überall nutzbar sein. |
 | `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
 | `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
+| `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog-Lambdalith | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur `Query`/`GetItem`). |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
