@@ -325,6 +325,16 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 - **Item-Formate unter `USER#<uid>`:**
   - Anpassung: `SK = OVERRIDE#<plantId>` mit `plantId` und `fields` (die geänderten Felder).
   - Eigene Sorte: `SK = PLANT#<id>` mit den Sortenfeldern sowie `publicationStatus` (Standard `PRIVATE`), optional `rejectionComment` und `archived`.
+- **Eigene Sorten** (`POST /catalog/plants`, `PUT` und `DELETE /catalog/plants/{id}`):
+  - Neue Sorten bekommen eine ULID und den Status `PRIVATE`.
+  - `PUT` ersetzt die Felder und lässt den Publikationsstatus unverändert.
+  - `DELETE` archiviert immer (`archived`, `archivedAt`), statt hart zu löschen: Der Catalog-Service weiß nicht, ob Pflanzungen die Sorte nutzen, weil die Services sich nie gegenseitig aufrufen. Archivierte Sorten verschwinden aus der Liste und lassen sich nicht mehr ändern; erneutes Archivieren ist erlaubt.
+  - Fremde und unbekannte IDs liefern 404.
+- **Anpassungen** (`PUT` und `DELETE /catalog/plants/{id}/override`): nur für globale Sorten. `PUT` speichert die geänderten Felder vollständig neu, `DELETE` setzt die Sorte zurück.
+- **Nachbarlisten:**
+  - Eigene Sorten dürfen auf globale und eigene, nicht archivierte Sorten des Users verweisen.
+  - Anpassungen globaler Sorten dürfen nur auf globale Sorten verweisen. Das ist die Regel „Nachbarlisten globaler Sorten nur auf globale Sorten“ für den persönlichen Overlay. Es geht dabei nichts verloren: Weil Nachbarn symmetrisch ausgewertet werden, trägt der User die Beziehung zu einer eigenen Sorte einfach an der eigenen Sorte ein.
+  - Eine Sorte ist nie ihr eigener Nachbar. Verstöße liefern 400 mit `issues` je Listeneintrag.
 - **Tests:**
   - Unit-Tests für Logik und App.
   - Integrationstest (`*.integration.test.ts`) gegen DynamoDB Local (`amazon/dynamodb-local:3.1.0`) über Testcontainers. Er braucht ein laufendes Docker.
@@ -470,7 +480,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-CFR1` (keine Geo-Sperre) | Distribution | Die App soll überall nutzbar sein. |
 | `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
 | `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
-| `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog-Lambdalith | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur `Query`/`GetItem`). |
+| `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog-Lambdalith | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur Item-Operationen auf der Tabelle, kein Scan, keine Indizes). |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |

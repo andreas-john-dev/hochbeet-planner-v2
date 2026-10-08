@@ -41,7 +41,7 @@ describe('GET /api/catalog/plants against DynamoDB Local', () => {
     const otherUsers = ownPlant('01J9ZQ3W8D6V2K5M7N8P9R0S1C', 'Andenbeere');
     await put({ PK: userPk(USER_B), SK: plantSk(otherUsers.id), ...otherUsers });
     app = createApp({
-      repository: new CatalogRepository(db.client, db.tableName),
+      store: new CatalogRepository(db.client, db.tableName),
       logger: createLogger({}, () => undefined),
     });
   }, 120_000);
