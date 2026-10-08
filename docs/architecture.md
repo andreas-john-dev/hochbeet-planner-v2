@@ -195,6 +195,14 @@ Admins sind Mitglieder der Cognito-Gruppe `admins`. Der Catalog-Service prüft d
 
 Der Startkatalog mit 56 Sorten steht in [`docs/startkatalog.md`](./startkatalog.md). Er wird als typisiertes Paket `packages/catalog-seed` gepflegt und beim Deploy per Custom Resource eingespielt.
 
+Umsetzung in `packages/catalog-seed`:
+
+- `src/data.ts` enthält die Sorten wie in der Tabelle, inklusive der Kurzformen in den Nachbarlisten. Jede Sorte hat eine feste ULID; sie wird nie geändert, weil Pflanzungen und Anpassungen darauf verweisen.
+- `resolveSeed()` löst die Kurzformen auf: Kohl, andere Kohlarten (ohne die Sorte selbst), Sellerie, Bohnen und „wie X“. Bei „wie X“ übernimmt die Sorte die rohen Listen von X; „andere Kohlarten“ wird danach für die übernehmende Sorte aufgelöst. Unbekannte Namen werfen einen Fehler. Eine Sorte steht nie in ihrer eigenen Liste.
+- Exportiert werden `seedPlants` (fertige `Plant`-Objekte) und `seedPlantByName`.
+- Icon-Schlüssel sind der Sortenname in Kleinbuchstaben mit Bindestrichen, Umlaute ausgeschrieben, z. B. `rote-bete`, `fruehlingszwiebel`. `packages/plant-icons` liefert die passenden SVGs.
+- Tests prüfen das Zod-Schema, die Nachbar-Referenzen und die Kurzformen. Widersprüche (gut auf einer, schlecht auf der anderen Seite) listet der Testreport `packages/catalog-seed/report/contradictions.md`. Die Tabelle wendet „Warnung sticht“ bereits an und enthält aktuell keine.
+
 ## Systemarchitektur
 
 ```mermaid

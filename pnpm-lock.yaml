@@ -152,7 +152,11 @@ importers:
         specifier: workspace:*
         version: link:../apps/web
 
-  packages/catalog-seed: {}
+  packages/catalog-seed:
+    dependencies:
+      '@hochbeet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/contracts:
     dependencies:
