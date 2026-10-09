@@ -4,15 +4,18 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
 import { isAdmin } from '@/lib/auth/types';
 import { cn } from '@/lib/utils';
+import { GuestBanner } from './GuestBanner';
 import { Logo } from './Logo';
 import { navItems } from './nav-items';
 import { ThemeToggle } from './ThemeToggle';
 
-/** Sidebar on desktop, top bar and bottom navigation on phones. */
+/** Sidebar on desktop, top bar and bottom navigation on phones; a banner in guest mode. */
 export function AppShell() {
-  const { user } = useAuth();
+  const { user, guest } = useAuth();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const items = navItems.filter((item) => !item.adminOnly || isAdmin(user));
+  const items = navItems.filter(
+    (item) => (!item.adminOnly || isAdmin(user)) && (!item.accountOnly || !guest),
+  );
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
@@ -41,10 +44,10 @@ export function AppShell() {
         </nav>
         <div className="mt-auto flex flex-col gap-1 border-t pt-3">
           <p className="text-muted-foreground truncate px-3 pb-1 text-xs" title={user?.email}>
-            {user?.email}
+            {guest ? 'Gastmodus' : user?.email}
           </p>
           <ThemeToggle showLabel />
-          <SignOutButton />
+          {!guest && <SignOutButton />}
         </div>
       </aside>
 
@@ -58,6 +61,7 @@ export function AppShell() {
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-10">
           {/* Keyed by path: each page enters softly (not with reduced motion). */}
+          {guest && <GuestBanner />}
           <div key={pathname} className="animate-enter">
             <Outlet />
           </div>

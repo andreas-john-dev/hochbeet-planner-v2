@@ -1,7 +1,10 @@
 import { EXAMPLE_BED_ID, exampleGarden, type Garden, PENDING_ID, pendingRequest } from './garden';
 
-/** Who may open a page: anyone signed out, any signed-in user, or admins only. */
-export type Access = 'public' | 'user' | 'admin';
+/**
+ * Who opens a page: anyone signed out, any signed-in user, admins only, or a guest without
+ * account (data in the browser, see apps/web/src/lib/local-api).
+ */
+export type Access = 'public' | 'user' | 'admin' | 'guest';
 
 /** All top-level pages. Add new pages here so tests and PR screenshots cover them. */
 export interface AppPage {
@@ -13,7 +16,7 @@ export interface AppPage {
   access: Access;
   /** Label in the main navigation, for pages that have one. */
   navLabel?: string;
-  /** Mock API data for the signed-in user, for pages that only show something with data. */
+  /** Data of the signed-in user or guest, for pages that only show something with data. */
   seed?: Garden;
 }
 
@@ -89,6 +92,23 @@ export const appPages: readonly AppPage[] = [
     access: 'admin',
   },
   { id: 'dev-icons', path: '/dev/icons', heading: 'Icon-Galerie', access: 'public' },
+  // Guest mode: same pages, with the guest banner and the local API.
+  {
+    id: 'gast-beete',
+    path: '/beete',
+    heading: 'Meine Beete',
+    access: 'guest',
+    seed: exampleGarden,
+  },
+  {
+    id: 'gast-beet-editor',
+    path: `/beete/${EXAMPLE_BED_ID}`,
+    heading: 'Hochbeet Süd',
+    access: 'guest',
+    seed: exampleGarden,
+  },
+  { id: 'gast-katalog', path: '/katalog', heading: 'Pflanzenkatalog', access: 'guest' },
 ];
 
-export const protectedPages = appPages.filter((p) => p.access !== 'public');
+/** Pages that need an account; signed out they redirect to the sign-in page. */
+export const protectedPages = appPages.filter((p) => p.access === 'user' || p.access === 'admin');

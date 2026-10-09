@@ -6,11 +6,13 @@ export interface NavItem {
   icon: LucideIcon;
   /** Only shown to members of the Cognito group `admins`. */
   adminOnly?: boolean;
+  /** Hidden in guest mode: needs an account. */
+  accountOnly?: boolean;
 }
 
 export const navItems: readonly NavItem[] = [
   { to: '/beete', label: 'Beete', icon: Sprout },
   { to: '/katalog', label: 'Katalog', icon: Leaf },
-  { to: '/profil', label: 'Profil', icon: UserRound },
-  { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
+  { to: '/profil', label: 'Profil', icon: UserRound, accountOnly: true },
+  { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true, accountOnly: true },
 ];

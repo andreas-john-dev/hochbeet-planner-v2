@@ -37,6 +37,17 @@ function match(path: string, pathname: string): Record<string, string> | undefin
   return params;
 }
 
+/** Thrown inside a route to answer with this status and German message. */
+export class LocalApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'LocalApiError';
+  }
+}
+
 // The explicit type argument checks the body against its response contract.
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export const json = <T>(body: T, status = 200) => Response.json(body, { status });
@@ -75,6 +86,7 @@ export async function handle(routes: readonly Route[], request: Request): Promis
     }
     return error('Diese Adresse gibt es nicht.', 404);
   } catch (cause) {
+    if (cause instanceof LocalApiError) return error(cause.message, cause.status);
     if (cause instanceof DOMException && cause.name === 'QuotaExceededError') {
       return error(
         'Der Speicher deines Browsers ist voll. Lösche alte Beete und versuche es noch einmal.',

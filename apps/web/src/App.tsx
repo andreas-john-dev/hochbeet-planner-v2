@@ -1,10 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, type RouterHistory } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ApiProvider } from '@/components/ApiProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { shouldRetry } from '@/lib/api';
 import { useAuth } from '@/lib/auth/context';
 import type { AuthAdapter } from '@/lib/auth/types';
 import { createAppRouter } from '@/router';
@@ -25,17 +23,11 @@ export function App({
   /** Replaces fetch for API calls, e.g. the mock API in dev and tests. */
   fetchFn?: typeof fetch;
 }) {
-  const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { retry: shouldRetry } } }),
-  );
-
   return (
     <ThemeProvider>
       <AuthProvider adapter={auth}>
         <ApiProvider fetchFn={fetchFn}>
-          <QueryClientProvider client={queryClient}>
-            <AppRouter history={history} />
-          </QueryClientProvider>
+          <AppRouter history={history} />
         </ApiProvider>
       </AuthProvider>
     </ThemeProvider>
