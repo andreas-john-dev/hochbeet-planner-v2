@@ -62,6 +62,11 @@ jobs:
       fail-fast: false
       matrix:
         project: [desktop-chrome, iphone, pixel]
+    # The official Playwright image renders exactly like `pnpm --filter e2e test:docker`, which
+    # wrote the screenshot baselines. Keep its version in sync with @playwright/test.
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
     steps:
       - uses: actions/checkout@v7
 
@@ -74,13 +79,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Without --with-deps: the runner image already has Chromium's system libraries, and the
-      # optional font packages --with-deps adds came from a very slow apt mirror (5+ minutes).
-      - name: Install Chromium
-        timeout-minutes: 5
-        run: pnpm --filter e2e exec playwright install chromium
-
       # Against the Vite dev server with the mocked API; the `setup` project signs in first.
+      # Chromium comes with the container image.
       - name: Playwright
         run: pnpm --filter e2e test --project=${{ matrix.project }}
 

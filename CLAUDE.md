@@ -43,8 +43,9 @@ pnpm synth                       # cdk synth inkl. cdk-nag über Turborepo; baut
 pnpm format                      # Prettier schreiben; pnpm format:check prüft nur
 pnpm exec vitest                 # Alle Vitest-Projekte in einem Prozess (Watch-Modus)
 pnpm --filter web dev            # Frontend lokal
-pnpm --filter e2e test           # Playwright; startet den Vite-Dev-Server selbst
-pnpm --filter e2e test --update-snapshots   # Screenshot-Baselines neu erzeugen (Diff vorher ansehen)
+pnpm --filter e2e test:docker    # Playwright im offiziellen Image wie in der CI (Docker; in Cloud-Sessions vorher dockerd starten)
+pnpm --filter e2e test:docker --update-snapshots=changed   # Screenshot-Baselines neu erzeugen (Diff vorher ansehen)
+pnpm --filter e2e test           # Playwright direkt; schneller, aber Screenshots weichen außerhalb des Images leicht ab
 pnpm --filter e2e screenshots    # Ganzseiten-Screenshots aller Seiten nach e2e/screenshots-out/
 SMOKE_BASE_URL=https://… pnpm --filter e2e smoke   # Smoke-Tests gegen eine deployte Stage; mit SMOKE_USER_EMAIL/-PASSWORD auch angemeldet
 pnpm --filter infra cdk synth    # CDK-CLI direkt, z. B. auch `cdk diff` oder `cdk ls`
@@ -78,6 +79,7 @@ Neue Seiten in `e2e/tests/pages.ts` eintragen (mit `access`, bei Seiten, die Dat
 Der Workflow `screenshots.yml` kommentiert in jedem PR mit Frontend-Änderungen Desktop- und Mobil-Screenshots der geänderten Seiten
 (Vergleich mit `main`); die Bilder liegen im Branch `screenshots`, der nie gemergt wird.
 Screenshots (Tests und PR-Kommentar) laden `e2e/screenshot.css`: Fest positionierte Leisten tragen `data-screenshot`, damit sie in Ganzseiten-Aufnahmen an den Seitenrändern bleiben.
+Screenshot-Baselines entstehen nur mit `test:docker` (Image `mcr.microsoft.com/playwright:v<Version>-noble`, auch im CI-Job; Version mit `@playwright/test` synchron halten).
 Playwright-Projekte: `desktop-chrome`, `iphone` (iPhone-Viewport mit Chromium), `pixel`; die Uhr ist in `e2e/tests/fixtures.ts` auf den 7. Oktober 2026 fixiert.
 TypeScript bleibt vorerst auf 6.0, weil typescript-eslint TypeScript 7 noch nicht unterstützt.
 Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Version passende Doku in `node_modules/turbo/docs/` lesen.

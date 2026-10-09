@@ -658,7 +658,8 @@ Umsetzung (Stand T-34):
 - **Abläufe:** Registrierung (`auth.spec.ts`), Beet anlegen (`beds.spec.ts`), Pflanzen setzen (`placement.spec.ts`, `mobile.spec.ts`), Warnung sehen (`warnings.spec.ts`), Zeitachse (`timeline.spec.ts`), eigene Sorte (`own-plants.spec.ts`), Admin-Freigabe (`admin.spec.ts`).
 - **Visual Regression:** `toHaveScreenshot` für Editor, Beetübersicht und Katalog je in Light- und Dark-Mode und je Projekt, dazu weitere Zustände (Warnung beim Ziehen, Zeitachse, Bottom-Sheets).
 - **Testdaten:** Jeder Test läuft in einem frischen Browser-Kontext, und der Mock hält seine Daten nur in dessen localStorage; `isolation.spec.ts` prüft das. Der angemeldete Smoke-Test in `prod` löscht sein Beet am Ende wieder, auch wenn ein Schritt scheitert, und räumt vorher Reste abgebrochener Läufe weg.
-- **CI:** Der Job `e2e` in `ci.yml` läuft je Projekt parallel (Matrix, je höchstens 10 Minuten); bei Fehlern lädt er `test-results/` als Artefakt hoch. Deployt wird nur, wenn auch er grün ist.
+- **CI:** Der Job `e2e` in `ci.yml` läuft je Projekt parallel (Matrix, je höchstens 10 Minuten) im offiziellen Image `mcr.microsoft.com/playwright`; bei Fehlern lädt er `test-results/` als Artefakt hoch. Deployt wird nur, wenn auch er grün ist.
+- **Screenshots reproduzierbar:** Schon kleine Unterschiede bei Schriften und Rendering zwischen Rechnern ergeben rund 1 % abweichende Pixel. Deshalb entstehen die Baselines mit `pnpm --filter e2e test:docker` im selben Image wie in der CI.
 - **Smoke-Testuser:** `SharedStatefulStack` legt den User `smoke-test@hochbeet.andi-john-dev.de` an, sobald der Deploy das GitHub-Secret `SMOKE_USER_PASSWORD` als NoEcho-Parameter übergibt (ohne Secret entsteht nichts, und der angemeldete Smoke-Test wird übersprungen). Das Passwort setzt eine kleine eigene Funktion per `AdminSetUserPassword`; die generische `AwsCustomResource` von CDK scheidet aus, weil ihr Handler das ganze Event samt Passwort loggt.
 
 ### Pipeline (GitHub Actions)
