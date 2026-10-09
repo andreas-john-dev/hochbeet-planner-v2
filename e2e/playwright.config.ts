@@ -2,12 +2,13 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = 5173;
 
-// Runs against the Vite dev server. MSW and the prod smoke suite follow in T-34.
+// Runs against the Vite dev server, whose API is mocked with MSW (apps/web/src/mocks).
+// The `setup` project signs in once per account and stores the login state (storageState).
 export default defineConfig({
   testDir: './tests',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  reporter: process.env.CI ? [['github'], ['list']] : 'list',
   use: {
     baseURL: `http://localhost:${String(port)}`,
     locale: 'de-DE',
@@ -20,11 +21,20 @@ export default defineConfig({
     toHaveScreenshot: { maxDiffPixelRatio: 0.001, stylePath: './screenshot.css' },
   },
   projects: [
-    { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
-    // iPhone viewport, touch and user agent, rendered with Chromium so all projects
-    // share one browser; switch to WebKit once it is installed in CI (T-34).
-    { name: 'iphone', use: { ...devices['iPhone 15'], browserName: 'chromium' } },
-    { name: 'pixel', use: { ...devices['Pixel 7'] } },
+    { name: 'setup', testMatch: /auth\.setup\.ts/, use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'desktop-chrome',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+    },
+    // iPhone viewport, touch and user agent, rendered with Chromium so all projects share one
+    // browser and one set of screenshot baselines.
+    {
+      name: 'iphone',
+      use: { ...devices['iPhone 15'], browserName: 'chromium' },
+      dependencies: ['setup'],
+    },
+    { name: 'pixel', use: { ...devices['Pixel 7'] }, dependencies: ['setup'] },
   ],
   webServer: {
     command: 'pnpm --filter web dev',

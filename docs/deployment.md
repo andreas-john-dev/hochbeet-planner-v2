@@ -65,6 +65,11 @@ Die Domain `hochbeet.andi-john-dev.de` und die Hosted Zone stehen in `infra/lib/
    - Wert: die `RoleArn` aus Schritt 2, z. B. `arn:aws:iam::123456789012:role/hochbeet-github-deploy`
 
    Die ARN ist kein Geheimnis, deshalb eine Variable und kein Secret.
+3. **Secret für den Smoke-Testuser** (empfohlen): Settings → Environments → `prod` → *Environment secrets* → *Add secret*
+   - Name: `SMOKE_USER_PASSWORD`
+   - Wert: ein eigenes Passwort nach der Richtlinie des User Pools (mindestens 8 Zeichen, Groß- und Kleinbuchstabe, Ziffer, Sonderzeichen), z. B. aus einem Passwortmanager.
+
+   Beim nächsten Deploy legt `Prod-SharedStateful` den User `smoke-test@hochbeet.andi-john-dev.de` an und setzt dieses Passwort. Die Smoke-Tests melden sich damit an, legen ein Beet mit Pflanzen an, prüfen die Warnung und löschen das Beet wieder. Ein neuer Wert ändert das Passwort beim nächsten Deploy. Ohne Secret wird der angemeldete Smoke-Test mit einer Warnung übersprungen.
 
 ### 4. Erster Deploy
 

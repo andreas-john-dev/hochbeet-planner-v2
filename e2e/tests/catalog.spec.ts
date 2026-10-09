@@ -104,3 +104,13 @@ test('an adjusted spacing changes the warnings in the editor and can be reset', 
   await expect(page.getByTestId('findings-summary')).toBeVisible();
   await expect(page.getByText(TOO_CLOSE)).toHaveCount(0);
 });
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`catalogue matches screenshot (${colorScheme})`, async ({ page }) => {
+    await signInAs(page, 'user');
+    await page.emulateMedia({ colorScheme });
+    await open(page, '/katalog', 'Pflanzenkatalog');
+    await expect(page.getByText('56 Sorten')).toBeVisible();
+    await expect(page).toHaveScreenshot(`catalog-${colorScheme}.png`);
+  });
+}
