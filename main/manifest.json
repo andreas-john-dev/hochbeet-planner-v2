@@ -284,6 +284,53 @@
     "navLabel": "Admin"
   },
   {
+    "id": "admin-anfrage",
+    "path": "/admin/anfragen/01J9ZQ3W8D6V2K5M7N8P9R0P10",
+    "heading": "Anfrage prüfen",
+    "access": "admin",
+    "seed": {
+      "beds": [],
+      "plantings": [],
+      "ownPlants": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0P10",
+          "name": "Eichblattsalat",
+          "category": "GEMUESE",
+          "family": "Korbblütler",
+          "feeder": "MITTEL",
+          "spacingInRowCm": 25,
+          "rowSpacingCm": 30,
+          "lifecycle": {
+            "type": "ANNUAL",
+            "cultureWeeks": 9
+          },
+          "goodNeighbors": [],
+          "badNeighbors": [],
+          "color": "#c9a66b",
+          "icon": "category-gemuese",
+          "source": "OWN",
+          "overridden": false,
+          "publication": {
+            "status": "PENDING"
+          },
+          "requestedAt": "2026-10-05"
+        }
+      ]
+    }
+  },
+  {
+    "id": "admin-sorte-neu",
+    "path": "/admin/sorten/neu",
+    "heading": "Globale Sorte anlegen",
+    "access": "admin"
+  },
+  {
+    "id": "admin-sorte",
+    "path": "/admin/sorten/01M49THV00RK9E9PC83NEE87CJ",
+    "heading": "Globale Sorte bearbeiten",
+    "access": "admin"
+  },
+  {
     "id": "dev-icons",
     "path": "/dev/icons",
     "heading": "Icon-Galerie",
