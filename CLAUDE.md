@@ -7,7 +7,7 @@ TypeScript-Monorepo: React-Frontend, serverless AWS-Backend, CDK.
 
 - `docs/architecture.md` – Architektur, Domänenmodell, Regeln, API, Stacks. **Verbindlich.**
 - `docs/startkatalog.md` – 56 Sorten mit Abständen, Familie, Bedarf, Standzeit und Nachbarn; Quelle für `packages/catalog-seed`.
-- GitHub-Issues – alle Aufgaben. Label `task` = umsetzbarer Task (T-01 … T-35), Label `epic` = User Story mit Task-Liste.
+- GitHub-Issues – alle Aufgaben. Label `task` = umsetzbarer Task (T-01 …), Label `epic` = User Story mit Task-Liste.
 
 ## Arbeitsweise
 
@@ -64,7 +64,7 @@ Seiten in `src/routes/`, shadcn/ui-Komponenten in `src/components/ui/` (Konfigur
 Farbschema über `useTheme()` aus `src/lib/theme.ts`; Wochenlabels über `formatWeek()` aus `@hochbeet/garden-rules`.
 Anmeldung über `useAuth()` aus `src/lib/auth/context.ts`; API-Aufrufe nur über `createApiClient()` aus `src/lib/api.ts` (sendet das ID-Token).
 Dev-Server und Playwright nutzen Mock-Auth (`apps/web/config.dev.json`): `test@example.com` bzw. `admin@example.com`, Passwort `Gemuese1!`, Code `123456`.
-Auch die API ist dort gemockt (`"apiMode": "mock"`): MSW-Handler in `apps/web/src/mocks/` bilden die Services nach, Daten im `localStorage` pro Testuser. Neue Endpunkte dort mit ergänzen.
+Auch die API ist dort gemockt (`"apiMode": "mock"`): `apps/web/src/mocks/` nutzt pro Testuser die lokale API aus `src/lib/local-api/` (Garden-Service und User-Teil des Catalog-Service im Browser, auch Grundlage des Gastmodus) plus eigene Routen für Veröffentlichung und Admin. Neue Endpunkte des Garden-Service oder für eigene Sorten in `src/lib/local-api/routes.ts` ergänzen, übergreifende bzw. Admin-Endpunkte in `src/mocks/handlers.ts`; gespeicherte Formen des Gastspeichers nur mit neuer Version und Migrationsschritt in `src/lib/local-api/store.ts` ändern.
 Daten im Frontend über `useApi()` und die Query-Hooks in `src/lib/garden.ts`.
 Katalog unter `/katalog`, `/katalog/$plantId`, `/katalog/neu` und `/katalog/$plantId/bearbeiten`: Filter, Labels und Anpassungs-Diff (`overrideFor`, `changedFields` gegen `plant.global`) in `src/lib/catalog.ts`, Formular eigener Sorten in `src/lib/plant-form.ts`.
 Admin-Bereich unter `/admin` (`src/routes/admin/`, `AdminLayout` zeigt Nicht-Admins eine 403-Seite); Ähnlichkeit und Korrekturen in `src/lib/admin.ts`, Sortenformular für alle Fälle in `src/components/catalog/PlantFormFields.tsx`.
@@ -107,7 +107,7 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 
 - Kein `cdk deploy` aus einer Entwickler- oder Claude-Code-Session. Deployt wird nur über GitHub Actions nach dem Merge auf `main` (OIDC-Rolle).
 - Keine AWS-Zugangsdaten, Tokens oder `.env`-Dateien mit Secrets ins Repo.
-- Playwright gegen `prod` läuft in der Pipeline; in Sessions gegen den Dev-Server mit MSW.
+- Playwright gegen `prod` läuft in der Pipeline; in Sessions gegen den Dev-Server mit Mock-API.
 
 ## Prompt-Vorlage
 

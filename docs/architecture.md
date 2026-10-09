@@ -563,9 +563,15 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
 ### Anmeldung
 
 - **Auth-Adapter:** Die App spricht Cognito nur über das Interface `AuthAdapter` (`apps/web/src/lib/auth/`) an. In prod steckt Amplify dahinter (`aws-amplify/auth`, SRP, ohne Hosted UI). Der Dev-Server liefert `config.json` aus `apps/web/config.dev.json` mit `"authMode": "mock"`; dann übernimmt ein lokaler Mock mit Testusern (`test@example.com`, `admin@example.com`, Passwort `Gemuese1!`, Bestätigungscode `123456`). Der Mock wird nur in diesem Fall nachgeladen und läuft in prod nie.
-- **Mock-API:** Mit `"apiMode": "mock"` in `config.dev.json` beantworten MSW-Handler (`apps/web/src/mocks/`) alle Aufrufe unter `/api/*` direkt im Browser.
-  - `createMockFetch()` ruft dafür `getResponse()` von MSW auf und kommt ohne Service-Worker aus, also ohne Zusatzdatei im Build. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
-  - Die Handler bilden Garden- und Catalog-Service nach: gleiche Routen, gleiche Contract-Schemas, gleiche Fehlerform. Daten liegen pro Testuser im `localStorage`, der globale Katalog liegt gemeinsam für alle Testuser daneben (Startkatalog, bis Admins ihn ändern), dazu Anpassungen und eigene Sorten je User. Der Mock-Token `mock-id-token.<email>|admins` trägt die Gruppen wie `cognito:groups`.
+- **Lokale API (`apps/web/src/lib/local-api/`):** Garden-Service und der User-Teil des Catalog-Service (Katalogliste, eigene Sorten, Anpassungen) laufen auch komplett im Browser. Das ist Produktionscode und Grundlage für den Gastmodus (Epic #84).
+  - `localRoutes({ repo, globals })` beantwortet die Routen mit denselben Contract-Schemas, Statuscodes und deutschen Fehlermeldungen wie die Services. `repo` liest und schreibt die Daten genau eines Users, `globals` liefert den globalen Katalog, auf dem Anpassungen und eigene Sorten aufbauen. IDs sind ULIDs aus dem Client.
+  - Ein kleiner eigener Router (`router.ts`) ordnet Methode und Pfad zu, statt MSW zu nutzen: Produktionscode hängt so nicht an einer Mock-Bibliothek, und der Mock-Chunk ist von rund 330 kB auf 11 kB geschrumpft. Unbekannte Routen geben 404, ein voller Browser-Speicher (`QuotaExceededError`) 507 mit deutscher Meldung.
+  - `createLocalFetch({ globals })` ist das `fetch` für Gäste und speichert unter dem Schlüssel `hochbeet-guest` im `localStorage`, als Umschlag `{ version, garden }`. Beim Lesen wird älterer Inhalt über Migrationsschritte (`migrations` in `store.ts`) auf die aktuelle Version gebracht und eintragsweise per zod geprüft: Ungültige Beete, Pflanzungen, Anpassungen oder Sorten fallen einzeln weg, ebenso Pflanzungen ohne Beet. Unlesbarer Inhalt (kaputtes JSON, unbekannte oder neuere Version) wandert einmal nach `hochbeet-guest-backup`, und die App startet leer statt abzustürzen.
+  - Veröffentlichen beantwortet die lokale API für Gäste mit 403; Admin-Routen gibt es dort nicht.
+  - Das Modul wird nur per `import()` geladen und landet nicht im Haupt-Bundle.
+- **Mock-API:** Mit `"apiMode": "mock"` in `config.dev.json` beantwortet `createMockFetch()` (`apps/web/src/mocks/`) alle Aufrufe unter `/api/*` direkt im Browser, ohne Service-Worker. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
+  - Sie nimmt pro Request den User aus dem Mock-Token und nutzt für ihn die lokale API (`localRoutes()` mit `MockStore.repository(userId)`). Dazu kommen die Routen, die es nur für angemeldete User gibt und die über User hinweg arbeiten: Veröffentlichung und Admin (`mockRoutes()` in `handlers.ts`).
+  - Daten liegen pro Testuser im `localStorage` (`hochbeet-mock-api`), der globale Katalog liegt gemeinsam für alle Testuser daneben (`hochbeet-mock-catalog`, Startkatalog, bis Admins ihn ändern). Der Mock-Token `mock-id-token.<email>|admins` trägt die Gruppen wie `cognito:groups`; ohne Token antwortet sie mit 401.
   - Playwright startet jeden Test mit leerem Speicher und kann Daten per `addInitScript` vorbelegen.
 - **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`, `useSavePlanting`, `useDeletePlanting`, `useAdjustPlant`, `useSaveOwnPlant`, `useRequestPublication`, `usePublicationQueue`, `useDecidePublication`, `useSaveGlobalPlant`). Nach Änderungen wird die Beetliste neu geladen.
 - **Beetübersicht (`/beete`):**
@@ -662,7 +668,7 @@ Die Regel-Engine bekommt die dichteste Testabdeckung, weil dort die Fachlogik li
 | Frontend | Vitest + Testing Library | Komponenten, Hooks, Editor-State |
 | E2E | Playwright mit Desktop-Chrome, iPhone, Pixel | Kernabläufe und `toHaveScreenshot` je Viewport |
 
-E2E-Tests laufen lokal und im PR gegen den Vite-Dev-Server mit gemocktem API (MSW) und nach jedem Deploy als Smoke-Suite gegen `prod`.
+E2E-Tests laufen lokal und im PR gegen den Vite-Dev-Server mit Mock-API und nach jedem Deploy als Smoke-Suite gegen `prod`.
 
 Umsetzung (Stand T-34):
 
@@ -676,7 +682,7 @@ Umsetzung (Stand T-34):
 
 ### Pipeline (GitHub Actions)
 
-1. Bei jedem Pull Request: Lint, Typecheck, Unit- und Integrationstests, `cdk synth` mit `cdk-nag`, Playwright gegen den Dev-Server mit MSW.
+1. Bei jedem Pull Request: Lint, Typecheck, Unit- und Integrationstests, `cdk synth` mit `cdk-nag`, Playwright gegen den Dev-Server mit Mock-API.
 2. Bei Merge auf `main`: Build, `cdk deploy --all` per OIDC-Rolle (keine Access Keys im Repo), danach Playwright-Smoke-Tests gegen `prod`.
 
 Umsetzung: `deploy.yml` startet per `workflow_run`, sobald die CI auf `main` grün ist, und deployt genau den getesteten Commit. Der Job läuft in der GitHub-Umgebung `prod`; nur diese darf die Rolle `hochbeet-github-deploy` übernehmen, und die Rolle darf ausschließlich die CDK-Bootstrap-Rollen übernehmen. Die einmalige Einrichtung (Bootstrap, Rolle aus `infra/bootstrap/github-deploy-role.yaml`, GitHub-Umgebung und Variable `AWS_DEPLOY_ROLE_ARN`) steht in [`docs/deployment.md`](./deployment.md). Die Smoke-Tests (`e2e/smoke/`) prüfen ohne Anmeldung Startseite, Deep-Links, `config.json`, das Caching der Assets und die 401 der APIs. Mit dem Smoke-Testuser legt `garden.smoke.ts` ein Beet an, setzt Tomate und Kartoffel, prüft Warnung, Speicherung und Zeitachse und löscht das Beet wieder.

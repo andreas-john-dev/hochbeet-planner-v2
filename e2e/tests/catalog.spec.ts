@@ -89,6 +89,10 @@ test('an adjusted spacing changes the warnings in the editor and can be reset', 
   await expect(page.getByText('angepasst (Standard: 25 cm)')).toBeVisible();
   await expect(page.getByText('Angepasst', { exact: true })).toBeVisible();
   await page.mouse.move(0, 0);
+  // Closing the dialog can leave the page scrolled a little; the screenshot shows the top.
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
   await expect(page).toHaveScreenshot('plant-adjusted.png');
 
   // The editor now warns.

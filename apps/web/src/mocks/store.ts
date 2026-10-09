@@ -1,18 +1,6 @@
 import { seedPlants } from '@hochbeet/catalog-seed';
-import type { Bed, CatalogPlant, Plant, Planting, PlantOverride } from '@hochbeet/contracts';
-
-/** Data of one mock user: the garden, adjustments of global plants and own plants. */
-export interface MockGarden {
-  beds: Bed[];
-  plantings: Planting[];
-  /** Overrides by plant id; missing in data seeded before adjustments existed. */
-  overrides?: Record<string, PlantOverride>;
-  /** Own plants as the catalogue lists them; archived ones stay for existing plantings. */
-  ownPlants?: OwnMockPlant[];
-}
-
-/** An own plant; `requestedAt` (ISO date) is set while its publication is pending. */
-export type OwnMockPlant = CatalogPlant & { archived?: boolean; requestedAt?: string };
+import type { Plant } from '@hochbeet/contracts';
+import { emptyGarden, type GardenRepository, type LocalGarden } from '@/lib/local-api/store';
 
 const STORAGE_KEY = 'hochbeet-mock-api';
 const CATALOG_KEY = 'hochbeet-mock-catalog';
@@ -24,16 +12,26 @@ const CATALOG_KEY = 'hochbeet-mock-catalog';
 export class MockStore {
   constructor(private readonly storage: Storage = localStorage) {}
 
-  read(userId: string): MockGarden {
-    return this.all()[userId] ?? { beds: [], plantings: [] };
+  read(userId: string): LocalGarden {
+    return this.all()[userId] ?? emptyGarden();
   }
 
-  write(userId: string, garden: MockGarden) {
+  write(userId: string, garden: LocalGarden) {
     this.storage.setItem(STORAGE_KEY, JSON.stringify({ ...this.all(), [userId]: garden }));
   }
 
+  /** One user's data for the local API. */
+  repository(userId: string): GardenRepository {
+    return {
+      read: () => this.read(userId),
+      write: (garden) => {
+        this.write(userId, garden);
+      },
+    };
+  }
+
   /** All users with data, for the admin queue across users. */
-  users(): [string, MockGarden][] {
+  users(): [string, LocalGarden][] {
     return Object.entries(this.all());
   }
 
@@ -46,8 +44,8 @@ export class MockStore {
     this.storage.setItem(CATALOG_KEY, JSON.stringify(plants));
   }
 
-  private all(): Record<string, MockGarden> {
+  private all(): Record<string, LocalGarden> {
     const raw = this.storage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, MockGarden>) : {};
+    return raw ? (JSON.parse(raw) as Record<string, LocalGarden>) : {};
   }
 }

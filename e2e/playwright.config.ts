@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = 5173;
 
-// Runs against the Vite dev server, whose API is mocked with MSW (apps/web/src/mocks).
+// Runs against the Vite dev server, whose API is mocked in the browser (apps/web/src/mocks).
 // The `setup` project signs in once per account and stores the login state (storageState).
 export default defineConfig({
   testDir: './tests',
