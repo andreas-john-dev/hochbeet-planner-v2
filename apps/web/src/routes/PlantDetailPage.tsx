@@ -9,6 +9,7 @@ import { SourceBadge } from '@/components/catalog/SourceBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
 import { CATEGORY_LABEL, changedFields, FEEDER_LABEL, lifecycleText } from '@/lib/catalog';
 import { useAdjustPlant, usePlants } from '@/lib/garden';
@@ -34,7 +35,7 @@ export function PlantDetailPage() {
           Der Katalog konnte nicht geladen werden. Bitte lade die Seite neu.
         </FormMessage>
       ) : plants.isPending ? (
-        <p className="text-muted-foreground text-sm">Sorte wird geladen …</p>
+        <PlantDetailSkeleton />
       ) : plant ? (
         <PlantDetails plant={plant} catalog={plants.data} />
       ) : (
@@ -43,6 +44,27 @@ export function PlantDetailPage() {
         </EmptyState>
       )}
     </>
+  );
+}
+
+/** Shape of the detail page while the catalogue loads. */
+function PlantDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6" aria-busy="true" role="status">
+      <span className="sr-only">Sorte wird geladen …</span>
+      <div className="flex items-center gap-4">
+        <Skeleton className="size-16 rounded-full" />
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} className="h-16 rounded-lg" />
+        ))}
+      </div>
+    </div>
   );
 }
 

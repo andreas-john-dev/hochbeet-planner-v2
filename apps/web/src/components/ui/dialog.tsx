@@ -14,7 +14,7 @@ export function DialogContent({
 }: ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+      <DialogPrimitive.Overlay className="animate-fade fixed inset-0 z-50 bg-black/50" />
       <DialogPrimitive.Content
         className={cn(
           'bg-card text-card-foreground fixed inset-x-4 top-1/2 z-50 mx-auto flex max-h-[calc(100dvh-2rem)] max-w-lg -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-xl border p-5 shadow-lg md:p-6',

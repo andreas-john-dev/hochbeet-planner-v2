@@ -10,5 +10,6 @@ test-results/
 .env.*
 .DS_Store
 screenshots-out/
+lighthouse-out/
 # Login state of the Playwright setup project
 e2e/.auth/

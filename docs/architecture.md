@@ -528,6 +528,18 @@ Umsetzung (Stand T-30):
 - **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe, Viewport, Pflanzart, Vorschau, Auswahl, den Entwurf beim Ziehen (Position oder Länge) und die Undo-Historie.
 - **Speichern:** Für Pflanzungen gibt es `useSavePlanting` und `useDeletePlanting` in `lib/garden.ts`. Sie ändern den Query-Cache optimistisch, rollen bei Fehlern zurück und laden danach neu. Neue Pflanzungen tragen bis zur Antwort eine temporäre ID (`tmp-…`); erst danach erscheint der Griff.
 
+### Barrierefreiheit und Feinschliff
+
+Umsetzung (Stand T-35):
+
+- **WCAG 2.1 AA:** `e2e/tests/a11y.spec.ts` prüft jede Seite aus `pages.ts` in Light- und Dark-Mode mit axe-core (Kontraste, Namen, Landmarks, Überschriften) in allen drei Playwright-Projekten. Dazu prüft ein Test per Tabulator, dass jedes fokussierte Element einen sichtbaren Fokus hat.
+- **Fokus:** Ein globaler `:focus-visible`-Rahmen (2 px in `--ring`) gilt für alles ohne eigenen Fokusring, z. B. die Navigation; Bedienelemente mit eigenem Ring behalten ihn.
+- **Ladezustände:** Skelette (`components/ui/skeleton.tsx`) in Form der Inhalte statt reiner Ladetexte; Screenreader hören den Ladetext einmal über `role="status"`.
+- **Fehlermeldungen:** `apiErrorMessage()` nimmt die deutsche Meldung des Service und unterscheidet sonst abgelaufene Anmeldung (401), fehlende Berechtigung (403), nicht mehr Vorhandenes (404), Serverprobleme (5xx) und fehlende Verbindung. Fehlerseiten von Proxys, die kein JSON sind, behalten ihren Status.
+- **Übergänge:** Seiten blenden kurz ein, das Abdunkeln hinter Dialogen ebenso; mit „Bewegung reduzieren“ entfällt beides. Dialoginhalte selbst bewegen sich nicht, damit Fokus und Scrollposition beim Öffnen stabil bleiben.
+- **Lighthouse:** `pnpm --filter e2e lighthouse` misst den Produktions-Build in `vite preview` (Mock-Auth und -API aus `config.dev.json`) mit dem mobilen Preset: Anmeldung, Beetübersicht, Editor und Katalog müssen bei Performance und Accessibility mindestens 90 erreichen. Der CI-Job `lighthouse` lädt die Berichte als Artefakt hoch. Lighthouse läuft per `npx` in fester Version statt als Abhängigkeit, weil es `@opentelemetry/api` in den Workspace zieht und damit vitest doppelt auflöst.
+- **375 px:** `shell.spec.ts` prüft weiterhin jede Seite auf horizontales Scrollen.
+
 ### Bedienung nach Gerät
 
 | Aktion | Desktop | Smartphone |

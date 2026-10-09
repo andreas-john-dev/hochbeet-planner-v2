@@ -78,3 +78,36 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+@layer base {
+  /* Visible keyboard focus everywhere; components with their own ring (outline-none) keep it. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Gentle entrance for pages and dialogs; skipped for people who reduce motion. */
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@utility animate-enter {
+  animation: enter 180ms ease-out;
+}
+@utility animate-fade {
+  animation: fade 150ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter,
+  .animate-fade {
+    animation: none;
+  }
+}

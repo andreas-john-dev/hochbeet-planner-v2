@@ -4,6 +4,7 @@ import { ArrowLeft, SearchX } from 'lucide-react';
 import { PlantFormFields } from '@/components/catalog/PlantFormFields';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
+import { SkeletonList } from '@/components/ui/skeleton';
 import { globalValues } from '@/lib/admin';
 import { usePlants, useSaveGlobalPlant } from '@/lib/garden';
 import { EMPTY_PLANT_FORM, plantForm } from '@/lib/plant-form';
@@ -32,7 +33,12 @@ export function GlobalPlantFormPage() {
       {plants.isError ? (
         <FormMessage tone="error">Der Katalog konnte nicht geladen werden.</FormMessage>
       ) : plants.isPending ? (
-        <p className="text-muted-foreground text-sm">Katalog wird geladen …</p>
+        <SkeletonList
+          label="Katalog wird geladen …"
+          count={5}
+          className="flex max-w-2xl flex-col gap-4"
+          itemClassName="h-11"
+        />
       ) : plantId && plant?.source !== 'GLOBAL' ? (
         <EmptyState icon={SearchX} title="Keine globale Sorte">
           Diese Sorte gibt es nicht im globalen Katalog.

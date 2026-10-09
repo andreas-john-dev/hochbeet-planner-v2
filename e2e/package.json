@@ -9,9 +9,11 @@
     "test": "playwright test",
     "screenshots": "playwright test -c playwright.screenshots.config.ts",
     "smoke": "playwright test -c playwright.smoke.config.ts",
-    "test:docker": "./scripts/playwright-docker.sh"
+    "test:docker": "./scripts/playwright-docker.sh",
+    "lighthouse": "playwright test -c playwright.lighthouse.config.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@playwright/test": "1.56.1",
     "pixelmatch": "^8.0.0",
     "pngjs": "^7.0.0"

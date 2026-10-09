@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from '@tanstack/react-router';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
@@ -11,6 +11,7 @@ import { ThemeToggle } from './ThemeToggle';
 /** Sidebar on desktop, top bar and bottom navigation on phones. */
 export function AppShell() {
   const { user } = useAuth();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const items = navItems.filter((item) => !item.adminOnly || isAdmin(user));
 
   return (
@@ -56,7 +57,10 @@ export function AppShell() {
         </header>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-10">
-          <Outlet />
+          {/* Keyed by path: each page enters softly (not with reduced motion). */}
+          <div key={pathname} className="animate-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
 

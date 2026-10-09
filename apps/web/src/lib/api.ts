@@ -32,19 +32,42 @@ export function createApiClient(getIdToken: TokenProvider, fetchFn: typeof fetch
 
     const response = await fetchFn(path, { ...init, headers });
     const text = await response.text();
-    const body: unknown = text ? JSON.parse(text) : undefined;
+    const body = parseBody(text);
     if (!response.ok) throw new ApiError(response.status, body);
     return body as T;
   };
 }
 
+/** JSON body, or undefined for empty and non-JSON bodies (e.g. a proxy's HTML error page). */
+function parseBody(text: string): unknown {
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 export type ApiFetch = ReturnType<typeof createApiClient>;
 
-/** German message of a failed API call: the service's `message`, or a generic hint. */
+/**
+ * German message of a failed API call: the service's `message` if it sent one, otherwise a
+ * hint that matches the kind of failure.
+ */
 export function apiErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     const body = error.body as { message?: unknown } | undefined;
     if (typeof body?.message === 'string') return body.message;
+    if (error.status === 401) return 'Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.';
+    if (error.status === 403) return 'Dafür fehlt dir die Berechtigung.';
+    if (error.status === 404) return 'Das gibt es nicht mehr. Bitte lade die Seite neu.';
+    if (error.status >= 500) {
+      return 'Der Server hat gerade ein Problem. Bitte versuche es gleich noch einmal.';
+    }
+  }
+  // fetch rejects with a TypeError when the network is down.
+  if (error instanceof TypeError) {
+    return 'Keine Verbindung zum Server. Prüfe deine Internetverbindung und versuche es noch einmal.';
   }
   return 'Das hat nicht geklappt. Bitte versuche es noch einmal.';
 }

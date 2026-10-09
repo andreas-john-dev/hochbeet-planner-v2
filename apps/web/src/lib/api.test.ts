@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, createApiClient, shouldRetry } from './api';
+import { ApiError, apiErrorMessage, createApiClient, shouldRetry } from './api';
 
 describe('createApiClient', () => {
   it('sends the ID token and parses JSON', async () => {
@@ -29,6 +29,34 @@ describe('createApiClient', () => {
     await expect(
       createApiClient(() => Promise.resolve('t'), fetchFn)('/api/catalog/plants'),
     ).rejects.toEqual(new ApiError(403, { message: 'nope' }));
+  });
+
+  it('keeps the status when an error page is not JSON', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(new Response('<html>Bad Gateway</html>', { status: 502 }));
+    await expect(
+      createApiClient(() => Promise.resolve('t'), fetchFn)('/api/catalog/plants'),
+    ).rejects.toEqual(new ApiError(502, undefined));
+  });
+});
+
+describe('apiErrorMessage', () => {
+  it('prefers the German message of the service', () => {
+    expect(apiErrorMessage(new ApiError(400, { message: 'Bitte prüfe deine Eingaben.' }))).toBe(
+      'Bitte prüfe deine Eingaben.',
+    );
+  });
+
+  it('explains the kind of failure otherwise', () => {
+    expect(apiErrorMessage(new ApiError(401, undefined))).toMatch(/Anmeldung ist abgelaufen/);
+    expect(apiErrorMessage(new ApiError(403, undefined))).toMatch(/Berechtigung/);
+    expect(apiErrorMessage(new ApiError(404, undefined))).toMatch(/gibt es nicht mehr/);
+    expect(apiErrorMessage(new ApiError(503, undefined))).toMatch(/Server hat gerade ein Problem/);
+    expect(apiErrorMessage(new TypeError('Failed to fetch'))).toMatch(/Keine Verbindung/);
+    expect(apiErrorMessage(new Error('?'))).toBe(
+      'Das hat nicht geklappt. Bitte versuche es noch einmal.',
+    );
   });
 });
 

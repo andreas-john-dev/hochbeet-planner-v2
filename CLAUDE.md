@@ -47,6 +47,7 @@ pnpm --filter e2e test:docker    # Playwright im offiziellen Image wie in der CI
 pnpm --filter e2e test:docker --update-snapshots=changed   # Screenshot-Baselines neu erzeugen (Diff vorher ansehen)
 pnpm --filter e2e test           # Playwright direkt; schneller, aber Screenshots weichen außerhalb des Images leicht ab
 pnpm --filter e2e screenshots    # Ganzseiten-Screenshots aller Seiten nach e2e/screenshots-out/
+pnpm --filter e2e lighthouse     # Lighthouse mobil gegen den Produktions-Build (vite preview), Schwelle 90; Berichte in e2e/lighthouse-out/
 SMOKE_BASE_URL=https://… pnpm --filter e2e smoke   # Smoke-Tests gegen eine deployte Stage; mit SMOKE_USER_EMAIL/-PASSWORD auch angemeldet
 pnpm --filter infra cdk synth    # CDK-CLI direkt, z. B. auch `cdk diff` oder `cdk ls`
 ```
@@ -56,7 +57,7 @@ Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `pac
 Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
 Deployment: `deploy.yml` deployt jeden grünen `main`-Commit per OIDC nach `prod` und führt danach die Smoke-Tests aus;
 einmalige Einrichtung und Fehlersuche in `docs/deployment.md`.
-Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test, build und synth aus, dazu Playwright je Projekt als parallele Matrix (Job `e2e`);
+Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test, build und synth aus, dazu Playwright je Projekt als parallele Matrix (Job `e2e`) und Lighthouse (Job `lighthouse`);
 der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
 Frontend (`apps/web`): Routen code-basiert in `src/router.tsx` (deutsche Pfade `/beete`, `/katalog`, `/profil`, `/admin`),
 Seiten in `src/routes/`, shadcn/ui-Komponenten in `src/components/ui/` (Konfiguration `components.json`), Import-Alias `@/` → `src/`.
@@ -75,7 +76,8 @@ Erneuerungen der Erde (Saisongrenzen) pflegt der Beet-Dialog über `src/lib/soil
 Änderungen an Pflanzungen im Editor laufen über `commit({ before, after })` in `BedEditorPage`, damit sie in der Undo-Historie (`src/lib/editor/history.ts`) landen.
 Unter `md` ersetzen Bottom-Sheets (`src/components/ui/sheet.tsx`) die Seitenleisten des Editors; Touch-Gesten in Playwright über `touchDrag()` in `e2e/tests/mobile.spec.ts` (CDP mit Zeitstempeln).
 In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten (nutzt den `storageState`, den das Projekt `setup` per Anmeldung in `e2e/.auth/` ablegt), Beete, Pflanzungen und eigene Sorten mit `seedGarden()` aus `e2e/tests/garden.ts` vorbelegen (auch für mehrere User, z. B. eine Anfrage eines anderen Users); Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.
-Neue Seiten in `e2e/tests/pages.ts` eintragen (mit `access`, bei Seiten, die Daten brauchen, mit `seed`): Tests und PR-Screenshots nutzen diese Liste.
+Neue Seiten in `e2e/tests/pages.ts` eintragen (mit `access`, bei Seiten, die Daten brauchen, mit `seed`): Tests, axe-Prüfung (`a11y.spec.ts`, WCAG 2.1 AA) und PR-Screenshots nutzen diese Liste.
+Ladezustände mit `Skeleton`/`SkeletonList` aus `src/components/ui/skeleton.tsx`, Fehlermeldungen von API-Aufrufen immer über `apiErrorMessage()`.
 Der Workflow `screenshots.yml` kommentiert in jedem PR mit Frontend-Änderungen Desktop- und Mobil-Screenshots der geänderten Seiten
 (Vergleich mit `main`); die Bilder liegen im Branch `screenshots`, der nie gemergt wird.
 Screenshots (Tests und PR-Kommentar) laden `e2e/screenshot.css`: Fest positionierte Leisten tragen `data-screenshot`, damit sie in Ganzseiten-Aufnahmen an den Seitenrändern bleiben.

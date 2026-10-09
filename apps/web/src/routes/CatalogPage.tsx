@@ -8,6 +8,7 @@ import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SkeletonList } from '@/components/ui/skeleton';
 import {
   CATEGORY_LABEL,
   type CatalogFilter,
@@ -157,9 +158,10 @@ export function CatalogPage() {
         <>
           <p className="text-muted-foreground mt-4 mb-2 text-sm" aria-live="polite">
             {plants.isPending
-              ? 'Katalog wird geladen …'
+              ? ''
               : `${String(shown.length)} ${shown.length === 1 ? 'Sorte' : 'Sorten'}`}
           </p>
+          {plants.isPending && <SkeletonList label="Katalog wird geladen …" count={9} />}
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Sorten">
             {shown.map((plant) => (
               <li key={plant.id}>

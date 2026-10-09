@@ -14,7 +14,7 @@ export function SheetContent({
 }: ComponentProps<typeof DialogPrimitive.Content> & { showClose?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/30" />
+      <DialogPrimitive.Overlay className="animate-fade fixed inset-0 z-50 bg-black/30" />
       <DialogPrimitive.Content
         className={cn(
           'bg-card text-card-foreground fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col gap-3 rounded-t-2xl border-t px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg outline-none',

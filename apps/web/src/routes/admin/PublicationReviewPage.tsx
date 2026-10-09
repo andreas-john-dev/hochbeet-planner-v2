@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { SkeletonList } from '@/components/ui/skeleton';
 import { correctionsFor, similarPlants } from '@/lib/admin';
 import { apiErrorMessage } from '@/lib/api';
 import { CATEGORY_LABEL, FEEDER_LABEL, lifecycleText } from '@/lib/catalog';
@@ -36,7 +37,12 @@ export function PublicationReviewPage() {
       {queue.isError || plants.isError ? (
         <FormMessage tone="error">Die Anfrage konnte nicht geladen werden.</FormMessage>
       ) : queue.isPending || plants.isPending ? (
-        <p className="text-muted-foreground text-sm">Anfrage wird geladen …</p>
+        <SkeletonList
+          label="Anfrage wird geladen …"
+          count={5}
+          className="flex max-w-2xl flex-col gap-4"
+          itemClassName="h-11"
+        />
       ) : request ? (
         <Review plant={request.plant} requestedAt={request.requestedAt} catalog={plants.data} />
       ) : (
