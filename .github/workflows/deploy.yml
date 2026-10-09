@@ -79,10 +79,21 @@ jobs:
       - name: CDK deploy
         id: deploy
         working-directory: infra
+        env:
+          # Creates the smoke test user (Prod-SharedStateful); see docs/deployment.md.
+          SMOKE_USER_PASSWORD: ${{ secrets.SMOKE_USER_PASSWORD }}
         run: |
-          pnpm exec cdk deploy --all --require-approval never --outputs-file cdk-outputs.json
+          params=()
+          if [ -n "$SMOKE_USER_PASSWORD" ]; then
+            params=(--parameters "Prod-SharedStateful:SmokeUserPassword=$SMOKE_USER_PASSWORD")
+          else
+            echo "::warning title=Smoke user missing::Secret SMOKE_USER_PASSWORD is not set; the signed-in smoke test is skipped. See docs/deployment.md."
+          fi
+          pnpm exec cdk deploy --all --require-approval never --outputs-file cdk-outputs.json "${params[@]}"
           url=$(node -p "require('./cdk-outputs.json')['Prod-Frontend'].Url")
+          email=$(node -p "require('./cdk-outputs.json')['Prod-SharedStateful']?.SmokeUserEmail ?? ''")
           echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "smoke-user-email=$email" >> "$GITHUB_OUTPUT"
           echo "### Live: $url" >> "$GITHUB_STEP_SUMMARY"
 
       # Without --with-deps: the runner image already has Chromium's system libraries, and the
@@ -91,10 +102,13 @@ jobs:
         timeout-minutes: 5
         run: pnpm --filter e2e exec playwright install chromium
 
+      # Read-only checks plus one signed-in run with the smoke user, which deletes its data again.
       - name: Smoke tests
         run: pnpm --filter e2e smoke
         env:
           SMOKE_BASE_URL: ${{ steps.deploy.outputs.url }}
+          SMOKE_USER_EMAIL: ${{ steps.deploy.outputs.smoke-user-email }}
+          SMOKE_USER_PASSWORD: ${{ secrets.SMOKE_USER_PASSWORD }}
 
       - uses: actions/upload-artifact@v7
         if: failure()

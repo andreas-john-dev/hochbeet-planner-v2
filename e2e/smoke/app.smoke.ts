@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// Read-only: no sign-in against prod here (a dedicated test user follows in T-34).
+// Read-only checks without sign-in; the signed-in run with the smoke user is in garden.smoke.ts.
 
 test('start page sends signed-out visitors to the sign-in page', async ({ page }) => {
   await page.goto('/');

@@ -635,6 +635,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog- und Garden-Lambdalith (`ServiceApiStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur Item-Operationen auf der Tabelle und `Query` auf `GSI1`, kein Scan, keine Index-Wildcard). |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
+| `AwsSolutions-IAM4` (AWS-managed Policy) | Passwort-Funktion des Smoke-Testusers (`SharedStatefulStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; sonst darf die Funktion nur `AdminSetUserPassword` auf diesem User Pool. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
 
 ## Testing & CI/CD
@@ -649,14 +650,23 @@ Die Regel-Engine bekommt die dichteste Testabdeckung, weil dort die Fachlogik li
 | Frontend | Vitest + Testing Library | Komponenten, Hooks, Editor-State |
 | E2E | Playwright mit Desktop-Chrome, iPhone, Pixel | Kernabläufe und `toHaveScreenshot` je Viewport |
 
-E2E-Tests laufen lokal gegen den Vite-Dev-Server mit gemocktem API (MSW) und nach jedem Deploy als Smoke-Suite gegen `prod` mit einem eigenen Testuser, dessen Login-Status per `storageState` wiederverwendet wird.
+E2E-Tests laufen lokal und im PR gegen den Vite-Dev-Server mit gemocktem API (MSW) und nach jedem Deploy als Smoke-Suite gegen `prod`.
+
+Umsetzung (Stand T-34):
+
+- **Projekte:** `desktop-chrome`, `iphone` (iPhone-Viewport mit Chromium) und `pixel`. Das Projekt `setup` (`e2e/tests/auth.setup.ts`) meldet Test- und Admin-User einmal über die Anmeldeseite an und speichert den Login-Status als `storageState` in `e2e/.auth/`. Tests starten daraus mit `signInAs()`; weil jeder Test sein Konto selbst wählt und manche mitten im Test wechseln, wird der gespeicherte localStorage pro Seite gesetzt statt pro Projekt.
+- **Abläufe:** Registrierung (`auth.spec.ts`), Beet anlegen (`beds.spec.ts`), Pflanzen setzen (`placement.spec.ts`, `mobile.spec.ts`), Warnung sehen (`warnings.spec.ts`), Zeitachse (`timeline.spec.ts`), eigene Sorte (`own-plants.spec.ts`), Admin-Freigabe (`admin.spec.ts`).
+- **Visual Regression:** `toHaveScreenshot` für Editor, Beetübersicht und Katalog je in Light- und Dark-Mode und je Projekt, dazu weitere Zustände (Warnung beim Ziehen, Zeitachse, Bottom-Sheets).
+- **Testdaten:** Jeder Test läuft in einem frischen Browser-Kontext, und der Mock hält seine Daten nur in dessen localStorage; `isolation.spec.ts` prüft das. Der angemeldete Smoke-Test in `prod` löscht sein Beet am Ende wieder, auch wenn ein Schritt scheitert, und räumt vorher Reste abgebrochener Läufe weg.
+- **CI:** Der Job `e2e` in `ci.yml` läuft je Projekt parallel (Matrix, je höchstens 10 Minuten); bei Fehlern lädt er `test-results/` als Artefakt hoch. Deployt wird nur, wenn auch er grün ist.
+- **Smoke-Testuser:** `SharedStatefulStack` legt den User `smoke-test@hochbeet.andi-john-dev.de` an, sobald der Deploy das GitHub-Secret `SMOKE_USER_PASSWORD` als NoEcho-Parameter übergibt (ohne Secret entsteht nichts, und der angemeldete Smoke-Test wird übersprungen). Das Passwort setzt eine kleine eigene Funktion per `AdminSetUserPassword`; die generische `AwsCustomResource` von CDK scheidet aus, weil ihr Handler das ganze Event samt Passwort loggt.
 
 ### Pipeline (GitHub Actions)
 
 1. Bei jedem Pull Request: Lint, Typecheck, Unit- und Integrationstests, `cdk synth` mit `cdk-nag`, Playwright gegen den Dev-Server mit MSW.
 2. Bei Merge auf `main`: Build, `cdk deploy --all` per OIDC-Rolle (keine Access Keys im Repo), danach Playwright-Smoke-Tests gegen `prod`.
 
-Umsetzung: `deploy.yml` startet per `workflow_run`, sobald die CI auf `main` grün ist, und deployt genau den getesteten Commit. Der Job läuft in der GitHub-Umgebung `prod`; nur diese darf die Rolle `hochbeet-github-deploy` übernehmen, und die Rolle darf ausschließlich die CDK-Bootstrap-Rollen übernehmen. Die einmalige Einrichtung (Bootstrap, Rolle aus `infra/bootstrap/github-deploy-role.yaml`, GitHub-Umgebung und Variable `AWS_DEPLOY_ROLE_ARN`) steht in [`docs/deployment.md`](./deployment.md). Die Smoke-Tests (`e2e/smoke/`) sind rein lesend und prüfen Startseite, Deep-Links, `config.json` und das Caching der Assets.
+Umsetzung: `deploy.yml` startet per `workflow_run`, sobald die CI auf `main` grün ist, und deployt genau den getesteten Commit. Der Job läuft in der GitHub-Umgebung `prod`; nur diese darf die Rolle `hochbeet-github-deploy` übernehmen, und die Rolle darf ausschließlich die CDK-Bootstrap-Rollen übernehmen. Die einmalige Einrichtung (Bootstrap, Rolle aus `infra/bootstrap/github-deploy-role.yaml`, GitHub-Umgebung und Variable `AWS_DEPLOY_ROLE_ARN`) steht in [`docs/deployment.md`](./deployment.md). Die Smoke-Tests (`e2e/smoke/`) prüfen ohne Anmeldung Startseite, Deep-Links, `config.json`, das Caching der Assets und die 401 der APIs. Mit dem Smoke-Testuser legt `garden.smoke.ts` ein Beet an, setzt Tomate und Kartoffel, prüft Warnung, Speicherung und Zeitachse und löscht das Beet wieder.
 
 Deployt wird ausschließlich über diese Pipeline, nicht aus Entwickler- oder Claude-Code-Sessions.
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
 import type { Access } from './pages';
 
@@ -10,8 +12,6 @@ export const USERS = {
   admin: { email: 'admin@example.com', password: 'Gemuese1!' },
 } as const;
 
-const MOCK_STORAGE_KEY = 'hochbeet-mock-auth';
-
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.clock.setFixedTime(NOW);
@@ -21,19 +21,29 @@ export const test = base.extend({
 
 export { expect };
 
+/** Login state per account, written by the `setup` project (tests/auth.setup.ts). */
+export const authFile = (access: Exclude<Access, 'public'>) =>
+  resolve(import.meta.dirname, '../.auth', `${access}.json`);
+
+interface StorageState {
+  origins: { origin: string; localStorage: { name: string; value: string }[] }[];
+}
+
 /**
- * Starts the page signed in as the given account (mock auth of the dev server).
- * Only seeds the session once, so a sign-out in the test sticks across reloads.
+ * Starts the page signed in as the given account, from the storageState of the `setup`
+ * project. Each test chooses its account itself and some switch accounts midway, so the
+ * stored localStorage is applied per page instead of per project. Only seeds it once, so a
+ * sign-out in the test sticks across reloads.
  */
 export async function signInAs(page: Page, access: Access) {
   if (access === 'public') return;
-  const { email } = USERS[access];
-  await page.addInitScript(
-    ([key, session]) => {
-      if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ session }));
-    },
-    [MOCK_STORAGE_KEY, email] as const,
-  );
+  const state = JSON.parse(readFileSync(authFile(access), 'utf8')) as StorageState;
+  const entries = state.origins.flatMap((o) => o.localStorage);
+  await page.addInitScript((items) => {
+    for (const { name, value } of items) {
+      if (!localStorage.getItem(name)) localStorage.setItem(name, value);
+    }
+  }, entries);
 }
 
 /** Opens a page and waits until heading and web font are ready. */

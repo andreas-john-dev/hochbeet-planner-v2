@@ -8,7 +8,17 @@ export default defineConfig({
   retries: 0,
   reporter: 'list',
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { ...devices['iPhone 15'], browserName: 'chromium' } },
+    {
+      name: 'setup',
+      testDir: './tests',
+      testMatch: /auth\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'] },
+    {
+      name: 'mobile',
+      use: { ...devices['iPhone 15'], browserName: 'chromium' },
+      dependencies: ['setup'],
+    },
   ],
 });

@@ -64,4 +64,58 @@ describe('SharedStatefulStack', () => {
   it('has no unacknowledged cdk-nag AwsSolutions findings', () => {
     expect(nagViolations).toEqual([]);
   });
+
+  it('creates the smoke test user only when the deploy passes a password', () => {
+    template.hasParameter('SmokeUserPassword', { Type: 'String', NoEcho: true, Default: '' });
+    template.hasCondition('HasSmokeUser', {
+      'Fn::Not': [{ 'Fn::Equals': [{ Ref: 'SmokeUserPassword' }, ''] }],
+    });
+    template.hasResource('AWS::Cognito::UserPoolUser', {
+      Condition: 'HasSmokeUser',
+      Properties: {
+        Username: stage.smokeUserEmail,
+        MessageAction: 'SUPPRESS',
+        UserAttributes: [
+          { Name: 'email', Value: stage.smokeUserEmail },
+          { Name: 'email_verified', Value: 'true' },
+        ],
+        UserPoolId: Match.anyValue(),
+      },
+    });
+    template.hasOutput('SmokeUserEmail', {
+      Condition: 'HasSmokeUser',
+      Value: stage.smokeUserEmail,
+    });
+  });
+
+  it('sets a permanent password with an own handler that never logs the event', () => {
+    template.hasResource('Custom::SmokeUserPassword', {
+      Condition: 'HasSmokeUser',
+      Properties: Match.objectLike({
+        Username: stage.smokeUserEmail,
+        Password: { Ref: 'SmokeUserPassword' },
+      }),
+    });
+    const [fn] = Object.values(
+      template.findResources('AWS::Lambda::Function', { Condition: 'HasSmokeUser' }),
+    );
+    const code = (fn as { Properties: { Code: { ZipFile: string } } }).Properties.Code.ZipFile;
+    expect(code).toContain('AdminSetUserPasswordCommand');
+    expect(code).toContain('Permanent: true');
+    expect(code).not.toMatch(/console\.(log|error)\([^)]*event/);
+    // The handler may only set passwords in this user pool.
+    template.hasResource('AWS::IAM::Policy', {
+      Condition: 'HasSmokeUser',
+      Properties: Match.objectLike({
+        PolicyDocument: Match.objectLike({
+          Statement: [
+            Match.objectLike({
+              Action: 'cognito-idp:AdminSetUserPassword',
+              Resource: { 'Fn::GetAtt': [Match.stringLikeRegexp('^UserPool'), 'Arn'] },
+            }),
+          ],
+        }),
+      }),
+    });
+  });
 });

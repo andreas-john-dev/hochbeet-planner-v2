@@ -52,3 +52,41 @@ jobs:
         run: pnpm build
       - name: CDK synth
         run: pnpm synth
+
+  e2e:
+    name: E2E (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    # The three projects run side by side, so the whole suite stays well below 10 minutes.
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop-chrome, iphone, pixel]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Without --with-deps: the runner image already has Chromium's system libraries, and the
+      # optional font packages --with-deps adds came from a very slow apt mirror (5+ minutes).
+      - name: Install Chromium
+        timeout-minutes: 5
+        run: pnpm --filter e2e exec playwright install chromium
+
+      # Against the Vite dev server with the mocked API; the `setup` project signs in first.
+      - name: Playwright
+        run: pnpm --filter e2e test --project=${{ matrix.project }}
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e2e-results-${{ matrix.project }}
+          path: e2e/test-results/
+          retention-days: 14
