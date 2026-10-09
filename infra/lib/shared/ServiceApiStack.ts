@@ -25,7 +25,19 @@ export interface ServiceApiStackProps extends StackProps {
   readonly apiDomainParameter: string;
   /** Secondary indexes the service may query. */
   readonly indexNames?: readonly string[];
+  /**
+   * Full paths reachable with GET and without a token, e.g. `/api/catalog/public/plants`.
+   * Each becomes its own route without authorizer and with a tighter throttle; the
+   * Lambdalith serves them under `<basePath>/public/`.
+   */
+  readonly publicGetPaths?: readonly string[];
 }
+
+/**
+ * Throttle of each public route: cached by CloudFront, so few requests ever reach it.
+ * `RouteSettings` is raw JSON in CloudFormation, hence the PascalCase keys.
+ */
+export const PUBLIC_ROUTE_THROTTLE = { ThrottlingRateLimit: 5, ThrottlingBurstLimit: 10 };
 
 /**
  * Stateless part of a service: its Hono Lambdalith behind an HTTP API with Cognito JWT
@@ -95,23 +107,33 @@ export class ServiceApiStack extends Stack {
       description: `${props.title} API (${props.stage.name})`,
       defaultAuthorizer: authorizer,
     });
+    const integration = new HttpLambdaIntegration('HandlerIntegration', this.handler);
     this.api.addRoutes({
       path: `${props.basePath}/{proxy+}`,
       methods: [apigw.HttpMethod.ANY],
-      integration: new HttpLambdaIntegration('HandlerIntegration', this.handler),
+      integration,
     });
-    this.configureStage();
+    // More specific than {proxy+}, so API Gateway picks these routes for exactly these paths.
+    const publicRoutes = (props.publicGetPaths ?? []).flatMap((path) =>
+      this.api.addRoutes({
+        path,
+        methods: [apigw.HttpMethod.GET],
+        integration,
+        authorizer: new apigw.HttpNoneAuthorizer(),
+      }),
+    );
+    this.configureStage(props.publicGetPaths ?? []);
 
     new ssm.StringParameter(this, 'ApiDomainParameter', {
       parameterName: props.apiDomainParameter,
       stringValue: `${this.api.apiId}.execute-api.${this.region}.${this.urlSuffix}`,
     });
 
-    this.acknowledgeNagFindings();
+    this.acknowledgeNagFindings(publicRoutes);
   }
 
   /** Access logs and a throttle on the default stage; keeps cost and abuse in check. */
-  private configureStage() {
+  private configureStage(publicGetPaths: readonly string[]) {
     const accessLogs = new logs.LogGroup(this, 'ApiAccessLogs', {
       retention: logs.RetentionDays.ONE_MONTH,
       removalPolicy: RemovalPolicy.DESTROY,
@@ -131,10 +153,22 @@ export class ServiceApiStack extends Stack {
       }),
     };
     stage.defaultRouteSettings = { throttlingRateLimit: 20, throttlingBurstLimit: 40 };
+    if (publicGetPaths.length > 0) {
+      stage.routeSettings = Object.fromEntries(
+        publicGetPaths.map((path) => [`GET ${path}`, PUBLIC_ROUTE_THROTTLE]),
+      );
+    }
   }
 
   /** Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag"). */
-  private acknowledgeNagFindings() {
+  private acknowledgeNagFindings(publicRoutes: readonly apigw.HttpRoute[]) {
+    for (const route of publicRoutes) {
+      Validations.of(route).acknowledge({
+        id: 'AwsSolutions-APIG4',
+        reason:
+          'Public read-only route by design (guests without account); returns no user data, is cached by CloudFront and has its own low throttle.',
+      });
+    }
     Validations.of(this.handler).acknowledge({
       id: 'AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]',
       reason:

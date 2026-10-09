@@ -1,6 +1,7 @@
 import {
   ApprovePublicationRequestSchema,
   type CatalogPlant,
+  type ListPublicPlantsResponse,
   type Plant,
   type PlantFields,
   type PublicationQueueResponse,
@@ -38,6 +39,17 @@ export function userOf(request: Request): MockUser | undefined {
 const NO_REQUEST = 'Für diese Sorte gibt es keine offene Anfrage.';
 /** The plant fields of an own plant, without id and catalogue metadata. */
 const fieldsOf = (plant: OwnPlant): PlantFields => SavePlantRequestSchema.parse(plant);
+
+/** Routes without sign-in: the global catalogue for guests, like the catalog service. */
+export function publicRoutes(store: MockStore): Route[] {
+  return [
+    route('GET', '/api/catalog/public/plants', () =>
+      json<ListPublicPlantsResponse>({
+        plants: [...store.readCatalog()].sort((a, b) => a.name.localeCompare(b.name, 'de')),
+      }),
+    ),
+  ];
+}
 
 /**
  * The parts of the catalog service that span users and exist only for signed-in users: the

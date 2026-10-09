@@ -1,6 +1,7 @@
 import {
   ApprovePublicationRequestSchema,
   type ListPlantsResponse,
+  type ListPublicPlantsResponse,
   RejectPublicationRequestSchema,
   SaveOverrideRequestSchema,
   SavePlantRequestSchema,
@@ -20,10 +21,22 @@ export interface AppDeps {
 /** API routes are served under /api/catalog: CloudFront forwards the full path. */
 export const BASE_PATH = '/api/catalog';
 
+/** Reachable without sign-in (API route without authorizer, cached by CloudFront). */
+export const PUBLIC_PLANTS_PATH = `${BASE_PATH}/public/plants`;
+/** How long browsers and CloudFront may keep the public catalogue. */
+export const PUBLIC_MAX_AGE_SECONDS = 300;
+
 export function createApp({ store, logger, now, newId }: AppDeps) {
   const app = createServiceApp(BASE_PATH, logger);
   const catalog = new CatalogService(store, now, newId);
   const admin = new AdminService(store, newId);
+
+  // Global plants only, for guests: no user, so no adjustments and no own plants.
+  app.get('/public/plants', async (c) => {
+    const body: ListPublicPlantsResponse = { plants: await catalog.listGlobal() };
+    c.header('Cache-Control', `public, max-age=${String(PUBLIC_MAX_AGE_SECONDS)}`);
+    return c.json(body);
+  });
 
   app.get('/plants', async (c) => {
     const body: ListPlantsResponse = { plants: await catalog.list(c.get('user').id) };

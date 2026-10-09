@@ -56,6 +56,23 @@ test('catalog API is routed through CloudFront and rejects requests without a va
   expect(withBadToken.status()).toBe(401);
 });
 
+test('public catalogue works without a token and is cached by CloudFront', async ({ request }) => {
+  const response = await request.get('/api/catalog/public/plants');
+  expect(response.status()).toBe(200);
+  expect(response.headers()['cache-control']).toBe('public, max-age=300');
+  const { plants } = (await response.json()) as { plants: Record<string, unknown>[] };
+  expect(plants.length).toBeGreaterThanOrEqual(56);
+  expect(plants[0]).not.toHaveProperty('source');
+  // Within five minutes CloudFront answers from its cache; a few tries, because the edge
+  // location has several cache servers.
+  await expect
+    .poll(async () => (await request.get('/api/catalog/public/plants')).headers()['x-cache'], {
+      intervals: [500, 1000, 1000, 2000],
+      timeout: 10_000,
+    })
+    .toMatch(/^(Hit|RefreshHit) from cloudfront$/);
+});
+
 test('garden API is routed through CloudFront and rejects requests without a valid token', async ({
   request,
 }) => {

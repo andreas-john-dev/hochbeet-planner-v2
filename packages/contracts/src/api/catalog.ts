@@ -8,6 +8,13 @@ import { IsoDateSchema } from '../primitives';
 export const ListPlantsResponseSchema = z.object({ plants: z.array(CatalogPlantSchema) });
 export type ListPlantsResponse = z.infer<typeof ListPlantsResponseSchema>;
 
+/**
+ * GET /catalog/public/plants: the global catalogue without sign-in (guests), without any
+ * user's adjustments or own plants. Cached by CloudFront for a few minutes.
+ */
+export const ListPublicPlantsResponseSchema = z.object({ plants: z.array(PlantSchema) });
+export type ListPublicPlantsResponse = z.infer<typeof ListPublicPlantsResponseSchema>;
+
 /** POST /catalog/plants, PUT /catalog/plants/{id}, POST/PUT /catalog/admin/plants[/{id}] */
 export const SavePlantRequestSchema = PlantFieldsSchema;
 export type SavePlantRequest = z.infer<typeof SavePlantRequestSchema>;

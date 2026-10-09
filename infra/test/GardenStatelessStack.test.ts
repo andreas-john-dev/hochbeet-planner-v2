@@ -99,6 +99,7 @@ describe('GardenStatelessStack', () => {
       AutoDeploy: true,
       AccessLogSettings: Match.objectLike({ Format: Match.stringLikeRegexp('requestId') }),
       DefaultRouteSettings: { ThrottlingRateLimit: 20, ThrottlingBurstLimit: 40 },
+      RouteSettings: Match.absent(),
     });
     template.allResourcesProperties('AWS::Logs::LogGroup', { RetentionInDays: 30 });
   });

@@ -307,6 +307,7 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 
 | Methode | Pfad | Zweck |
 | --- | --- | --- |
+| GET | `/catalog/public/plants` | Globaler Katalog ohne Anmeldung (Gäste), von CloudFront 5 Minuten gecacht |
 | GET | `/catalog/plants` | Effektive Sorten des Users (global + Anpassungen + eigene) |
 | POST | `/catalog/plants` | Eigene Sorte anlegen |
 | PUT | `/catalog/plants/{id}` | Eigene Sorte ändern |
@@ -323,7 +324,11 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 
 - **Lambdalith:** Hono-App in `src/app.ts`, Lambda-Einstieg `src/handler.ts`. Alle Routen liegen unter `/api/catalog` (`BASE_PATH`), weil CloudFront den vollen Pfad an die HTTP API weiterreicht.
 - **Authentifizierung:** Die HTTP API prüft das Cognito-ID-Token mit einem JWT-Authorizer (Issuer = User Pool, Audience = SPA-Client). Ohne gültiges Token antwortet API Gateway mit 401.
-- **User-Kontext:** Eine Middleware liest `sub` und `cognito:groups` aus den geprüften Claims (`requestContext.authorizer.jwt.claims`). Fehlen sie, antwortet auch die App mit 401.
+- **User-Kontext:** Eine Middleware liest `sub` und `cognito:groups` aus den geprüften Claims (`requestContext.authorizer.jwt.claims`). Fehlen sie, antwortet auch die App mit 401, außer unter `<BASE_PATH>/public/` (`PUBLIC_PREFIX` in `@hochbeet/service-kit`). Handler dort lesen nie den User.
+- **Öffentlicher Katalog** (`GET /catalog/public/plants`, für den Gastmodus):
+  - Liefert nur die globalen Sorten als `Plant` (`ListPublicPlantsResponse`), nach Namen sortiert, ohne Anpassungen, eigene Sorten oder sonstige Daten von Usern.
+  - Eigene Route in der HTTP API ohne Authorizer (`ServiceApiStack`, Prop `publicGetPaths`), genauer als `{proxy+}` und deshalb vorrangig. Alle anderen Pfade, auch weitere unter `/public/`, bleiben hinter dem JWT-Authorizer. Die Route hat ein eigenes, niedrigeres Throttling (5 Requests/s, Burst 10).
+  - Die App setzt `Cache-Control: public, max-age=300`. CloudFront cacht `/api/catalog/public/*` mit einer eigenen Cache-Policy (TTL höchstens 5 Minuten) ohne Header, Cookies oder Query-Strings im Cache-Key; alle Gäste teilen sich also eine Kopie, und die Lambda läuft höchstens alle paar Minuten je Edge-Standort. Neu freigegebene Sorten erscheinen bei Gästen deshalb mit bis zu 5 Minuten Verzögerung.
 - **Logging:** Pro Request schreibt die App eine JSON-Logzeile mit `requestId`, `userId`, Methode, Pfad, Status und Dauer.
 - **Fehler:** Antworten haben immer die Form `ErrorResponse` mit deutscher `message`. Interne Fehler werden geloggt und nach außen nur allgemein gemeldet.
 - **Effektive Sicht** (`src/catalog/effective.ts`) für `GET /catalog/plants`:
@@ -571,7 +576,7 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
   - Das Modul wird nur per `import()` geladen und landet nicht im Haupt-Bundle.
 - **Mock-API:** Mit `"apiMode": "mock"` in `config.dev.json` beantwortet `createMockFetch()` (`apps/web/src/mocks/`) alle Aufrufe unter `/api/*` direkt im Browser, ohne Service-Worker. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
   - Sie nimmt pro Request den User aus dem Mock-Token und nutzt für ihn die lokale API (`localRoutes()` mit `MockStore.repository(userId)`). Dazu kommen die Routen, die es nur für angemeldete User gibt und die über User hinweg arbeiten: Veröffentlichung und Admin (`mockRoutes()` in `handlers.ts`).
-  - Daten liegen pro Testuser im `localStorage` (`hochbeet-mock-api`), der globale Katalog liegt gemeinsam für alle Testuser daneben (`hochbeet-mock-catalog`, Startkatalog, bis Admins ihn ändern). Der Mock-Token `mock-id-token.<email>|admins` trägt die Gruppen wie `cognito:groups`; ohne Token antwortet sie mit 401.
+  - Daten liegen pro Testuser im `localStorage` (`hochbeet-mock-api`), der globale Katalog liegt gemeinsam für alle Testuser daneben (`hochbeet-mock-catalog`, Startkatalog, bis Admins ihn ändern). Der Mock-Token `mock-id-token.<email>|admins` trägt die Gruppen wie `cognito:groups`; ohne Token antwortet sie mit 401, außer für den öffentlichen Katalog (`publicRoutes()`).
   - Playwright startet jeden Test mit leerem Speicher und kann Daten per `addInitScript` vorbelegen.
 - **API-Zugriff:** `ApiProvider` stellt `useApi()` bereit. Die Query-Hooks liegen in `apps/web/src/lib/garden.ts` (`useBeds`, `useBedWithPlantings`, `usePlants`, `useSaveBed`, `useDeleteBed`, `useSavePlanting`, `useDeletePlanting`, `useAdjustPlant`, `useSaveOwnPlant`, `useRequestPublication`, `usePublicationQueue`, `useDecidePublication`, `useSaveGlobalPlant`). Nach Änderungen wird die Beetliste neu geladen.
 - **Beetübersicht (`/beete`):**
@@ -597,7 +602,7 @@ Eine CDK-App in TypeScript deployt sechs Stacks nach `eu-central-1` und den Zert
 | `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
 | `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds | User Pool, API-URLs; Zertifikat per Cross-Region-Referenz |
 
-CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP API und alles andere auf den Bucket. Damit gibt es nur eine Origin und keine CORS-Konfiguration. Die Origin-Request-Policy reicht den `Authorization`-Header durch, für `/api/*` ist Caching aus.
+CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP API und alles andere auf den Bucket. Damit gibt es nur eine Origin und keine CORS-Konfiguration. Die Origin-Request-Policy reicht den `Authorization`-Header durch, für `/api/*` ist Caching aus. Einzige Ausnahme ist der öffentliche Katalog unter `/api/catalog/public/*`: Er wird ohne Viewer-Header weitergereicht und 5 Minuten gecacht.
 
 ### Frontend-Stack
 
@@ -608,10 +613,11 @@ CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP AP
   | --- | --- | --- |
   | `/assets/*` (Dateinamen mit Hash) | `CachingOptimized` | `public, max-age=31536000, immutable` |
   | `/config.json` | `CachingDisabled` | `no-cache` |
+  | `/api/catalog/public/*` | eigene Policy, TTL höchstens 300 s, nichts im Cache-Key | `public, max-age=300` (von der Lambda) |
   | alles andere, v. a. `index.html` | eigene Policy, TTL 0 | `no-cache` |
 
 - **Deployment:** Zwei `BucketDeployment`s mit unterschiedlichem `Cache-Control`, beide ohne `prune`. So bleiben Assets des vorherigen Builds erreichbar, solange Browser noch das alte `index.html` haben. Nach dem Deploy werden `/index.html` und `/config.json` invalidiert.
-- **API-Behaviors:** `FrontendStack.addApiBehavior('/api/catalog/*' | '/api/garden/*', origin)` hängt die HTTP APIs an (alle Methoden, alle Viewer-Header außer `Host`, kein Caching).
+- **API-Behaviors:** `FrontendStack.addApiBehavior('/api/catalog/*' | '/api/garden/*', origin)` hängt die HTTP APIs an (alle Methoden, alle Viewer-Header außer `Host`, kein Caching). `addPublicApiBehavior('/api/catalog/public/*', origin, maxAge)` hängt den öffentlichen Katalog davor an (nur `GET`/`HEAD`, gecacht); die Reihenfolge zählt, weil CloudFront das erste passende Behavior nimmt.
 - Der Bucket ist zustandslos (`DESTROY` mit `autoDeleteObjects`), weil sein Inhalt bei jedem Deploy neu entsteht. `cdk synth` braucht den Build von `apps/web`; Turborepo baut ihn vorher, weil `infra` von `web` abhängt.
 
 Regeln für stateful Stacks: `RemovalPolicy.RETAIN`, Point-in-Time-Recovery, Termination Protection, DynamoDB im On-Demand-Modus. Eine Stage-Konfiguration in `infra/lib/config/stages.ts` enthält nur `prod`; `dev` wird dort später als zweiter Eintrag ergänzt.
@@ -651,6 +657,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-CFR2` (kein WAF) | Distribution | WAF kostet monatlich pro Web-ACL; die App soll im Leerlauf nahezu nichts kosten. |
 | `AwsSolutions-CFR3` (keine Access-Logs) | Distribution | Für eine Hobby-App nicht nötig, kostet Speicher. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Catalog- und Garden-Lambdalith (`ServiceApiStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; Tabellenzugriff regelt eine eigene Policy (nur Item-Operationen auf der Tabelle und `Query` auf `GSI1`, kein Scan, keine Index-Wildcard). |
+| `AwsSolutions-APIG4` (Route ohne Autorisierung) | Route `GET /api/catalog/public/plants` (`ServiceApiStack`, `publicGetPaths`) | Bewusst öffentlich für Gäste: nur lesend, ohne User-Daten, von CloudFront gecacht und mit eigenem, niedrigem Throttling. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Passwort-Funktion des Smoke-Testusers (`SharedStatefulStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; sonst darf die Funktion nur `AdminSetUserPassword` auf diesem User Pool. |
@@ -685,7 +692,7 @@ Umsetzung (Stand T-34):
 1. Bei jedem Pull Request: Lint, Typecheck, Unit- und Integrationstests, `cdk synth` mit `cdk-nag`, Playwright gegen den Dev-Server mit Mock-API.
 2. Bei Merge auf `main`: Build, `cdk deploy --all` per OIDC-Rolle (keine Access Keys im Repo), danach Playwright-Smoke-Tests gegen `prod`.
 
-Umsetzung: `deploy.yml` startet per `workflow_run`, sobald die CI auf `main` grün ist, und deployt genau den getesteten Commit. Der Job läuft in der GitHub-Umgebung `prod`; nur diese darf die Rolle `hochbeet-github-deploy` übernehmen, und die Rolle darf ausschließlich die CDK-Bootstrap-Rollen übernehmen. Die einmalige Einrichtung (Bootstrap, Rolle aus `infra/bootstrap/github-deploy-role.yaml`, GitHub-Umgebung und Variable `AWS_DEPLOY_ROLE_ARN`) steht in [`docs/deployment.md`](./deployment.md). Die Smoke-Tests (`e2e/smoke/`) prüfen ohne Anmeldung Startseite, Deep-Links, `config.json`, das Caching der Assets und die 401 der APIs. Mit dem Smoke-Testuser legt `garden.smoke.ts` ein Beet an, setzt Tomate und Kartoffel, prüft Warnung, Speicherung und Zeitachse und löscht das Beet wieder.
+Umsetzung: `deploy.yml` startet per `workflow_run`, sobald die CI auf `main` grün ist, und deployt genau den getesteten Commit. Der Job läuft in der GitHub-Umgebung `prod`; nur diese darf die Rolle `hochbeet-github-deploy` übernehmen, und die Rolle darf ausschließlich die CDK-Bootstrap-Rollen übernehmen. Die einmalige Einrichtung (Bootstrap, Rolle aus `infra/bootstrap/github-deploy-role.yaml`, GitHub-Umgebung und Variable `AWS_DEPLOY_ROLE_ARN`) steht in [`docs/deployment.md`](./deployment.md). Die Smoke-Tests (`e2e/smoke/`) prüfen ohne Anmeldung Startseite, Deep-Links, `config.json`, das Caching der Assets, die 401 der APIs und den öffentlichen Katalog samt CloudFront-Cache. Mit dem Smoke-Testuser legt `garden.smoke.ts` ein Beet an, setzt Tomate und Kartoffel, prüft Warnung, Speicherung und Zeitachse und löscht das Beet wieder.
 
 Deployt wird ausschließlich über diese Pipeline, nicht aus Entwickler- oder Claude-Code-Sessions.
 
