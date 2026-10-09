@@ -1,8 +1,10 @@
 import type { CatalogPlant } from '@hochbeet/contracts';
 import { CircleCheck, Clock, Lock, Send, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth/context';
 import { publicationState, type PublicationState } from '@/lib/catalog';
 import { useRequestPublication } from '@/lib/garden';
 import { ownNeighbors } from '@/lib/plant-form';
@@ -38,7 +40,7 @@ const STATE: Record<
   },
 };
 
-/** Publication status of an own plant and „Für alle vorschlagen“. */
+/** Publication status of an own plant and „Für alle vorschlagen“ (needs an account). */
 export function PublicationPanel({
   plant,
   catalog,
@@ -46,11 +48,12 @@ export function PublicationPanel({
   plant: CatalogPlant;
   catalog: readonly CatalogPlant[];
 }) {
+  const { guest } = useAuth();
   const request = useRequestPublication(plant.id);
   const state = publicationState(plant);
   const { icon: Icon, title, text, className } = STATE[state];
   const blocking = ownNeighbors(plant, catalog);
-  const canRequest = state === 'PRIVATE' || state === 'REJECTED';
+  const canRequest = !guest && (state === 'PRIVATE' || state === 'REJECTED');
 
   return (
     <section
@@ -78,6 +81,14 @@ export function PublicationPanel({
         <p className="text-sm">
           Vorschlagen geht nur mit Nachbarn aus dem gemeinsamen Katalog. Entferne dafür zuerst{' '}
           {blocking.map((p) => p.name).join(', ')} aus den Nachbarn.
+        </p>
+      )}
+      {guest && (
+        <p className="text-sm">
+          <Link to="/anmelden" className="text-primary font-medium hover:underline">
+            Melde dich an
+          </Link>
+          , um die Sorte für alle vorzuschlagen.
         </p>
       )}
       {request.isError && <FormMessage tone="error">{apiErrorMessage(request.error)}</FormMessage>}

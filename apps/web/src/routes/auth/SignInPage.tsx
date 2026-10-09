@@ -10,6 +10,7 @@ import { authErrorCode, authErrorMessage } from '@/lib/auth/errors';
 import { safeRedirect } from '@/lib/auth/redirect';
 import { signInSchema } from '@/lib/auth/schemas';
 import { AuthHeading } from './AuthLayout';
+import { TryWithoutAccount } from './TryWithoutAccount';
 import { parseSignInSearch } from './search';
 
 const notices = {
@@ -84,6 +85,7 @@ export function SignInPage() {
           Registrieren
         </Link>
       </p>
+      <TryWithoutAccount />
     </>
   );
 }

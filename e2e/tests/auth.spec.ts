@@ -93,6 +93,8 @@ test('shows the admin section only to admins', async ({ page }) => {
   await open(page, `/admin/sorten/neu`, 'Kein Zugriff');
 });
 
-test('lists every page in pages.ts', () => {
-  expect(new Set(appPages.map((p) => p.path)).size).toBe(appPages.length);
+test('lists every page in pages.ts once', () => {
+  // Guest pages share paths with the signed-in pages, so a page is path plus access.
+  expect(new Set(appPages.map((p) => p.id)).size).toBe(appPages.length);
+  expect(new Set(appPages.map((p) => `${p.access} ${p.path}`)).size).toBe(appPages.length);
 });

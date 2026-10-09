@@ -67,17 +67,30 @@ const forgotPasswordRoute = createRoute({
   component: ForgotPasswordPage,
 });
 
-// Everything else needs a signed-in user.
+// Everything else needs a signed-in user or guest mode.
 const appLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
   component: AppShell,
   beforeLoad: ({ context, location }) => {
-    if (!context.auth.user) {
+    if (!context.auth.user && !context.auth.guest) {
       throw redirect({ to: '/anmelden', search: { redirect: location.href } });
     }
   },
 });
+
+/** Profile and admin area need an account: guests go to the sign-in page. */
+const accountOnly = ({
+  context,
+  location,
+}: {
+  context: RouterContext;
+  location: { href: string };
+}) => {
+  if (!context.auth.user) {
+    throw redirect({ to: '/anmelden', search: { redirect: location.href } });
+  }
+};
 
 const indexRoute = createRoute({
   getParentRoute: () => appLayout,
@@ -89,11 +102,12 @@ const indexRoute = createRoute({
 
 /* eslint-enable @typescript-eslint/only-throw-error */
 
-// Admin area: AdminLayout shows a 403 page to everyone else (no redirect, see T-33).
+// Admin area: AdminLayout shows signed-in non-admins a 403 page (no redirect, see T-33).
 const adminRoute = createRoute({
   getParentRoute: () => appLayout,
   path: '/admin',
   component: AdminLayout,
+  beforeLoad: accountOnly,
 });
 
 const adminChildren = [
@@ -150,7 +164,12 @@ const routeTree = rootRoute.addChildren([
       path: '/katalog/$plantId/bearbeiten',
       component: PlantFormPage,
     }),
-    createRoute({ getParentRoute: () => appLayout, path: '/profil', component: ProfilePage }),
+    createRoute({
+      getParentRoute: () => appLayout,
+      path: '/profil',
+      component: ProfilePage,
+      beforeLoad: accountOnly,
+    }),
     adminRoute.addChildren(adminChildren),
   ]),
   iconGalleryRoute,

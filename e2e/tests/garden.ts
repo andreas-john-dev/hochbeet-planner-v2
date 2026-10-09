@@ -1,7 +1,10 @@
 import type { Page } from '@playwright/test';
 import { USERS } from './fixtures';
+import type { Access } from './pages';
 
 const MOCK_API_KEY = 'hochbeet-mock-api';
+/** Guest data in the browser (apps/web/src/lib/local-api/keys.ts), versioned envelope. */
+export const GUEST_STORAGE_KEY = 'hochbeet-guest';
 
 export interface Garden {
   beds: unknown[];
@@ -22,6 +25,24 @@ export async function seedGarden(page: Page, garden: Garden, email: string = USE
     },
     [MOCK_API_KEY, email, garden] as const,
   );
+}
+
+/** Seeds the guest's browser storage, once, so changes survive reloads. */
+export async function seedGuestGarden(page: Page, garden: Garden) {
+  await page.addInitScript(
+    ([key, data]) => {
+      if (localStorage.getItem(key) === null) {
+        localStorage.setItem(key, JSON.stringify({ version: 1, garden: data }));
+      }
+    },
+    [GUEST_STORAGE_KEY, garden] as const,
+  );
+}
+
+/** Seeds data for whoever opens the page: a test user or the guest. */
+export async function seedFor(page: Page, access: Access, garden: Garden) {
+  if (access === 'guest') await seedGuestGarden(page, garden);
+  else if (access !== 'public') await seedGarden(page, garden, USERS[access].email);
 }
 
 /** Seed plant IDs from packages/catalog-seed. */

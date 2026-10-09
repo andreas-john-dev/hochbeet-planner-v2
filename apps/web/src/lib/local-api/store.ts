@@ -9,6 +9,7 @@ import {
   PlantingSchema,
 } from '@hochbeet/contracts';
 import { z } from 'zod';
+import { GUEST_BACKUP_KEY, GUEST_STORAGE_KEY } from './keys';
 
 /** An own plant; `requestedAt` (ISO date) is set while its publication is pending. */
 export type OwnPlant = CatalogPlant & { archived?: boolean; requestedAt?: string };
@@ -36,9 +37,7 @@ export interface GardenRepository {
 
 export const emptyGarden = (): LocalGarden => ({ beds: [], plantings: [] });
 
-export const GUEST_STORAGE_KEY = 'hochbeet-guest';
-/** Unreadable data is moved here instead of being lost silently. */
-export const GUEST_BACKUP_KEY = 'hochbeet-guest-backup';
+export { GUEST_BACKUP_KEY, GUEST_STORAGE_KEY } from './keys';
 export const GUEST_STORAGE_VERSION = 1;
 
 /**

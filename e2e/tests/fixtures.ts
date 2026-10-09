@@ -21,8 +21,14 @@ export const test = base.extend({
 
 export { expect };
 
+/** Accounts with a stored login state. */
+export type Account = Exclude<Access, 'public' | 'guest'>;
+
+/** localStorage flag of guest mode (apps/web/src/lib/auth/guest.ts). */
+export const GUEST_MODE_KEY = 'hochbeet-guest-mode';
+
 /** Login state per account, written by the `setup` project (tests/auth.setup.ts). */
-export const authFile = (access: Exclude<Access, 'public'>) =>
+export const authFile = (access: Account) =>
   resolve(import.meta.dirname, '../.auth', `${access}.json`);
 
 interface StorageState {
@@ -30,13 +36,23 @@ interface StorageState {
 }
 
 /**
- * Starts the page signed in as the given account, from the storageState of the `setup`
+ * Starts the page signed in as the given account (or in guest mode), from the storageState of the `setup`
  * project. Each test chooses its account itself and some switch accounts midway, so the
  * stored localStorage is applied per page instead of per project. Only seeds it once, so a
  * sign-out in the test sticks across reloads.
  */
 export async function signInAs(page: Page, access: Access) {
   if (access === 'public') return;
+  if (access === 'guest') {
+    // Only once, so ending guest mode in the test sticks across reloads.
+    await page.addInitScript((key) => {
+      if (!sessionStorage.getItem('guest-seeded')) {
+        sessionStorage.setItem('guest-seeded', '1');
+        localStorage.setItem(key, '1');
+      }
+    }, GUEST_MODE_KEY);
+    return;
+  }
   const state = JSON.parse(readFileSync(authFile(access), 'utf8')) as StorageState;
   const entries = state.origins.flatMap((o) => o.localStorage);
   await page.addInitScript((items) => {

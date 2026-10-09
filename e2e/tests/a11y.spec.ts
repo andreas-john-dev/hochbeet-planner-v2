@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, open, signInAs, test, USERS } from './fixtures';
-import { seedGarden } from './garden';
+import { expect, open, signInAs, test } from './fixtures';
+import { seedFor } from './garden';
 import { appPages } from './pages';
 
 // Every page in light and dark mode against WCAG 2.1 A/AA (contrast, names, landmarks, ...).
@@ -8,9 +8,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
   for (const appPage of appPages) {
     test(`${appPage.id} has no WCAG A/AA violations (${colorScheme})`, async ({ page }) => {
       await signInAs(page, appPage.access);
-      if (appPage.seed && appPage.access !== 'public') {
-        await seedGarden(page, appPage.seed, USERS[appPage.access].email);
-      }
+      if (appPage.seed) await seedFor(page, appPage.access, appPage.seed);
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await open(page, appPage.path, appPage.heading);
       const { violations } = await new AxeBuilder({ page })

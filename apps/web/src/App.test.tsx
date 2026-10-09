@@ -1,9 +1,12 @@
 import { createMemoryHistory } from '@tanstack/react-router';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
+import { GUEST_MODE_KEY } from './lib/auth/guest';
 import { createMockAuthAdapter, MOCK_USERS } from './lib/auth/mock-adapter';
+import { GUEST_STORAGE_KEY } from './lib/local-api/keys';
+import { createMockFetch } from './mocks/fetch';
 
 type Account = keyof typeof MOCK_USERS;
 
@@ -100,6 +103,116 @@ describe('App', () => {
       await renderAt('/beete', 'admin');
       await userEvent.click((await sidebarNav()).getByRole('link', { name: 'Admin' }));
       expect(await heading('Administration')).toBeVisible();
+    });
+  });
+
+  describe('guest mode', () => {
+    /** The app with the mock API, recording every request that leaves the local API. */
+    function renderGuest(path: string) {
+      const mockFetch = createMockFetch();
+      const fetchFn = vi.fn<typeof fetch>((input, init) => mockFetch(input, init));
+      render(
+        <App
+          auth={createMockAuthAdapter()}
+          fetchFn={fetchFn}
+          history={createMemoryHistory({ initialEntries: [path] })}
+        />,
+      );
+      const paths = () =>
+        fetchFn.mock.calls.map(([input]) =>
+          typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url,
+        );
+      return { paths };
+    }
+
+    /** Guest mode with one bed in this browser's storage. */
+    const seedGuestBed = (name: string) => {
+      localStorage.setItem(GUEST_MODE_KEY, '1');
+      const bed = {
+        id: '01J9ZQ3W8D6V2K5M7N8P9R0BED',
+        name,
+        widthCm: 100,
+        depthCm: 50,
+        mainRowDirection: 'V',
+        soilRenewals: [],
+      };
+      localStorage.setItem(
+        GUEST_STORAGE_KEY,
+        JSON.stringify({ version: 1, garden: { beds: [bed], plantings: [] } }),
+      );
+    };
+
+    const startGuest = async () => {
+      await userEvent.click(await screen.findByRole('button', { name: 'Ohne Konto ausprobieren' }));
+      expect(await heading('Meine Beete')).toBeVisible();
+    };
+
+    it('starts from the sign-in page without any request to the services', async () => {
+      const { paths } = renderGuest('/anmelden');
+      await startGuest();
+      expect(screen.getByTestId('guest-banner')).toHaveTextContent('nur in diesem Browser');
+      const links = (await sidebarNav()).getAllByRole('link');
+      expect(links.map((l) => l.textContent)).toEqual(['Beete', 'Katalog']);
+      expect(await screen.findByRole('button', { name: 'Erstes Beet anlegen' })).toBeVisible();
+      expect(localStorage.getItem(GUEST_MODE_KEY)).toBe('1');
+      expect(paths()).toEqual([]);
+    });
+
+    it('shows the beds from this browser after a reload', async () => {
+      seedGuestBed('Balkon');
+      renderGuest('/beete');
+      expect(await screen.findByText('Balkon')).toBeVisible();
+      expect(screen.getByTestId('guest-banner')).toBeVisible();
+    });
+
+    it('loads only the public catalogue from the server', async () => {
+      localStorage.setItem(GUEST_MODE_KEY, '1');
+      const { paths } = renderGuest('/katalog');
+      expect(await heading('Pflanzenkatalog')).toBeVisible();
+      expect(await screen.findByText('Kopfsalat')).toBeVisible();
+      expect(paths()).toEqual(['/api/catalog/public/plants']);
+    });
+
+    it.each(['/profil', '/admin'])('sends guests from %s to the sign-in page', async (path) => {
+      localStorage.setItem(GUEST_MODE_KEY, '1');
+      renderGuest(path);
+      expect(await heading('Anmelden')).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Weiter ohne Konto' })).toBeVisible();
+    });
+
+    it.each([
+      ['Daten behalten', true],
+      ['Daten löschen', false],
+    ] as const)('ends guest mode with „%s“', async (choice, kept) => {
+      localStorage.setItem(GUEST_MODE_KEY, '1');
+      localStorage.setItem(GUEST_STORAGE_KEY, '{"version":1,"garden":{"beds":[]}}');
+      renderGuest('/beete');
+      await userEvent.click(await screen.findByRole('button', { name: 'Gastmodus beenden' }));
+      await userEvent.click(screen.getByRole('button', { name: choice }));
+      expect(await heading('Anmelden')).toBeVisible();
+      expect(localStorage.getItem(GUEST_MODE_KEY)).toBeNull();
+      expect(localStorage.getItem(GUEST_STORAGE_KEY) !== null).toBe(kept);
+    });
+
+    it('ends when signing in, and the user does not see cached guest data', async () => {
+      seedGuestBed('Gastbeet');
+      const { paths } = renderGuest('/beete');
+      expect(await screen.findByText('Gastbeet')).toBeVisible();
+
+      const [signIn] = screen.getAllByRole('link', { name: 'Anmelden' });
+      if (!signIn) throw new Error('Sign-in link missing');
+      await userEvent.click(signIn);
+      await userEvent.type(await screen.findByLabelText('E-Mail'), MOCK_USERS.user.email);
+      await userEvent.type(screen.getByLabelText('Passwort'), MOCK_USERS.user.password);
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+      expect(await heading('Meine Beete')).toBeVisible();
+      expect(await screen.findByRole('button', { name: 'Erstes Beet anlegen' })).toBeVisible();
+      expect(screen.queryByText('Gastbeet')).toBeNull();
+      expect(screen.queryByTestId('guest-banner')).toBeNull();
+      expect(localStorage.getItem(GUEST_MODE_KEY)).toBeNull();
+      // The guest's data stays for the import after sign-in (T-39).
+      expect(localStorage.getItem(GUEST_STORAGE_KEY)).toContain('Gastbeet');
+      expect(paths()).toContain('/api/garden/beds');
     });
   });
 

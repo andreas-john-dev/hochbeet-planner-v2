@@ -6,7 +6,7 @@ import type {
   ListPlantsResponse,
 } from '@hochbeet/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLocalFetch } from './index';
+import { createLocalFetch, publicCatalog } from './index';
 import { createGuestRepository, GUEST_STORAGE_KEY } from './store';
 
 const bedFields = (name: string) => ({
@@ -185,5 +185,37 @@ describe('createLocalFetch', () => {
     setItem.mockRestore();
     expect(response.status).toBe(507);
     expect(localStorage.getItem(GUEST_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('publicCatalog', () => {
+  const ok = () => Response.json({ plants: seedPlants });
+
+  it('loads the public catalogue once and shares it', async () => {
+    const baseFetch = vi.fn<typeof fetch>(() => Promise.resolve(ok()));
+    const globals = publicCatalog(baseFetch);
+    expect(await globals()).toHaveLength(56);
+    await globals();
+    expect(baseFetch).toHaveBeenCalledTimes(1);
+    expect(baseFetch).toHaveBeenCalledWith('/api/catalog/public/plants');
+  });
+
+  it('answers 503 with a German message when the catalogue is unreachable, and tries again later', async () => {
+    const baseFetch = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('offline'))
+      .mockResolvedValueOnce(Response.json({ nope: true }))
+      .mockResolvedValue(ok());
+    const fetchFn = createLocalFetch({
+      repo: createGuestRepository(localStorage),
+      globals: publicCatalog(baseFetch),
+    });
+    const send = (path: string) => fetchFn(path);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await send('/api/catalog/plants');
+      expect(response.status).toBe(503);
+      expect(((await response.json()) as { message: string }).message).toMatch(/Katalog/);
+    }
+    expect((await send('/api/catalog/plants')).status).toBe(200);
   });
 });

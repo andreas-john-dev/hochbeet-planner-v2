@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth/context';
 import { authErrorMessage } from '@/lib/auth/errors';
 import { confirmSchema, PASSWORD_HINT, signUpSchema } from '@/lib/auth/schemas';
 import { AuthHeading } from './AuthLayout';
+import { TryWithoutAccount } from './TryWithoutAccount';
 import { parseSignUpSearch } from './search';
 
 export function SignUpPage() {
@@ -76,6 +77,7 @@ function SignUpForm() {
           Anmelden
         </Link>
       </p>
+      <TryWithoutAccount />
     </>
   );
 }
