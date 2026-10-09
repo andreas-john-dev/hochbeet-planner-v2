@@ -10,11 +10,15 @@ export interface Garden {
   ownPlants?: unknown[];
 }
 
-/** Seeds the mock API with beds and plantings for a test user (default: the normal user). */
+/**
+ * Seeds the mock API with data for a test user (default: the normal user). Can be called for
+ * several users; each user's data is only written once, so changes survive reloads.
+ */
 export async function seedGarden(page: Page, garden: Garden, email: string = USERS.user.email) {
   await page.addInitScript(
     ([key, user, data]) => {
-      if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ [user]: data }));
+      const all = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+      if (!(user in all)) localStorage.setItem(key, JSON.stringify({ ...all, [user]: data }));
     },
     [MOCK_API_KEY, email, garden] as const,
   );
@@ -32,6 +36,37 @@ export const PLANTS = {
   chives: '01M49THV00JTGP22ZW0RKZZT9K', // Schnittlauch, perennial
   thyme: '01M49THV00Y146B7QH3XHMRCBA', // Thymian, perennial
 } as const;
+
+/** An own plant as the catalogue lists it; `extra` sets e.g. `publication` or `requestedAt`. */
+export const ownPlant = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  name,
+  category: 'GEMUESE',
+  family: 'Korbblütler',
+  feeder: 'SCHWACH',
+  spacingInRowCm: 10,
+  rowSpacingCm: 25,
+  lifecycle: { type: 'ANNUAL', cultureWeeks: 20 },
+  goodNeighbors: [],
+  badNeighbors: [],
+  color: '#c9a66b',
+  icon: 'category-gemuese',
+  source: 'OWN',
+  overridden: false,
+  publication: { status: 'PRIVATE' },
+  ...extra,
+});
+
+/** Id and data of a pending publication request, for the admin pages. */
+export const PENDING_ID = '01J9ZQ3W8D6V2K5M7N8P9R0P10';
+export const pendingRequest = ownPlant(PENDING_ID, 'Eichblattsalat', {
+  spacingInRowCm: 25,
+  rowSpacingCm: 30,
+  lifecycle: { type: 'ANNUAL', cultureWeeks: 9 },
+  feeder: 'MITTEL',
+  publication: { status: 'PENDING' },
+  requestedAt: '2026-10-05',
+});
 
 export const bed = (id: string, name: string, widthCm: number, depthCm: number) => ({
   id,

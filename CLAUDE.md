@@ -65,6 +65,7 @@ Dev-Server und Playwright nutzen Mock-Auth (`apps/web/config.dev.json`): `test@e
 Auch die API ist dort gemockt (`"apiMode": "mock"`): MSW-Handler in `apps/web/src/mocks/` bilden die Services nach, Daten im `localStorage` pro Testuser. Neue Endpunkte dort mit ergänzen.
 Daten im Frontend über `useApi()` und die Query-Hooks in `src/lib/garden.ts`.
 Katalog unter `/katalog`, `/katalog/$plantId`, `/katalog/neu` und `/katalog/$plantId/bearbeiten`: Filter, Labels und Anpassungs-Diff (`overrideFor`, `changedFields` gegen `plant.global`) in `src/lib/catalog.ts`, Formular eigener Sorten in `src/lib/plant-form.ts`.
+Admin-Bereich unter `/admin` (`src/routes/admin/`, `AdminLayout` zeigt Nicht-Admins eine 403-Seite); Ähnlichkeit und Korrekturen in `src/lib/admin.ts`, Sortenformular für alle Fälle in `src/components/catalog/PlantFormFields.tsx`.
 Beet-Editor unter `/beete/$bedId`: SVG in cm über einen `viewBox`, Viewport-Mathematik in `src/lib/editor/`, Zustand-Store je Beet; jede Pflanzung hat `data-testid="planting-<id>"` plus `data-x`/`data-y`/`data-length-cm`;
 Platzierlogik rein in `src/lib/editor/placement.ts`, Drag & Drop mit `@dnd-kit/core` nur in `BedEditorPage`.
 Die gewählte Woche steht als `week` (Montag) im Editor-Store; Zeitachse und Geister in `src/lib/editor/timeline.ts`.
@@ -72,7 +73,7 @@ Warnungen im Editor: Saison, Status je Pflanzung und Liste über `src/lib/editor
 Erneuerungen der Erde (Saisongrenzen) pflegt der Beet-Dialog über `src/lib/soil-renewals.ts`.
 Änderungen an Pflanzungen im Editor laufen über `commit({ before, after })` in `BedEditorPage`, damit sie in der Undo-Historie (`src/lib/editor/history.ts`) landen.
 Unter `md` ersetzen Bottom-Sheets (`src/components/ui/sheet.tsx`) die Seitenleisten des Editors; Touch-Gesten in Playwright über `touchDrag()` in `e2e/tests/mobile.spec.ts` (CDP mit Zeitstempeln).
-In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten, Beete und Pflanzungen mit `seedGarden()` aus `e2e/tests/garden.ts` vorbelegen; Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.
+In Playwright-Tests mit `signInAs(page, 'user' | 'admin')` aus `e2e/tests/fixtures.ts` angemeldet starten, Beete, Pflanzungen und eigene Sorten mit `seedGarden()` aus `e2e/tests/garden.ts` vorbelegen (auch für mehrere User, z. B. eine Anfrage eines anderen Users); Seiten in `e2e/tests/pages.ts` haben ein `access`-Feld.
 Neue Seiten in `e2e/tests/pages.ts` eintragen (mit `access`, bei Seiten, die Daten brauchen, mit `seed`): Tests und PR-Screenshots nutzen diese Liste.
 Der Workflow `screenshots.yml` kommentiert in jedem PR mit Frontend-Änderungen Desktop- und Mobil-Screenshots der geänderten Seiten
 (Vergleich mit `main`); die Bilder liegen im Branch `screenshots`, der nie gemergt wird.

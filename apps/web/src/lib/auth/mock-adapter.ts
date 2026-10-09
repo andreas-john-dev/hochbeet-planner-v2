@@ -123,8 +123,13 @@ export function createMockAuthAdapter(storage: Storage = localStorage): AuthAdap
       return Promise.resolve();
     },
     getIdToken() {
-      const { session } = load();
-      return Promise.resolve(session ? `mock-id-token.${session}` : null);
+      // `mock-id-token.<email>`, plus `|<groups>` like `cognito:groups` for group members.
+      const { session, accounts } = load();
+      if (!session) return Promise.resolve(null);
+      const groups = accounts[key(session)]?.groups ?? [];
+      return Promise.resolve(
+        `mock-id-token.${session}${groups.length > 0 ? `|${groups.join(',')}` : ''}`,
+      );
     },
   };
 }

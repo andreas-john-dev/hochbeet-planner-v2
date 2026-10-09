@@ -13,7 +13,8 @@ describe('mock auth adapter', () => {
       email: 'admin@example.com',
       groups: ['admins'],
     });
-    expect(await auth.getIdToken()).toBeTruthy();
+    // The groups travel in the token, like `cognito:groups` in the real ID token.
+    expect(await auth.getIdToken()).toBe('mock-id-token.admin@example.com|admins');
     await auth.signOut();
     expect(await auth.getCurrentUser()).toBeNull();
     expect(await auth.getIdToken()).toBeNull();

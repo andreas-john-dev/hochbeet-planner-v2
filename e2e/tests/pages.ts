@@ -1,4 +1,4 @@
-import { EXAMPLE_BED_ID, exampleGarden, type Garden } from './garden';
+import { EXAMPLE_BED_ID, exampleGarden, type Garden, PENDING_ID, pendingRequest } from './garden';
 
 /** Who may open a page: anyone signed out, any signed-in user, or admins only. */
 export type Access = 'public' | 'user' | 'admin';
@@ -67,6 +67,26 @@ export const appPages: readonly AppPage[] = [
     heading: 'Administration',
     access: 'admin',
     navLabel: 'Admin',
+  },
+  {
+    id: 'admin-anfrage',
+    path: `/admin/anfragen/${PENDING_ID}`,
+    heading: 'Anfrage prüfen',
+    access: 'admin',
+    // The admin's own request: the queue lists requests of all users.
+    seed: { beds: [], plantings: [], ownPlants: [pendingRequest] },
+  },
+  {
+    id: 'admin-sorte-neu',
+    path: '/admin/sorten/neu',
+    heading: 'Globale Sorte anlegen',
+    access: 'admin',
+  },
+  {
+    id: 'admin-sorte',
+    path: '/admin/sorten/01M49THV00RK9E9PC83NEE87CJ',
+    heading: 'Globale Sorte bearbeiten',
+    access: 'admin',
   },
   { id: 'dev-icons', path: '/dev/icons', heading: 'Icon-Galerie', access: 'public' },
 ];

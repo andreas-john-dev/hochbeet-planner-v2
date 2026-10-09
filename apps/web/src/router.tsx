@@ -8,8 +8,10 @@ import {
 } from '@tanstack/react-router';
 import { AppShell } from '@/components/layout/AppShell';
 import type { AuthStore } from '@/lib/auth/context';
-import { isAdmin } from '@/lib/auth/types';
-import { AdminPage } from '@/routes/AdminPage';
+import { AdminLayout } from '@/routes/admin/AdminLayout';
+import { AdminPage } from '@/routes/admin/AdminPage';
+import { GlobalPlantFormPage } from '@/routes/admin/GlobalPlantFormPage';
+import { PublicationReviewPage } from '@/routes/admin/PublicationReviewPage';
 import { AuthLayout } from '@/routes/auth/AuthLayout';
 import { ForgotPasswordPage } from '@/routes/auth/ForgotPasswordPage';
 import { parseSignInSearch, parseSignUpSearch } from '@/routes/auth/search';
@@ -85,16 +87,33 @@ const indexRoute = createRoute({
   },
 });
 
+/* eslint-enable @typescript-eslint/only-throw-error */
+
+// Admin area: AdminLayout shows a 403 page to everyone else (no redirect, see T-33).
 const adminRoute = createRoute({
   getParentRoute: () => appLayout,
   path: '/admin',
-  component: AdminPage,
-  beforeLoad: ({ context }) => {
-    if (!isAdmin(context.auth.user)) throw redirect({ to: '/beete' });
-  },
+  component: AdminLayout,
 });
 
-/* eslint-enable @typescript-eslint/only-throw-error */
+const adminChildren = [
+  createRoute({ getParentRoute: () => adminRoute, path: '/', component: AdminPage }),
+  createRoute({
+    getParentRoute: () => adminRoute,
+    path: '/anfragen/$plantId',
+    component: PublicationReviewPage,
+  }),
+  createRoute({
+    getParentRoute: () => adminRoute,
+    path: '/sorten/neu',
+    component: GlobalPlantFormPage,
+  }),
+  createRoute({
+    getParentRoute: () => adminRoute,
+    path: '/sorten/$plantId',
+    component: GlobalPlantFormPage,
+  }),
+];
 
 const bedEditorRoute = createRoute({
   getParentRoute: () => appLayout,
@@ -132,7 +151,7 @@ const routeTree = rootRoute.addChildren([
       component: PlantFormPage,
     }),
     createRoute({ getParentRoute: () => appLayout, path: '/profil', component: ProfilePage }),
-    adminRoute,
+    adminRoute.addChildren(adminChildren),
   ]),
   iconGalleryRoute,
 ]);

@@ -4,11 +4,12 @@ import { ArrowLeft, SearchX } from 'lucide-react';
 import { PlantFormFields } from '@/components/catalog/PlantFormFields';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
-import { usePlants, useSaveOwnPlant } from '@/lib/garden';
+import { globalValues } from '@/lib/admin';
+import { usePlants, useSaveGlobalPlant } from '@/lib/garden';
 import { EMPTY_PLANT_FORM, plantForm } from '@/lib/plant-form';
 
-/** Route component for /katalog/neu and /katalog/$plantId/bearbeiten. */
-export function PlantFormPage() {
+/** Route component for /admin/sorten/neu and /admin/sorten/$plantId. */
+export function GlobalPlantFormPage() {
   const plantId = plantIdParam(useParams({ strict: false }));
   const plants = usePlants();
   const plant = plantId ? plants.data?.find((p) => p.id === plantId) : undefined;
@@ -16,29 +17,28 @@ export function PlantFormPage() {
   return (
     <>
       <Link
-        to={plantId ? '/katalog/$plantId' : '/katalog'}
-        params={plantId ? { plantId } : undefined}
+        to="/admin"
         className="text-muted-foreground hover:text-foreground mb-4 inline-flex min-h-11 items-center gap-1 text-sm"
       >
         <ArrowLeft aria-hidden className="size-4" />
-        {plantId ? 'Zurück zur Sorte' : 'Katalog'}
+        Administration
       </Link>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight md:text-3xl">
-        {plantId ? 'Sorte bearbeiten' : 'Eigene Sorte anlegen'}
+      <h1 className="mb-2 text-2xl font-semibold tracking-tight md:text-3xl">
+        {plantId ? 'Globale Sorte bearbeiten' : 'Globale Sorte anlegen'}
       </h1>
+      <p className="text-muted-foreground mb-6">
+        Gilt für alle. Persönliche Anpassungen der Nutzer bleiben bestehen.
+      </p>
       {plants.isError ? (
-        <FormMessage tone="error">
-          Der Katalog konnte nicht geladen werden. Bitte lade die Seite neu.
-        </FormMessage>
+        <FormMessage tone="error">Der Katalog konnte nicht geladen werden.</FormMessage>
       ) : plants.isPending ? (
         <p className="text-muted-foreground text-sm">Katalog wird geladen …</p>
-      ) : plantId && plant?.source !== 'OWN' ? (
-        <EmptyState icon={SearchX} title="Keine eigene Sorte">
-          Bearbeiten lassen sich nur deine eigenen Sorten. Globale Sorten passt du auf ihrer Seite
-          für dich an.
+      ) : plantId && plant?.source !== 'GLOBAL' ? (
+        <EmptyState icon={SearchX} title="Keine globale Sorte">
+          Diese Sorte gibt es nicht im globalen Katalog.
         </EmptyState>
       ) : (
-        <OwnPlantForm key={plantId} plant={plant} catalog={plants.data} />
+        <GlobalPlantForm key={plantId} plant={plant} catalog={plants.data} />
       )}
     </>
   );
@@ -50,7 +50,7 @@ function plantIdParam(params: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function OwnPlantForm({
+function GlobalPlantForm({
   plant,
   catalog,
 }: {
@@ -58,22 +58,23 @@ function OwnPlantForm({
   catalog: readonly CatalogPlant[];
 }) {
   const navigate = useNavigate();
-  const save = useSaveOwnPlant();
-  const toDetails = (plantId: string) => navigate({ to: '/katalog/$plantId', params: { plantId } });
+  const save = useSaveGlobalPlant();
+  const toAdmin = () => navigate({ to: '/admin' });
   return (
     <PlantFormFields
-      initial={plant ? plantForm(plant) : EMPTY_PLANT_FORM}
+      initial={plant ? plantForm(globalValues(plant)) : EMPTY_PLANT_FORM}
       catalog={catalog}
-      neighborCandidates={catalog.filter((p) => p.id !== plant?.id)}
+      // Global plants may only point to global plants.
+      neighborCandidates={catalog.filter((p) => p.source === 'GLOBAL' && p.id !== plant?.id)}
       submitLabel={plant ? 'Speichern' : 'Sorte anlegen'}
       pending={save.isPending}
       error={save.error}
       onSubmit={async (fields) => {
-        const saved = await save.mutateAsync({ id: plant?.id, fields });
-        await toDetails(saved.id);
+        await save.mutateAsync({ id: plant?.id, fields });
+        await toAdmin();
       }}
       onCancel={() => {
-        void (plant ? toDetails(plant.id) : navigate({ to: '/katalog' }));
+        void toAdmin();
       }}
     />
   );
