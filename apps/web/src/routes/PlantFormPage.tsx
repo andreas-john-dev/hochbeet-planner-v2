@@ -4,6 +4,7 @@ import { ArrowLeft, SearchX } from 'lucide-react';
 import { PlantFormFields } from '@/components/catalog/PlantFormFields';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
+import { SkeletonList } from '@/components/ui/skeleton';
 import { usePlants, useSaveOwnPlant } from '@/lib/garden';
 import { EMPTY_PLANT_FORM, plantForm } from '@/lib/plant-form';
 
@@ -31,7 +32,12 @@ export function PlantFormPage() {
           Der Katalog konnte nicht geladen werden. Bitte lade die Seite neu.
         </FormMessage>
       ) : plants.isPending ? (
-        <p className="text-muted-foreground text-sm">Katalog wird geladen …</p>
+        <SkeletonList
+          label="Katalog wird geladen …"
+          count={5}
+          className="flex max-w-2xl flex-col gap-4"
+          itemClassName="h-11"
+        />
       ) : plantId && plant?.source !== 'OWN' ? (
         <EmptyState icon={SearchX} title="Keine eigene Sorte">
           Bearbeiten lassen sich nur deine eigenen Sorten. Globale Sorten passt du auf ihrer Seite

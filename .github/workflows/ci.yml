@@ -90,3 +90,34 @@ jobs:
           name: e2e-results-${{ matrix.project }}
           path: e2e/test-results/
           retention-days: 14
+
+  lighthouse:
+    name: Lighthouse (mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        timeout-minutes: 5
+        run: pnpm --filter e2e exec playwright install chromium
+
+      # Production build in `vite preview`; Performance and Accessibility must reach 90.
+      - name: Lighthouse
+        run: pnpm --filter e2e lighthouse
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: e2e/lighthouse-out/
+          retention-days: 14

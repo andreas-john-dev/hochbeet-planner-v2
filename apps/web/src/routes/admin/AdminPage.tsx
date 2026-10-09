@@ -9,6 +9,7 @@ import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SkeletonList } from '@/components/ui/skeleton';
 import { FEEDER_LABEL, filterCatalog, NO_FILTER } from '@/lib/catalog';
 import { usePlants, usePublicationQueue } from '@/lib/garden';
 
@@ -47,7 +48,12 @@ function Queue() {
       {queue.isError ? (
         <FormMessage tone="error">Die Warteschlange konnte nicht geladen werden.</FormMessage>
       ) : queue.isPending ? (
-        <p className="text-muted-foreground text-sm">Warteschlange wird geladen …</p>
+        <SkeletonList
+          label="Warteschlange wird geladen …"
+          count={2}
+          className="grid gap-2 sm:grid-cols-2"
+          itemClassName="h-14 rounded-xl"
+        />
       ) : requests.length === 0 ? (
         <EmptyState icon={Inbox} title="Keine offenen Anfragen">
           Schlägt jemand eine eigene Sorte für alle vor, erscheint sie hier.
@@ -122,6 +128,8 @@ function GlobalPlants() {
       </div>
       {plants.isError ? (
         <FormMessage tone="error">Der Katalog konnte nicht geladen werden.</FormMessage>
+      ) : plants.isPending ? (
+        <SkeletonList label="Globale Sorten werden geladen …" itemClassName="h-14 rounded-xl" />
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Globale Sorten">
           {globals.map((plant) => (

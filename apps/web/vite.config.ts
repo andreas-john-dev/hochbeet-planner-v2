@@ -2,23 +2,25 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vite';
+import { type Connect, defineConfig, type Plugin } from 'vite';
 
 /**
- * Serves config.dev.json as /config.json on the dev server only. In prod, CDK writes
- * config.json at deploy time; the file never ends up in the build.
+ * Serves config.dev.json as /config.json on the dev server and in `vite preview` (used for
+ * Lighthouse runs against the production build). In prod, CDK writes config.json at deploy
+ * time; the file never ends up in the build.
  */
 function devConfig(): Plugin {
+  const serveConfig = (server: { middlewares: Connect.Server }) => {
+    server.middlewares.use('/config.json', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.end(readFileSync(new URL('./config.dev.json', import.meta.url)));
+    });
+  };
   return {
     name: 'hochbeet-dev-config',
-    apply: 'serve',
-    configureServer(server) {
-      server.middlewares.use('/config.json', (_req, res) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.end(readFileSync(new URL('./config.dev.json', import.meta.url)));
-      });
-    },
+    configureServer: serveConfig,
+    configurePreviewServer: serveConfig,
   };
 }
 
