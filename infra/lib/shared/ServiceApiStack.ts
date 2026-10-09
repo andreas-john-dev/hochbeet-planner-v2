@@ -122,7 +122,7 @@ export class ServiceApiStack extends Stack {
         authorizer: new apigw.HttpNoneAuthorizer(),
       }),
     );
-    this.configureStage(props.publicGetPaths ?? []);
+    this.configureStage(props.publicGetPaths ?? [], publicRoutes);
 
     new ssm.StringParameter(this, 'ApiDomainParameter', {
       parameterName: props.apiDomainParameter,
@@ -133,7 +133,10 @@ export class ServiceApiStack extends Stack {
   }
 
   /** Access logs and a throttle on the default stage; keeps cost and abuse in check. */
-  private configureStage(publicGetPaths: readonly string[]) {
+  private configureStage(
+    publicGetPaths: readonly string[],
+    publicRoutes: readonly apigw.HttpRoute[],
+  ) {
     const accessLogs = new logs.LogGroup(this, 'ApiAccessLogs', {
       retention: logs.RetentionDays.ONE_MONTH,
       removalPolicy: RemovalPolicy.DESTROY,
@@ -157,6 +160,11 @@ export class ServiceApiStack extends Stack {
       stage.routeSettings = Object.fromEntries(
         publicGetPaths.map((path) => [`GET ${path}`, PUBLIC_ROUTE_THROTTLE]),
       );
+      // Route settings name routes by key, which CloudFormation does not see as a reference:
+      // without these dependencies it may update the stage before the routes exist (404).
+      for (const route of publicRoutes) {
+        stage.addResourceDependency(route.node.defaultChild as apigw.CfnRoute);
+      }
     }
   }
 
