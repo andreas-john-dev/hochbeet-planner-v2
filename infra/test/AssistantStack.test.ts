@@ -127,8 +127,10 @@ describe('AssistantStack', () => {
     expect(actions.some((a) => a.startsWith('aws-marketplace:'))).toBe(false);
   });
 
-  it('traces the runtime and writes usage logs', () => {
-    template.resourceCountIs('AWS::Logs::Delivery', 2);
+  it('writes usage logs without X-Ray tracing', () => {
+    // Trace delivery fails unless X-Ray Transaction Search is enabled in the account.
+    template.resourceCountIs('AWS::Logs::Delivery', 1);
+    template.resourceCountIs('AWS::XRay::ResourcePolicy', 0);
     template.hasResourceProperties('AWS::Logs::LogGroup', {
       LogGroupName: '/aws/vendedlogs/bedrock-agentcore/prod-bed-assistant-usage',
       RetentionInDays: 30,

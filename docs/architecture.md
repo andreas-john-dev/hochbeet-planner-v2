@@ -454,7 +454,7 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 - Code-Deployment statt Container: `pnpm --filter @hochbeet/bed-assistant build` legt in `dist/` den Agenten samt aller Abhängigkeiten als Wheels für Linux ARM64 und Python 3.13 ab (rund 80 MB); CDK lädt das als Zip-Asset hoch (`AgentRuntimeArtifact.fromCodeAsset`). So braucht die Pipeline weder Docker noch ECR.
 - Eingehend ein JWT-Authorizer auf den Cognito User Pool: Audience ist der SPA-Client, und der Claim `cognito:groups` muss `ai-testers` oder `admins` enthalten (`CONTAINS_ANY`).
 - Die Rolle darf genau ein Modell aufrufen (Inference-Profil plus das Modell dahinter in den EU-Regionen) und im Kontingent zählen; keine Marketplace-Rechte. Claude-Modelle muss ein User mit Marketplace-Rechten einmal pro Konto selbst aufrufen, damit Bedrock das Abo anlegt (siehe `docs/deployment.md`).
-- Observability: X-Ray-Tracing und Usage-Logs nach CloudWatch (`/aws/vendedlogs/bedrock-agentcore/<stage>-bed-assistant-usage`); die Ausgaben des Agenten landen im Log der Runtime.
+- Observability: Usage-Logs nach CloudWatch (`/aws/vendedlogs/bedrock-agentcore/<stage>-bed-assistant-usage`); die Ausgaben des Agenten landen im Log der Runtime. X-Ray-Tracing ist aus: Die Trace-Delivery der Runtime verlangt, dass im Konto die X-Ray Transaction Search (Trace-Segmente nach CloudWatch Logs) eingeschaltet ist, sonst schlägt das Deploy fehl. Wer Traces will, schaltet sie zuerst ein und setzt dann `tracingEnabled` im `AssistantStack`.
 - Aufruf: `POST https://bedrock-agentcore.<region>.amazonaws.com/runtimes/<URL-kodierte ARN>/invocations?qualifier=DEFAULT` mit `Authorization: Bearer <ID-Token>` und einer Session-ID von mindestens 33 Zeichen im Header `X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`. Die ARN steht im SSM-Parameter und als Stack-Output; die Smoke-Tests stellen nach jedem Deploy eine kurze Frage.
 
 ### Gemeinsamer Service-Code
@@ -657,7 +657,7 @@ Eine CDK-App in TypeScript deployt acht Stacks nach `eu-central-1` und den Zerti
 | `Prod-GardenStateful` | DynamoDB-Tabelle | – |
 | `Prod-GardenStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
 | `Prod-AssistantStateful` | DynamoDB-Tabelle für das Tageskontingent des Assistenten (TTL) | – |
-| `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer, Tracing und Usage-Logs | User Pool, Kontingent-Tabelle |
+| `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer und Usage-Logs | User Pool, Kontingent-Tabelle |
 | `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
 | `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds | User Pool, API-URLs; Zertifikat per Cross-Region-Referenz |
 
@@ -722,7 +722,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Passwort-Funktion des Smoke-Testusers (`SharedStatefulStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; sonst darf die Funktion nur `AdminSetUserPassword` auf diesem User Pool. |
-| `AwsSolutions-IAM5` | Rolle der AgentCore Runtime (`AssistantStack`) | Das EU-Inference-Profil leitet auf dasselbe Modell in mehreren EU-Regionen, deshalb braucht die Modell-ARN eine Regions-Wildcard. Die übrigen Wildcards (eigene Logs, X-Ray, Metriken mit Namespace-Bedingung, Workload Identity, Lesezugriff auf den CDK-Asset-Bucket für den Code-Zip) erzeugt das L2-Construct selbst. Jeder Fund ist einzeln bestätigt. |
+| `AwsSolutions-IAM5` | Rolle der AgentCore Runtime (`AssistantStack`) | Das EU-Inference-Profil leitet auf dasselbe Modell in mehreren EU-Regionen, deshalb braucht die Modell-ARN eine Regions-Wildcard. Die übrigen Wildcards (eigene Logs, X-Ray-Segmente, Metriken mit Namespace-Bedingung, Workload Identity, Lesezugriff auf den CDK-Asset-Bucket für den Code-Zip) erzeugt das L2-Construct selbst. Jeder Fund ist einzeln bestätigt. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
 
 ## Testing & CI/CD

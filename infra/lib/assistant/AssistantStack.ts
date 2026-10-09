@@ -78,7 +78,8 @@ export class AssistantStack extends Stack {
         MAX_INPUT_CHARS: String(MAX_ASSISTANT_MESSAGE_CHARS),
         ALLOWED_GROUPS: assistant.allowedGroups.join(','),
       },
-      tracingEnabled: true,
+      // X-Ray tracing needs Transaction Search enabled in the account (see docs/architecture.md).
+      tracingEnabled: false,
       loggingConfigs: [
         {
           logType: agentcore.LogType.USAGE_LOGS,
