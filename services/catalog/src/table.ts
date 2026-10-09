@@ -19,3 +19,6 @@ export const OVERRIDE_PREFIX = 'OVERRIDE#';
 
 /** GSI1 partition of the admin queue; GSI1SK = `<requested at>#<plant id>`. */
 export const PUBLICATION_PENDING = 'PUBLICATION#PENDING';
+
+/** Record of a guest import: the id mapping first, then the response once it is done. */
+export const importSk = (importId: string) => `IMPORT#${importId}`;

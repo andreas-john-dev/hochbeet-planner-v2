@@ -2,3 +2,5 @@
 export const GUEST_STORAGE_KEY = 'hochbeet-guest';
 /** Unreadable data is moved here instead of being lost silently. */
 export const GUEST_BACKUP_KEY = 'hochbeet-guest-backup';
+/** Id of the import of the guest's data into an account, kept until it succeeded (idempotency). */
+export const GUEST_IMPORT_ID_KEY = 'hochbeet-guest-import-id';

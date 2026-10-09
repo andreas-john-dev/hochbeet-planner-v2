@@ -1,6 +1,10 @@
 import {
   ApprovePublicationRequestSchema,
   type CatalogPlant,
+  ImportCatalogRequestSchema,
+  type ImportCatalogResponse,
+  ImportGardenRequestSchema,
+  type ImportGardenResponse,
   type ListPublicPlantsResponse,
   type Plant,
   type PlantFields,
@@ -103,6 +107,74 @@ export function mockRoutes(
       };
       replaceOwn(user.id, garden, plant);
       return json<CatalogPlant>(listed(plant));
+    }),
+
+    // Imports of a guest's data, like the services: new ids, idempotent per importId.
+    route('POST', '/api/catalog/import', async ({ request }) => {
+      const parsed = await parseJson(request, ImportCatalogRequestSchema);
+      if (parsed.response) return parsed.response;
+      const key = `${user.id}|catalog|${parsed.data.importId}`;
+      const done = store.readImport(key);
+      if (done) return json(done);
+      const globalIds = idsOf(store.readCatalog());
+      const plantIds = Object.fromEntries(parsed.data.ownPlants.map((p) => [p.id, newId()]));
+      const mapNeighbors = (list: readonly string[], self: string) =>
+        list.flatMap((id) => {
+          const mapped = plantIds[id] ?? (globalIds.has(id) ? id : undefined);
+          return mapped && mapped !== self ? [mapped] : [];
+        });
+      const garden = store.read(user.id);
+      const imported: OwnPlant[] = parsed.data.ownPlants.map(({ archived, ...plant }) => {
+        const id = plantIds[plant.id] ?? newId();
+        return {
+          ...plant,
+          id,
+          goodNeighbors: mapNeighbors(plant.goodNeighbors, id),
+          badNeighbors: mapNeighbors(plant.badNeighbors, id),
+          source: 'OWN',
+          overridden: false,
+          publication: { status: 'PRIVATE' },
+          ...(archived ? { archived } : {}),
+        };
+      });
+      const overrides = { ...garden.overrides };
+      for (const { plantId, fields } of parsed.data.overrides) {
+        // An adjustment the user already has wins.
+        if (globalIds.has(plantId) && !(plantId in overrides)) overrides[plantId] = fields;
+      }
+      store.write(user.id, {
+        ...garden,
+        ownPlants: [...(garden.ownPlants ?? []), ...imported],
+        overrides,
+      });
+      const result: ImportCatalogResponse = { plantIds };
+      store.writeImport(key, result);
+      return json(result);
+    }),
+
+    route('POST', '/api/garden/import', async ({ request }) => {
+      const parsed = await parseJson(request, ImportGardenRequestSchema);
+      if (parsed.response) return parsed.response;
+      const key = `${user.id}|garden|${parsed.data.importId}`;
+      const done = store.readImport(key);
+      if (done) return json(done);
+      const bedIds = Object.fromEntries(parsed.data.beds.map((b) => [b.id, newId()]));
+      const garden = store.read(user.id);
+      store.write(user.id, {
+        ...garden,
+        beds: [...garden.beds, ...parsed.data.beds.map((b) => ({ ...b, id: bedIds[b.id] ?? '' }))],
+        plantings: [
+          ...garden.plantings,
+          ...parsed.data.plantings.map((p) => ({
+            ...p,
+            id: newId(),
+            bedId: bedIds[p.bedId] ?? '',
+          })),
+        ],
+      });
+      const result: ImportGardenResponse = { bedIds };
+      store.writeImport(key, result);
+      return json(result);
     }),
 
     route(

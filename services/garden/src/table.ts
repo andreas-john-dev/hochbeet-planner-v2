@@ -10,3 +10,5 @@ export const PLANTING_INFIX = '#PLANTING#';
 export const bedSk = (bedId: string) => `${BED_PREFIX}${bedId}`;
 export const plantingSk = (bedId: string, plantingId: string) =>
   `${bedSk(bedId)}${PLANTING_INFIX}${plantingId}`;
+/** Record of a guest import: the id mapping first, then `DONE` with the response. */
+export const importSk = (importId: string) => `IMPORT#${importId}`;

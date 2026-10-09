@@ -1,5 +1,6 @@
 import {
   ApprovePublicationRequestSchema,
+  ImportCatalogRequestSchema,
   type ListPlantsResponse,
   type ListPublicPlantsResponse,
   RejectPublicationRequestSchema,
@@ -8,11 +9,14 @@ import {
 } from '@hochbeet/contracts';
 import { createServiceApp, isAdmin, type Logger, parseBody } from '@hochbeet/service-kit';
 import { HTTPException } from 'hono/http-exception';
+import { ulid } from 'ulid';
 import { AdminService } from './catalog/admin';
+import { importCatalog } from './catalog/import';
 import { CatalogService, type CatalogStore } from './catalog/service';
+import type { CatalogImportStore } from './catalog/import';
 
 export interface AppDeps {
-  store: CatalogStore;
+  store: CatalogStore & CatalogImportStore;
   logger: Logger;
   now?: () => Date;
   newId?: () => string;
@@ -26,7 +30,7 @@ export const PUBLIC_PLANTS_PATH = `${BASE_PATH}/public/plants`;
 /** How long browsers and CloudFront may keep the public catalogue. */
 export const PUBLIC_MAX_AGE_SECONDS = 300;
 
-export function createApp({ store, logger, now, newId }: AppDeps) {
+export function createApp({ store, logger, now, newId = () => ulid() }: AppDeps) {
   const app = createServiceApp(BASE_PATH, logger);
   const catalog = new CatalogService(store, now, newId);
   const admin = new AdminService(store, newId);
@@ -72,6 +76,12 @@ export function createApp({ store, logger, now, newId }: AppDeps) {
 
   app.post('/plants/:id/publication', async (c) => {
     return c.json(await catalog.requestPublication(c.get('user').id, c.req.param('id')));
+  });
+
+  // A guest's own plants and adjustments after sign-in; idempotent per importId.
+  app.post('/import', async (c) => {
+    const request = await parseBody(c, ImportCatalogRequestSchema);
+    return c.json(await importCatalog(store, c.get('user').id, request, newId));
   });
 
   // Admin area: members of the Cognito group `admins` only.

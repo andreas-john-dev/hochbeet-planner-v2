@@ -293,6 +293,7 @@ Die Services rufen sich nicht gegenseitig auf. Der Garden-Service prüft nur die
 | `GLOBAL` | `PLANT#<id>` | Globale Sorte |
 | `USER#<uid>` | `PLANT#<id>` | Eigene Sorte |
 | `USER#<uid>` | `OVERRIDE#<plantId>` | Persönliche Anpassung |
+| `USER#<uid>` | `IMPORT#<importId>` | Stand eines Imports aus dem Gastmodus (ID-Zuordnung, Antwort) |
 
 Ein GSI (`GSI1PK = PUBLICATION#PENDING`, `GSI1SK = <angefragt am>`) liefert die Admin-Warteschlange. Die effektive Sicht eines Users entsteht aus zwei Queries; die globalen Sorten werden in der Lambda für einige Minuten gecacht.
 
@@ -319,6 +320,7 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 | POST | `/catalog/admin/publications/{id}/approve` | Freigeben, optional mit Korrekturen (Admin) |
 | POST | `/catalog/admin/publications/{id}/reject` | Ablehnen mit Kommentar (Admin) |
 | POST/PUT | `/catalog/admin/plants[/{id}]` | Globale Sorten pflegen (Admin) |
+| POST | `/catalog/import` | Eigene Sorten und Anpassungen aus dem Gastmodus übernehmen |
 
 **Umsetzung (`services/catalog`):**
 
@@ -373,6 +375,7 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 | --- | --- | --- |
 | `USER#<uid>` | `BED#<bedId>` | Beet |
 | `USER#<uid>` | `BED#<bedId>#PLANTING#<id>` | Pflanzung |
+| `USER#<uid>` | `IMPORT#<importId>` | Stand eines Imports aus dem Gastmodus (ID-Zuordnung, Antwort) |
 
 Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen über alle Zeiträume. Die Mandantentrennung ist damit Teil des Schlüssels.
 
@@ -386,6 +389,7 @@ Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen �
 | POST | `/garden/beds/{bedId}/plantings` | Pflanzung anlegen |
 | PUT | `/garden/beds/{bedId}/plantings/{id}` | Pflanzung ändern (verschieben, Daten, Entfernen) |
 | DELETE | `/garden/beds/{bedId}/plantings/{id}` | Pflanzung löschen |
+| POST | `/garden/import` | Beete und Pflanzungen aus dem Gastmodus übernehmen |
 
 Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erzeugen den Hinweis „Beetrand“.
 
@@ -405,8 +409,21 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
   - Die API prüft nur die Struktur über `SavePlantingRequestSchema`: Raster-Vielfache von 5, Reihen mit Orientierung und Länge, Start vor Ende, Start und Entfernen jeweils am Montag.
   - Fachliche Befunde wie „Beetrand“ berechnet der Client. Sie blockieren das Speichern nie, auch eine Pflanzung außerhalb des Beets wird gespeichert.
   - Ob die Sorte existiert, prüft der Garden-Service nicht, weil Services sich nie gegenseitig aufrufen.
+- **Import aus dem Gastmodus** (`POST /garden/import`, `src/garden/import.ts`): siehe „Übernahme aus dem Gastmodus“.
 - **Mandantentrennung:** Fremde und unbekannte Beete liefern 404. Weil der User Teil jedes Schlüssels ist, kann eine Query nie fremde Beete treffen.
 - **Tests:** Integrationstests gegen DynamoDB Local; die Hilfsfunktionen dafür stellt `@hochbeet/service-kit/testing` bereit.
+
+### Übernahme aus dem Gastmodus
+
+Meldet sich ein Gast an oder registriert sich, fragt die App nach der Übernahme seiner Daten aus dem Browser (T-39). Weil Services sich nie gegenseitig aufrufen, gibt es zwei Endpunkte, und der Client verbindet sie:
+
+1. `POST /catalog/import` mit eigenen Sorten (auch archivierten, weil Pflanzungen sie nutzen können) und Anpassungen. Eigene Sorten bekommen neue ULIDs und sind privat; Nachbarn zeigen auf die neuen IDs importierter Sorten oder auf globale Sorten, unbekannte fallen weg. Anpassungen gelten nur für globale Sorten und nur mit globalen Nachbarn; hat der User für eine Sorte schon eine Anpassung, bleibt seine (`PutItem` mit `attribute_not_exists`). Die Antwort ordnet alte Sorten-IDs den neuen zu.
+2. Der Client setzt diese IDs in die Pflanzungen ein und ruft `POST /garden/import` mit Beeten und Pflanzungen auf. Beete und Pflanzungen bekommen neue ULIDs, Pflanzungen zeigen auf die neuen Beete; eine Pflanzung eines Beets, das nicht im Import ist, ergibt 400.
+
+- **Idempotenz:** Beide Requests tragen dieselbe `importId` (ULID aus dem Client, im `localStorage` unter `hochbeet-guest-import-id`, bis der Import gelungen ist). Jeder Service speichert unter `IMPORT#<importId>` zuerst die ID-Zuordnung, schreibt dann die Daten mit genau diesen IDs und zuletzt die Antwort. Ein wiederholter Request liefert die gespeicherte Antwort; ein unterbrochener Import wird mit denselben IDs zu Ende geschrieben. So entstehen nie Duplikate.
+- **Grenzen:** höchstens 50 Beete, 1000 Pflanzungen, 200 eigene Sorten und 200 Anpassungen je Import, mit deutscher Meldung; das reicht weit für alles, was ein Gast im Browser plant, und hält einen Request klein.
+- **Schreiben:** einzelne `PutItem`-Aufrufe, 25 parallel; die IAM-Policies der Lambdas bleiben unverändert.
+- **Frontend:** `GuestImportDialog` (im `AppShell`, nur angemeldet) liest die Gastdaten (`createGuestRepository()`), nennt, was in diesem Browser liegt, und bietet „Übernehmen“ bzw. „Lokale Beete hinzufügen“, wenn das Konto schon Beete hat, dazu „Verwerfen“ und „Später“. Nach Erfolg löscht es die Gastdaten und lädt alle Abfragen neu; bei Fehlern bleiben die Daten, und die Meldung kommt über `apiErrorMessage()`. Die Logik liegt in `src/lib/guest-import.ts`, die Mock-API bildet beide Endpunkte nach.
 
 ### Gemeinsamer Service-Code
 
@@ -581,7 +598,7 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
   - Jede Identität (User, Gast, abgemeldet) bekommt einen eigenen Query-Cache, damit nach einem Wechsel keine zwischengespeicherten Daten der vorherigen sichtbar sind.
   - Router: Gäste dürfen in den App-Bereich (`/beete`, Editor, Katalog, eigene Sorten). `/profil` und `/admin` schicken sie wie Abgemeldete zur Anmeldung; in der Navigation fehlen beide (`accountOnly` in `nav-items.ts`). „Für alle vorschlagen“ ersetzt ein Hinweis zur Anmeldung.
   - Ein Hinweis über jeder Seite (`GuestBanner`) sagt, dass die Beete nur in diesem Browser liegen, und verlinkt Registrierung und Anmeldung. „Gastmodus beenden“ fragt, ob die Daten für später bleiben oder gelöscht werden.
-  - Meldet sich ein Gast an oder registriert sich, bleiben seine lokalen Daten erhalten; die Übernahme ins Konto folgt mit T-39.
+  - Meldet sich ein Gast an oder registriert sich, bleiben seine lokalen Daten erhalten, bis er sie übernimmt oder verwirft (siehe „Übernahme aus dem Gastmodus“).
 - **Mock-API:** Mit `"apiMode": "mock"` in `config.dev.json` beantwortet `createMockFetch()` (`apps/web/src/mocks/`) alle Aufrufe unter `/api/*` direkt im Browser, ohne Service-Worker. Wie der Auth-Mock wird sie nur in diesem Fall nachgeladen.
   - Sie nimmt pro Request den User aus dem Mock-Token und nutzt für ihn die lokale API (`localRoutes()` mit `MockStore.repository(userId)`). Dazu kommen die Routen, die es nur für angemeldete User gibt und die über User hinweg arbeiten: Veröffentlichung und Admin (`mockRoutes()` in `handlers.ts`).
   - Daten liegen pro Testuser im `localStorage` (`hochbeet-mock-api`), der globale Katalog liegt gemeinsam für alle Testuser daneben (`hochbeet-mock-catalog`, Startkatalog, bis Admins ihn ändern). Der Mock-Token `mock-id-token.<email>|admins` trägt die Gruppen wie `cognito:groups`; ohne Token antwortet sie mit 401, außer für den öffentlichen Katalog (`publicRoutes()`).

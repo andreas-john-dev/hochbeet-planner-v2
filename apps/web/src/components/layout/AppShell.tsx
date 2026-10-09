@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { LogOut } from 'lucide-react';
+import { GuestImportDialog } from '@/components/GuestImportDialog';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
 import { isAdmin } from '@/lib/auth/types';
@@ -62,6 +63,7 @@ export function AppShell() {
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-10">
           {/* Keyed by path: each page enters softly (not with reduced motion). */}
           {guest && <GuestBanner />}
+          {user && <GuestImportDialog key={user.userId} />}
           <div key={pathname} className="animate-enter">
             <Outlet />
           </div>

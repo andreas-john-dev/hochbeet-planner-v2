@@ -27,11 +27,15 @@ export async function seedGarden(page: Page, garden: Garden, email: string = USE
   );
 }
 
-/** Seeds the guest's browser storage, once, so changes survive reloads. */
+/**
+ * Seeds the guest's browser storage once per tab, so changes, an import or deleting the data
+ * survive reloads.
+ */
 export async function seedGuestGarden(page: Page, garden: Garden) {
   await page.addInitScript(
     ([key, data]) => {
-      if (localStorage.getItem(key) === null) {
+      if (!sessionStorage.getItem('guest-garden-seeded')) {
+        sessionStorage.setItem('guest-garden-seeded', '1');
         localStorage.setItem(key, JSON.stringify({ version: 1, garden: data }));
       }
     },

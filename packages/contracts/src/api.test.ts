@@ -3,11 +3,13 @@ import {
   ApprovePublicationRequestSchema,
   BedWithPlantingsResponseSchema,
   ErrorResponseSchema,
+  ImportCatalogRequestSchema,
+  ImportGardenRequestSchema,
   RejectPublicationRequestSchema,
   SaveBedRequestSchema,
   SavePlantingRequestSchema,
 } from './index';
-import { bed, rowPlanting, singlePlanting } from './fixtures.test-utils';
+import { bed, ID, rowPlanting, singlePlanting, tomato } from './fixtures.test-utils';
 
 describe('garden API contracts', () => {
   it('creates beds without id', () => {
@@ -39,6 +41,48 @@ describe('catalog API contracts', () => {
 
   it('requires a reason to reject', () => {
     expect(RejectPublicationRequestSchema.safeParse({ comment: '  ' }).success).toBe(false);
+  });
+});
+
+describe('import contracts', () => {
+  const importId = '01J9ZQ3W8D6V2K5M7N8P9R0MP1';
+
+  it('imports beds with their plantings', () => {
+    const body = { importId, beds: [bed], plantings: [singlePlanting, rowPlanting] };
+    expect(ImportGardenRequestSchema.parse(body)).toEqual(body);
+  });
+
+  it('refuses plantings of beds outside the import and duplicate beds', () => {
+    const result = ImportGardenRequestSchema.safeParse({
+      importId,
+      beds: [bed, bed],
+      plantings: [{ ...singlePlanting, bedId: ID.tomato }],
+    });
+    expect(result.error?.issues.map((i) => [i.path.join('.'), i.message])).toEqual([
+      ['beds', 'Beet doppelt.'],
+      ['plantings.0.bedId', 'Dieses Beet fehlt im Import.'],
+    ]);
+  });
+
+  it('limits the size of an import', () => {
+    const beds = Array.from({ length: 51 }, () => bed);
+    const result = ImportGardenRequestSchema.safeParse({ importId, beds, plantings: [] });
+    expect(result.error?.issues[0]?.message).toBe('Höchstens 50 Beete auf einmal.');
+  });
+
+  it('imports own plants, optionally archived, and adjustments', () => {
+    const body = {
+      importId,
+      ownPlants: [{ ...tomato, archived: true }],
+      overrides: [{ plantId: tomato.id, fields: { spacingInRowCm: 30 } }],
+    };
+    expect(ImportCatalogRequestSchema.parse(body)).toEqual(body);
+    expect(
+      ImportCatalogRequestSchema.safeParse({
+        ...body,
+        overrides: [{ plantId: tomato.id, fields: {} }],
+      }).success,
+    ).toBe(false);
   });
 });
 

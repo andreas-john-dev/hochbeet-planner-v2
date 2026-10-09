@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CatalogPlantSchema, PlantFieldsSchema, PlantOverrideSchema, PlantSchema } from '../domain';
-import { IsoDateSchema } from '../primitives';
+import { IsoDateSchema, UlidSchema } from '../primitives';
 
 // Catalog-Service, routes under /api/catalog (docs/architecture.md, "Catalog-Service").
 
@@ -47,3 +47,30 @@ export const RejectPublicationRequestSchema = z.object({
   comment: z.string().trim().min(1, 'Bitte begründe die Ablehnung.').max(500),
 });
 export type RejectPublicationRequest = z.infer<typeof RejectPublicationRequestSchema>;
+
+/** Most own plants and adjustments one import may carry. */
+export const MAX_IMPORT_PLANTS = 200;
+
+/**
+ * POST /catalog/import: a guest's own plants and adjustments from the browser, after sign-in.
+ * Own plants get new ids and stay private; neighbours are mapped to the new ids, and those
+ * the user's catalogue does not know are dropped. Adjustments of unknown plants are skipped,
+ * and an adjustment the user already has wins over the imported one. Idempotent per
+ * `importId`, like POST /garden/import.
+ */
+export const ImportCatalogRequestSchema = z.object({
+  importId: UlidSchema,
+  ownPlants: z
+    .array(PlantSchema.extend({ archived: z.boolean().optional() }))
+    .max(MAX_IMPORT_PLANTS, `Höchstens ${String(MAX_IMPORT_PLANTS)} eigene Sorten auf einmal.`),
+  overrides: z
+    .array(z.object({ plantId: UlidSchema, fields: PlantOverrideSchema }))
+    .max(MAX_IMPORT_PLANTS, `Höchstens ${String(MAX_IMPORT_PLANTS)} Anpassungen auf einmal.`),
+});
+export type ImportCatalogRequest = z.infer<typeof ImportCatalogRequestSchema>;
+
+/** Response of POST /catalog/import: new plant id per imported own plant id. */
+export const ImportCatalogResponseSchema = z.object({
+  plantIds: z.record(UlidSchema, UlidSchema),
+});
+export type ImportCatalogResponse = z.infer<typeof ImportCatalogResponseSchema>;

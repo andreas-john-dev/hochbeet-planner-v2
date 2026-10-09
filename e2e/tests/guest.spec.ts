@@ -172,10 +172,15 @@ test('signing in ends guest mode and shows the account, not the guest beds', asy
   await page.getByLabel('E-Mail').fill(USERS.user.email);
   await page.getByLabel('Passwort').fill(USERS.user.password);
   await page.getByRole('button', { name: 'Anmelden' }).click();
+  // The import question (T-39, guest-import.spec.ts); later keeps the data.
+  await page
+    .getByRole('dialog', { name: 'Beete aus dem Gastmodus übernehmen?' })
+    .getByRole('button', { name: 'Später' })
+    .click();
   await expect(page.getByRole('heading', { name: 'Noch keine Beete' })).toBeVisible();
   await expect(page.getByTestId('guest-banner')).toHaveCount(0);
   const stored = await storage(page);
   expect(stored.mode).toBeNull();
-  // Kept for the import after sign-in (T-39).
+  // Kept for the import on the next visit.
   expect(stored.guest).toContain('Gastbeet');
 });
