@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Duration } from 'aws-cdk-lib';
 import { HttpOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -46,7 +47,9 @@ describe('FrontendStack', () => {
       webDistPath: fakeWebDist(),
       certificate: certificateStack.certificate,
     });
-    stack.addApiBehavior('/api/catalog/*', new HttpOrigin('catalog.example.com'));
+    const catalog = new HttpOrigin('catalog.example.com');
+    stack.addPublicApiBehavior('/api/catalog/public/*', catalog, Duration.minutes(5));
+    stack.addApiBehavior('/api/catalog/*', catalog);
     nagViolations = synthAndCollectNagViolations(app, outdir);
     template = Template.fromStack(stack);
   });
@@ -148,6 +151,27 @@ describe('FrontendStack', () => {
     expect(api?.CachePolicyId).toBe(CACHING_DISABLED);
     expect(api?.OriginRequestPolicyId).toBe(ALL_VIEWER_EXCEPT_HOST_HEADER);
     expect(api?.AllowedMethods).toContain('POST');
+  });
+
+  it('caches the public catalogue for five minutes, shared by all viewers', () => {
+    const paths = behaviors().map((b) => b.PathPattern);
+    // CloudFront takes the first match, so the public path must come before the API.
+    expect(paths.indexOf('/api/catalog/public/*')).toBeLessThan(paths.indexOf('/api/catalog/*'));
+    const publicApi = behavior('/api/catalog/public/*');
+    expect(publicApi?.OriginRequestPolicyId).toBeUndefined();
+    expect(publicApi?.AllowedMethods).toEqual(['GET', 'HEAD']);
+    template.hasResourceProperties('AWS::CloudFront::CachePolicy', {
+      CachePolicyConfig: Match.objectLike({
+        MinTTL: 0,
+        DefaultTTL: 300,
+        MaxTTL: 300,
+        ParametersInCacheKeyAndForwardedToOrigin: Match.objectLike({
+          HeadersConfig: { HeaderBehavior: 'none' },
+          CookiesConfig: { CookieBehavior: 'none' },
+          QueryStringsConfig: { QueryStringBehavior: 'none' },
+        }),
+      }),
+    });
   });
 
   it('serves the app under its own domain with TLS 1.2 or newer', () => {

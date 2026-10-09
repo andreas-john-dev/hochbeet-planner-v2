@@ -78,7 +78,7 @@ describe('CatalogStatelessStack', () => {
     });
   });
 
-  it('protects every route with the Cognito JWT authorizer', () => {
+  it('protects every route except the public catalogue with the Cognito JWT authorizer', () => {
     template.hasResourceProperties('AWS::ApiGatewayV2::Authorizer', {
       AuthorizerType: 'JWT',
       IdentitySource: ['$request.header.Authorization'],
@@ -95,11 +95,16 @@ describe('CatalogStatelessStack', () => {
         },
       },
     });
-    const routes = Object.values(template.findResources('AWS::ApiGatewayV2::Route'));
-    expect(routes).toHaveLength(1);
-    expect(routes[0]).toMatchObject({
-      Properties: { RouteKey: 'ANY /api/catalog/{proxy+}', AuthorizationType: 'JWT' },
-    });
+    const routes = Object.values(template.findResources('AWS::ApiGatewayV2::Route')).map(
+      (r) => (r as { Properties: { RouteKey: string; AuthorizationType: string } }).Properties,
+    );
+    expect(routes).toEqual([
+      expect.objectContaining({ RouteKey: 'ANY /api/catalog/{proxy+}', AuthorizationType: 'JWT' }),
+      expect.objectContaining({
+        RouteKey: 'GET /api/catalog/public/plants',
+        AuthorizationType: 'NONE',
+      }),
+    ]);
   });
 
   it('logs access and throttles the default stage', () => {
@@ -108,6 +113,9 @@ describe('CatalogStatelessStack', () => {
       AutoDeploy: true,
       AccessLogSettings: Match.objectLike({ Format: Match.stringLikeRegexp('requestId') }),
       DefaultRouteSettings: { ThrottlingRateLimit: 20, ThrottlingBurstLimit: 40 },
+      RouteSettings: {
+        'GET /api/catalog/public/plants': { ThrottlingRateLimit: 5, ThrottlingBurstLimit: 10 },
+      },
     });
     template.allResourcesProperties('AWS::Logs::LogGroup', { RetentionInDays: 30 });
   });

@@ -175,6 +175,32 @@ export class FrontendStack extends Stack {
     });
   }
 
+  /**
+   * Routes a public, read-only API path (e.g. `/api/catalog/public/*`) and caches it for at
+   * most `maxAge`, honouring a shorter `Cache-Control` of the origin. No viewer headers,
+   * cookies or query strings reach the origin or the cache key, so every guest shares one
+   * cached copy. Call it before `addApiBehavior` of the same service: CloudFront takes the
+   * first matching behavior.
+   */
+  addPublicApiBehavior(
+    pathPattern: '/api/catalog/public/*',
+    origin: cloudfront.IOrigin,
+    maxAge: Duration,
+  ) {
+    this.distribution.addBehavior(pathPattern, origin, {
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+      cachePolicy: new cloudfront.CachePolicy(this, 'PublicApiCachePolicy', {
+        comment: 'Public API reads: shared cache for a few minutes',
+        minTtl: Duration.seconds(0),
+        defaultTtl: maxAge,
+        maxTtl: maxAge,
+        enableAcceptEncodingGzip: true,
+        enableAcceptEncodingBrotli: true,
+      }),
+    });
+  }
+
   /** Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag"). */
   private acknowledgeNagFindings() {
     const ack = (scope: Construct, id: string, reason: string) => {

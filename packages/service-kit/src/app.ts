@@ -18,12 +18,21 @@ export interface ServiceEnv {
 export const errorBody = (message: string): ErrorResponse => ({ message });
 
 /**
+ * Routes under `<basePath>/public/` work without sign-in, e.g. the catalogue for guests.
+ * API Gateway decides which of them are reachable without a token (one route each, without
+ * authorizer); everything else there keeps the JWT authorizer. Public handlers never read
+ * the user: there is none.
+ */
+export const PUBLIC_PREFIX = '/public/';
+
+/**
  * Hono app for one service under `basePath` (CloudFront forwards the full path), with
  * the shared middleware: user context from the JWT claims of the API Gateway authorizer
- * (401 without), one structured log line per request, and German error responses.
+ * (401 without, except for public routes), one structured log line per request, and German error responses.
  */
 export function createServiceApp(basePath: string, logger: Logger) {
   const app = new Hono<ServiceEnv>().basePath(basePath);
+  const isPublic = (path: string) => path.startsWith(`${basePath}${PUBLIC_PREFIX}`);
 
   app.use(async (c, next) => {
     const started = Date.now();
@@ -35,8 +44,10 @@ export function createServiceApp(basePath: string, logger: Logger) {
     c.set('logger', log);
     try {
       // API Gateway rejects requests without a valid token; this is the second line of defence.
-      if (!user) throw new HTTPException(401, { message: 'Bitte melde dich an.' });
-      c.set('user', user);
+      if (user) c.set('user', user);
+      else if (!isPublic(c.req.path)) {
+        throw new HTTPException(401, { message: 'Bitte melde dich an.' });
+      }
       await next();
     } finally {
       log.info('request', {

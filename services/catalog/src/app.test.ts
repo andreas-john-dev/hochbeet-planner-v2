@@ -40,6 +40,27 @@ describe('catalog app', () => {
     expect(repository.listUserItems).not.toHaveBeenCalled();
   });
 
+  it('serves the global catalogue without sign-in, cacheable and without user data', async () => {
+    const { app, repository } = setup({
+      listGlobalPlants: vi.fn(() => Promise.resolve([seedPlant('Zwiebel'), seedPlant('Möhre')])),
+    });
+    const response = await app.request('/api/catalog/public/plants');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
+    const body = (await response.json()) as { plants: Record<string, unknown>[] };
+    expect(body.plants.map((p) => p.name)).toEqual(['Möhre', 'Zwiebel']);
+    expect(body.plants[0]).not.toHaveProperty('source');
+    expect(repository.listUserItems).not.toHaveBeenCalled();
+  });
+
+  it('keeps everything else outside /public behind sign-in', async () => {
+    const { app } = setup();
+    for (const path of ['/api/catalog/plants', '/api/catalog/admin/publications']) {
+      expect((await app.request(path)).status).toBe(401);
+    }
+    expect((await app.request('/api/catalog/public/plants', { method: 'POST' })).status).toBe(404);
+  });
+
   it('lists the effective plants of the signed-in user', async () => {
     const { app, repository } = setup();
     const response = await app.request('/api/catalog/plants', {}, authorized(USER_A));

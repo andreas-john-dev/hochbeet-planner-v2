@@ -54,6 +54,15 @@ describe('mock API', () => {
     expect(await response.json()).toEqual({ message: 'Bitte melde dich an.' });
   });
 
+  it('serves the global catalogue without token, like the public catalog route', async () => {
+    const response = await fetchFn('/api/catalog/public/plants');
+    expect(response.status).toBe(200);
+    const { plants } = (await response.json()) as { plants: Record<string, unknown>[] };
+    expect(plants).toHaveLength(56);
+    expect(plants[0]).not.toHaveProperty('source');
+    expect((await fetchFn('/api/catalog/public/plants', { method: 'POST' })).status).toBe(404);
+  });
+
   it('keeps beds per user, sorted by name', async () => {
     await createBed('a@example.com', 'Zweites');
     await createBed('a@example.com', 'Erstes');

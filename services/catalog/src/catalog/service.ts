@@ -1,5 +1,6 @@
 import {
   type CatalogPlant,
+  type Plant,
   type PlantFields,
   PlantFieldsSchema,
   type PlantOverride,
@@ -39,6 +40,13 @@ export class CatalogService {
     private readonly now: () => Date = () => new Date(),
     private readonly newId: () => string = () => ulid(),
   ) {}
+
+  /** The global catalogue as everyone sees it without adjustments, sorted by name. */
+  async listGlobal(): Promise<Plant[]> {
+    return [...(await this.store.listGlobalPlants())].sort((a, b) =>
+      a.name.localeCompare(b.name, 'de'),
+    );
+  }
 
   async list(userId: string): Promise<CatalogPlant[]> {
     const [globals, { overrides, own }] = await Promise.all([

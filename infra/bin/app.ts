@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
-import { App, Validations } from 'aws-cdk-lib';
+import { PUBLIC_MAX_AGE_SECONDS } from '@hochbeet/catalog-service';
+import { App, Duration, Validations } from 'aws-cdk-lib';
 import { HttpOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { AwsSolutionsChecks } from 'cdk-nag';
@@ -60,7 +61,13 @@ for (const stage of stages) {
   const names = ssmParameters(stage);
   const apiOrigin = (parameterName: string) =>
     new HttpOrigin(ssm.StringParameter.valueForStringParameter(frontend, parameterName));
-  frontend.addApiBehavior('/api/catalog/*', apiOrigin(names.catalogApiDomain));
+  const catalogOrigin = apiOrigin(names.catalogApiDomain);
+  frontend.addPublicApiBehavior(
+    '/api/catalog/public/*',
+    catalogOrigin,
+    Duration.seconds(PUBLIC_MAX_AGE_SECONDS),
+  );
+  frontend.addApiBehavior('/api/catalog/*', catalogOrigin);
   frontend.addApiBehavior('/api/garden/*', apiOrigin(names.gardenApiDomain));
 }
 
