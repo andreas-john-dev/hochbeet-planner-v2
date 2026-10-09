@@ -1,0 +1,13 @@
+{
+  "name": "@hochbeet/bed-assistant",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Python agent (Strands) on Bedrock AgentCore; the scripts wrap uv so Turborepo runs it with the rest.",
+  "scripts": {
+    "lint": "uv run --frozen ruff check . && uv run --frozen ruff format --check .",
+    "format": "uv run --frozen ruff format .",
+    "typecheck": "uv run --frozen mypy",
+    "test": "uv run --frozen pytest -q",
+    "build": "./scripts/build.sh"
+  }
+}

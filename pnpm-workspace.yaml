@@ -2,6 +2,7 @@ packages:
   - apps/*
   - services/*
   - packages/*
+  - agents/*
   - infra
   - e2e
 

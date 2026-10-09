@@ -10,7 +10,11 @@ describe('SharedStatefulStack', () => {
 
   beforeAll(() => {
     const { app, outdir } = createApp();
-    stack = new SharedStatefulStack(app, 'Prod-SharedStateful', { env, stage });
+    stack = new SharedStatefulStack(app, 'Prod-SharedStateful', {
+      env,
+      stage,
+      budgetAlertEmail: 'budget@example.com',
+    });
     nagViolations = synthAndCollectNagViolations(app, outdir);
     template = Template.fromStack(stack);
   });
@@ -46,8 +50,38 @@ describe('SharedStatefulStack', () => {
     expect(flows).not.toContain('ALLOW_USER_PASSWORD_AUTH');
   });
 
-  it('creates the admins group', () => {
+  it('creates the admins and ai-testers groups', () => {
     template.hasResourceProperties('AWS::Cognito::UserPoolGroup', { GroupName: 'admins' });
+    template.hasResourceProperties('AWS::Cognito::UserPoolGroup', { GroupName: 'ai-testers' });
+  });
+
+  it('alerts by mail at 80 and 100 % of the monthly budget', () => {
+    const subscribers = [{ SubscriptionType: 'EMAIL', Address: 'budget@example.com' }];
+    template.hasResourceProperties('AWS::Budgets::Budget', {
+      Budget: {
+        BudgetName: 'hochbeet-prod-monthly',
+        BudgetType: 'COST',
+        TimeUnit: 'MONTHLY',
+        BudgetLimit: { Amount: stage.monthlyBudgetUsd, Unit: 'USD' },
+      },
+      NotificationsWithSubscribers: [80, 100].map((threshold) => ({
+        Notification: {
+          NotificationType: 'ACTUAL',
+          ComparisonOperator: 'GREATER_THAN',
+          Threshold: threshold,
+          ThresholdType: 'PERCENTAGE',
+        },
+        Subscribers: subscribers,
+      })),
+    });
+  });
+
+  it('keeps the budget without alerts when no address is configured', () => {
+    const { app } = createApp();
+    const withoutMail = new SharedStatefulStack(app, 'NoMail', { env, stage });
+    Template.fromStack(withoutMail).hasResourceProperties('AWS::Budgets::Budget', {
+      NotificationsWithSubscribers: Match.absent(),
+    });
   });
 
   it('publishes user pool and client id to SSM', () => {
@@ -81,6 +115,11 @@ describe('SharedStatefulStack', () => {
         ],
         UserPoolId: Match.anyValue(),
       },
+    });
+    // The smoke test asks the assistant once, so the user is an AI tester.
+    template.hasResource('AWS::Cognito::UserPoolUserToGroupAttachment', {
+      Condition: 'HasSmokeUser',
+      Properties: Match.objectLike({ Username: stage.smokeUserEmail, GroupName: 'ai-testers' }),
     });
     template.hasOutput('SmokeUserEmail', {
       Condition: 'HasSmokeUser',

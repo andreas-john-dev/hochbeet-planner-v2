@@ -69,7 +69,21 @@ Die Domain `hochbeet.andi-john-dev.de` und die Hosted Zone stehen in `infra/lib/
    - Name: `SMOKE_USER_PASSWORD`
    - Wert: ein eigenes Passwort nach der Richtlinie des User Pools (mindestens 8 Zeichen, Groß- und Kleinbuchstabe, Ziffer, Sonderzeichen), z. B. aus einem Passwortmanager.
 
-   Beim nächsten Deploy legt `Prod-SharedStateful` den User `smoke-test@hochbeet.andi-john-dev.de` an und setzt dieses Passwort. Die Smoke-Tests melden sich damit an, legen ein Beet mit Pflanzen an, prüfen die Warnung und löschen das Beet wieder. Ein neuer Wert ändert das Passwort beim nächsten Deploy. Ohne Secret wird der angemeldete Smoke-Test mit einer Warnung übersprungen.
+   Beim nächsten Deploy legt `Prod-SharedStateful` den User `smoke-test@hochbeet.andi-john-dev.de` an und setzt dieses Passwort. Die Smoke-Tests melden sich damit an, legen ein Beet mit Pflanzen an, prüfen die Warnung und löschen das Beet wieder. Ein neuer Wert ändert das Passwort beim nächsten Deploy. Ohne Secret wird der angemeldete Smoke-Test mit einer Warnung übersprungen. Der User ist auch in der Gruppe `ai-testers` und stellt dem Beet-Assistenten eine kurze Frage (eine seiner 20 Fragen am Tag).
+4. **Variable für den Budget-Alarm** (empfohlen): wie in Schritt 2 eine Repository-Variable
+   - Name: `BUDGET_ALERT_EMAIL`
+   - Wert: die Adresse, die bei 80 % und 100 % des Monatsbudgets (10 USD, `monthlyBudgetUsd` in `infra/lib/config/stages.ts`) eine Mail bekommt.
+
+   Der Deploy übergibt sie als CDK-Context; sie steht nie im Repository. AWS schickt beim ersten Mal keine Bestätigungsmail, die Alarme kommen direkt. Ohne Variable entsteht das Budget ohne Alarme, und der Deploy warnt.
+5. **Claude-Modell für den Beet-Assistenten freischalten** (einmal pro AWS-Konto): Bedrock legt für Anthropic-Modelle beim ersten Aufruf ein AWS-Marketplace-Abo an. Das darf nur ein User mit Marketplace-Rechten, nicht die Rolle der Runtime. Deshalb einmal als Admin aufrufen, zum Beispiel in der Bedrock-Konsole (Model catalog → Claude Haiku 4.5 → Playground) oder per CLI:
+
+   ```bash
+   aws bedrock-runtime converse --region eu-central-1 \
+     --model-id eu.anthropic.claude-haiku-4-5-20251001-v1:0 \
+     --messages '[{"role":"user","content":[{"text":"Hallo"}]}]'
+   ```
+
+   Fragt die Konsole nach Use-Case-Angaben für Anthropic, diese einmal ausfüllen. Das Abo erscheint unter AWS Marketplace → *Manage subscriptions*.
 
 ### 4. Erster Deploy
 
@@ -99,6 +113,8 @@ Wer die Einrichtung schon vor der eigenen Domain gemacht hat, braucht einmalig:
 | `Prod-Certificate` hängt lange in `CREATE_IN_PROGRESS` | ACM wartet auf die DNS-Validierung; die Hosted Zone muss die öffentlich delegierte Zone von `andi-john-dev.de` sein. |
 | `This stack uses assets, so the toolkit stack must be deployed` | Schritt 1 fehlt. |
 | `Unable to fetch parameters [/hochbeet/prod/shared/…]` | `Prod-SharedStateful` ist nicht deployt; `cdk deploy --all` deployt ihn eigentlich vor `Prod-Frontend`. |
+| `Model access is denied … AWS Marketplace actions (aws-marketplace:ViewSubscriptions, aws-marketplace:Subscribe)` | Das Marketplace-Abo für das Claude-Modell fehlt (Schritt 5). Kommt die Meldung auch beim Aufruf als Admin mit „subscription … cannot be completed at this time“, ist meist die Zahlungsmethode ungültig (Billing → *Payment methods*), das Konto noch in der Verifizierung oder eine SCP der Organization verbietet Marketplace-Aktionen. |
+| Smoke-Test „answers the smoke user“ mit 429 | Das Tageskontingent des Smoke-Users ist aufgebraucht (mehr als 20 Deploys bzw. Wiederholungen an einem Tag); am nächsten Tag geht es wieder. |
 | `… is in UPDATE_ROLLBACK_FAILED state and can not be updated` | Ein vorheriger Deploy ist gescheitert und auch sein Rollback. Der Stack muss einmal manuell weiterrollen, bevor die Pipeline wieder deployen kann (siehe unten). |
 | `Unable to find Route by key … within the provided RouteSettings` | Die Stage wurde vor der Route aktualisiert, die ihre `RouteSettings` nennen. `ServiceApiStack` setzt dafür eine explizite Abhängigkeit der Stage auf die öffentlichen Routen (seit dem Fix nach T-37). |
 

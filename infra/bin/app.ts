@@ -4,6 +4,8 @@ import { App, Duration, Validations } from 'aws-cdk-lib';
 import { HttpOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { AwsSolutionsChecks } from 'cdk-nag';
+import { AssistantStack } from '../lib/assistant/AssistantStack';
+import { AssistantStatefulStack } from '../lib/assistant/AssistantStatefulStack';
 import { CatalogStatefulStack } from '../lib/catalog/CatalogStatefulStack';
 import { CatalogStatelessStack } from '../lib/catalog/CatalogStatelessStack';
 import { ssmParameters } from '../lib/config/ssm';
@@ -16,6 +18,9 @@ import { SharedStatefulStack } from '../lib/shared/SharedStatefulStack';
 
 const app = new App();
 const webDistPath = fileURLToPath(new URL('../../apps/web/dist', import.meta.url));
+// From the GitHub variable BUDGET_ALERT_EMAIL (`cdk deploy -c budgetAlertEmail=…`), never in the repo.
+const budgetAlertContext = app.node.tryGetContext('budgetAlertEmail') as string | undefined;
+const budgetAlertEmail = budgetAlertContext?.trim() ? budgetAlertContext.trim() : undefined;
 
 for (const stage of stages) {
   const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: stage.region };
@@ -23,6 +28,7 @@ for (const stage of stages) {
   const shared = new SharedStatefulStack(app, `${stage.stackPrefix}-SharedStateful`, {
     env,
     stage,
+    budgetAlertEmail,
   });
   const catalogStateful = new CatalogStatefulStack(app, `${stage.stackPrefix}-CatalogStateful`, {
     env,
@@ -45,6 +51,16 @@ for (const stage of stages) {
   });
   gardenStateless.addStackDependency(shared, 'JWT authorizer reads the user pool ids from SSM');
   gardenStateless.addStackDependency(gardenStateful, 'reads the table name from SSM');
+
+  const assistantStateful = new AssistantStatefulStack(
+    app,
+    `${stage.stackPrefix}-AssistantStateful`,
+    { env, stage },
+  );
+  const assistant = new AssistantStack(app, `${stage.stackPrefix}-Assistant`, { env, stage });
+  assistant.addStackDependency(shared, 'JWT authorizer reads the user pool ids from SSM');
+  assistant.addStackDependency(assistantStateful, 'reads the quota table name from SSM');
+
   const certificate = new CertificateStack(app, `${stage.stackPrefix}-Certificate`, {
     env: { account: env.account, region: CLOUDFRONT_CERTIFICATE_REGION },
     stage,

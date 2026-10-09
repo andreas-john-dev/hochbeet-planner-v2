@@ -38,6 +38,8 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.2)(vite@8.3.3(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  agents/bed-assistant: {}
+
   apps/web:
     dependencies:
       '@dnd-kit/core':
@@ -174,9 +176,15 @@ importers:
         specifier: ^10.8.1
         version: 10.8.1
     devDependencies:
+      '@hochbeet/bed-assistant':
+        specifier: workspace:*
+        version: link:../agents/bed-assistant
       '@hochbeet/catalog-service':
         specifier: workspace:*
         version: link:../services/catalog
+      '@hochbeet/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
       '@hochbeet/garden-service':
         specifier: workspace:*
         version: link:../services/garden
