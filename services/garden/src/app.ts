@@ -1,6 +1,7 @@
 import {
   type Bed,
   type BedWithPlantingsResponse,
+  ImportGardenRequestSchema,
   type ListBedsResponse,
   type Planting,
   SaveBedRequestSchema,
@@ -8,6 +9,7 @@ import {
 } from '@hochbeet/contracts';
 import { createServiceApp, type Logger, NotFoundError, parseBody } from '@hochbeet/service-kit';
 import { ulid } from 'ulid';
+import { importGarden } from './garden/import';
 import type { GardenRepository } from './garden/repository';
 
 export type GardenStore = Pick<
@@ -20,6 +22,9 @@ export type GardenStore = Pick<
   | 'bedExists'
   | 'putPlanting'
   | 'deletePlanting'
+  | 'getImport'
+  | 'putImport'
+  | 'putImported'
 >;
 
 export interface AppDeps {
@@ -102,6 +107,12 @@ export function createApp({ store, logger, newId = () => ulid() }: AppDeps) {
     );
     if (!deleted) throw new NotFoundError(PLANTING_NOT_FOUND);
     return c.body(null, 204);
+  });
+
+  // A guest's beds and plantings after sign-in; idempotent per importId.
+  app.post('/import', async (c) => {
+    const request = await parseBody(c, ImportGardenRequestSchema);
+    return c.json(await importGarden(store, c.get('user').id, request, newId));
   });
 
   return app;

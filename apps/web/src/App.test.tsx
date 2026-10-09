@@ -205,6 +205,11 @@ describe('App', () => {
       await userEvent.type(await screen.findByLabelText('E-Mail'), MOCK_USERS.user.email);
       await userEvent.type(screen.getByLabelText('Passwort'), MOCK_USERS.user.password);
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+      // The import question comes first (T-39); „Später“ keeps the data for another visit.
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Beete aus dem Gastmodus übernehmen?',
+      });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Später' }));
       expect(await heading('Meine Beete')).toBeVisible();
       expect(await screen.findByRole('button', { name: 'Erstes Beet anlegen' })).toBeVisible();
       expect(screen.queryByText('Gastbeet')).toBeNull();
@@ -213,6 +218,83 @@ describe('App', () => {
       // The guest's data stays for the import after sign-in (T-39).
       expect(localStorage.getItem(GUEST_STORAGE_KEY)).toContain('Gastbeet');
       expect(paths()).toContain('/api/garden/beds');
+    });
+  });
+
+  describe('importing guest data after sign-in', () => {
+    async function signInWithGuestData(name: string) {
+      localStorage.setItem(
+        GUEST_STORAGE_KEY,
+        JSON.stringify({
+          version: 1,
+          garden: {
+            beds: [
+              {
+                id: '01J9ZQ3W8D6V2K5M7N8P9R0BED',
+                name,
+                widthCm: 100,
+                depthCm: 50,
+                mainRowDirection: 'V',
+                soilRenewals: [],
+              },
+            ],
+            plantings: [],
+          },
+        }),
+      );
+      const auth = createMockAuthAdapter();
+      await auth.signIn(MOCK_USERS.user.email, MOCK_USERS.user.password);
+      render(
+        <App
+          auth={auth}
+          fetchFn={createMockFetch()}
+          history={createMemoryHistory({ initialEntries: ['/beete'] })}
+        />,
+      );
+      return screen.findByRole('dialog', { name: 'Beete aus dem Gastmodus übernehmen?' });
+    }
+
+    it('moves the beds into the account and clears this browser', async () => {
+      const dialog = await signInWithGuestData('Balkon');
+      expect(dialog).toHaveTextContent('In diesem Browser liegen 1 Beet aus dem Gastmodus.');
+      await userEvent.click(await within(dialog).findByRole('button', { name: 'Übernehmen' }));
+      expect(await screen.findByRole('article', { name: 'Balkon' })).toBeVisible();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(localStorage.getItem(GUEST_STORAGE_KEY)).toBeNull();
+    });
+
+    it('discards the beds on request', async () => {
+      const dialog = await signInWithGuestData('Balkon');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
+      expect(await screen.findByRole('button', { name: 'Erstes Beet anlegen' })).toBeVisible();
+      expect(localStorage.getItem(GUEST_STORAGE_KEY)).toBeNull();
+    });
+
+    it('offers to add them when the account already has beds', async () => {
+      localStorage.setItem(
+        'hochbeet-mock-api',
+        JSON.stringify({
+          [MOCK_USERS.user.email]: {
+            beds: [
+              {
+                id: '01J9ZQ3W8D6V2K5M7N8P9R0ACC',
+                name: 'Kontobeet',
+                widthCm: 100,
+                depthCm: 50,
+                mainRowDirection: 'V',
+                soilRenewals: [],
+              },
+            ],
+            plantings: [],
+          },
+        }),
+      );
+      const dialog = await signInWithGuestData('Balkon');
+      await userEvent.click(
+        await within(dialog).findByRole('button', { name: 'Lokale Beete hinzufügen' }),
+      );
+      expect(await screen.findByRole('article', { name: 'Balkon' })).toBeVisible();
+      expect(screen.getByRole('article', { name: 'Kontobeet' })).toBeVisible();
     });
   });
 

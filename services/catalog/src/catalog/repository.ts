@@ -12,9 +12,11 @@ import {
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { type Plant, type PlantOverride, PlantSchema } from '@hochbeet/contracts';
+import { z } from 'zod';
 import {
   catalogTable,
   GLOBAL_PK,
+  importSk,
   OVERRIDE_PREFIX,
   overrideSk,
   PLANT_PREFIX,
@@ -29,6 +31,16 @@ import {
   type OwnPlantItem,
   OwnPlantItemSchema,
 } from './effective';
+
+/** Writes of an import running in parallel; plain item actions keep the IAM policy small. */
+const WRITE_CONCURRENCY = 25;
+
+/** State of a guest import: new id per imported id, and the response once it is done. */
+export const ImportRecordSchema = z.object({
+  ids: z.record(z.string(), z.string()),
+  result: z.unknown().optional(),
+});
+export type ImportRecord = z.infer<typeof ImportRecordSchema>;
 
 /** Global plants change rarely (seed, admin); each Lambda instance caches them briefly. */
 export const GLOBAL_CACHE_MS = 5 * 60 * 1000;
@@ -257,6 +269,59 @@ export class CatalogRepository {
   }
 
   /** Stored form of an own plant; pending plants carry the GSI1 keys of the admin queue. */
+  async getImport(userId: string, importId: string): Promise<ImportRecord | undefined> {
+    const { Item } = await this.client.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { PK: userPk(userId), SK: importSk(importId) },
+      }),
+    );
+    return Item ? ImportRecordSchema.parse(Item) : undefined;
+  }
+
+  async putImport(userId: string, importId: string, record: ImportRecord): Promise<void> {
+    await this.client.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: { PK: userPk(userId), SK: importSk(importId), ...record },
+      }),
+    );
+  }
+
+  /**
+   * Writes imported own plants (new ids, fixed by the import record, so writing again after
+   * an interruption changes nothing) and adjustments, which never replace one the user has.
+   */
+  async putImported(
+    userId: string,
+    own: readonly OwnPlantItem[],
+    overrides: readonly OverrideItem[],
+  ): Promise<void> {
+    const writes = [
+      ...own.map(
+        (item) => () =>
+          this.client.send(
+            new PutCommand({ TableName: this.tableName, Item: this.ownRecord(userId, item) }),
+          ),
+      ),
+      ...overrides.map(
+        (item) => () =>
+          this.ifConditionHolds(() =>
+            this.client.send(
+              new PutCommand({
+                TableName: this.tableName,
+                Item: { PK: userPk(userId), SK: overrideSk(item.plantId), ...item },
+                ConditionExpression: 'attribute_not_exists(PK)',
+              }),
+            ),
+          ),
+      ),
+    ];
+    for (let i = 0; i < writes.length; i += WRITE_CONCURRENCY) {
+      await Promise.all(writes.slice(i, i + WRITE_CONCURRENCY).map((write) => write()));
+    }
+  }
+
   private ownRecord(userId: string, item: OwnPlantItem) {
     const queue =
       item.publicationStatus === 'PENDING' && item.requestedAt

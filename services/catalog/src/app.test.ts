@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from './app';
 import type { UserCatalogItems } from './catalog/repository';
+import type { CatalogImportStore } from './catalog/import';
 import type { CatalogStore } from './catalog/service';
 import { createLogger } from '@hochbeet/service-kit';
 import { authorized, seedPlant, USER_A } from './test/fixtures';
 
-function setup(overrides: Partial<CatalogStore> = {}) {
+function setup(overrides: Partial<CatalogStore & CatalogImportStore> = {}) {
   const lines: Record<string, unknown>[] = [];
   const logger = createLogger({ service: 'catalog' }, (line) => {
     lines.push(JSON.parse(line) as Record<string, unknown>);
@@ -26,6 +27,9 @@ function setup(overrides: Partial<CatalogStore> = {}) {
     listPendingPublications: vi.fn(() => Promise.resolve([])),
     approvePublication: vi.fn(() => Promise.resolve(true)),
     rejectPublication: vi.fn(() => Promise.resolve(true)),
+    getImport: vi.fn(() => Promise.resolve(undefined)),
+    putImport: vi.fn(() => Promise.resolve()),
+    putImported: vi.fn(() => Promise.resolve()),
     ...overrides,
   };
   return { app: createApp({ store: repository, logger }), repository, lines };

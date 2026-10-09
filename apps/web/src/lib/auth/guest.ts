@@ -1,4 +1,4 @@
-import { GUEST_BACKUP_KEY, GUEST_STORAGE_KEY } from '@/lib/local-api/keys';
+import { GUEST_BACKUP_KEY, GUEST_IMPORT_ID_KEY, GUEST_STORAGE_KEY } from '@/lib/local-api/keys';
 
 /** Set while someone uses the app without an account; survives reloads. */
 export const GUEST_MODE_KEY = 'hochbeet-guest-mode';
@@ -34,6 +34,7 @@ export function deleteGuestData() {
   try {
     storage()?.removeItem(GUEST_STORAGE_KEY);
     storage()?.removeItem(GUEST_BACKUP_KEY);
+    storage()?.removeItem(GUEST_IMPORT_ID_KEY);
   } catch {
     // Nothing stored, nothing to delete.
   }

@@ -4,6 +4,7 @@ import { emptyGarden, type GardenRepository, type LocalGarden } from '@/lib/loca
 
 const STORAGE_KEY = 'hochbeet-mock-api';
 const CATALOG_KEY = 'hochbeet-mock-catalog';
+const IMPORTS_KEY = 'hochbeet-mock-imports';
 
 /**
  * Mock API data per user plus the global catalogue shared by all users (the start catalogue
@@ -42,6 +43,18 @@ export class MockStore {
 
   writeCatalog(plants: Plant[]) {
     this.storage.setItem(CATALOG_KEY, JSON.stringify(plants));
+  }
+
+  /** Stored response of an import, per user, service and import id (idempotency). */
+  readImport(key: string): unknown {
+    const raw = this.storage.getItem(IMPORTS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, unknown>)[key] : undefined;
+  }
+
+  writeImport(key: string, result: unknown) {
+    const raw = this.storage.getItem(IMPORTS_KEY);
+    const all = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    this.storage.setItem(IMPORTS_KEY, JSON.stringify({ ...all, [key]: result }));
   }
 
   private all(): Record<string, LocalGarden> {

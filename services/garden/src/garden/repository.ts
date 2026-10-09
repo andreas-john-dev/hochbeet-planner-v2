@@ -7,12 +7,21 @@ import {
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { type Bed, BedSchema, type Planting, PlantingSchema } from '@hochbeet/contracts';
-import { BED_PREFIX, bedSk, PLANTING_INFIX, plantingSk, userPk } from '../table';
+import { z } from 'zod';
+import { BED_PREFIX, bedSk, importSk, PLANTING_INFIX, plantingSk, userPk } from '../table';
 
 type Item = Record<string, unknown>;
 
-/** Deletes running in parallel; plain DeleteItem keeps the IAM policy to item actions. */
+/** Writes running in parallel; plain item actions keep the IAM policy small. */
 const DELETE_CONCURRENCY = 25;
+const WRITE_CONCURRENCY = 25;
+
+/** State of a guest import: new id per imported id, and the response once it is done. */
+export const ImportRecordSchema = z.object({
+  ids: z.record(z.string(), z.string()),
+  result: z.unknown().optional(),
+});
+export type ImportRecord = z.infer<typeof ImportRecordSchema>;
 
 export interface BedWithPlantings {
   bed: Bed;
@@ -130,6 +139,43 @@ export class GardenRepository {
     }
     await this.delete({ PK: userPk(userId), SK: bedSk(bedId) });
     return true;
+  }
+
+  async getImport(userId: string, importId: string): Promise<ImportRecord | undefined> {
+    const { Item } = await this.client.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { PK: userPk(userId), SK: importSk(importId) },
+      }),
+    );
+    return Item ? ImportRecordSchema.parse(Item) : undefined;
+  }
+
+  async putImport(userId: string, importId: string, record: ImportRecord): Promise<void> {
+    await this.client.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: { PK: userPk(userId), SK: importSk(importId), ...record },
+      }),
+    );
+  }
+
+  /**
+   * Writes imported beds and their plantings without conditions: the ids are new and fixed
+   * by the import record, so writing them again after an interruption changes nothing.
+   */
+  async putImported(userId: string, beds: readonly Bed[], plantings: readonly Planting[]) {
+    const items = [
+      ...beds.map((bed) => ({ PK: userPk(userId), SK: bedSk(bed.id), ...bed })),
+      ...plantings.map((p) => ({ PK: userPk(userId), SK: plantingSk(p.bedId, p.id), ...p })),
+    ];
+    for (let i = 0; i < items.length; i += WRITE_CONCURRENCY) {
+      await Promise.all(
+        items
+          .slice(i, i + WRITE_CONCURRENCY)
+          .map((Item) => this.client.send(new PutCommand({ TableName: this.tableName, Item }))),
+      );
+    }
   }
 
   private async ifConditionHolds(write: () => Promise<unknown>): Promise<boolean> {
