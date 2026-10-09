@@ -1,30 +1,11 @@
 import type { Page } from '@playwright/test';
 import { expect, open, signInAs, test } from './fixtures';
-import { bed, seedGarden } from './garden';
+import { bed, ownPlant, seedGarden } from './garden';
 
 const BED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0S1A';
 const ONION = '01M49THV006G34Z07ZJ8N4X0KS'; // Zwiebel
 const REJECTED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0P01';
 const LINKED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0P02';
-
-const ownPlant = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
-  id,
-  name,
-  category: 'GEMUESE',
-  family: 'Korbblütler',
-  feeder: 'SCHWACH',
-  spacingInRowCm: 10,
-  rowSpacingCm: 25,
-  lifecycle: { type: 'ANNUAL', cultureWeeks: 20 },
-  goodNeighbors: [],
-  badNeighbors: [],
-  color: '#c9a66b',
-  icon: 'category-gemuese',
-  source: 'OWN',
-  overridden: false,
-  publication: { status: 'PRIVATE' },
-  ...extra,
-});
 
 /** Places a plant from the palette in the middle of the bed, by keyboard or by tap. */
 async function plantInBed(page: Page, name: string, isMobile: boolean) {

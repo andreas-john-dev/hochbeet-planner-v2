@@ -86,8 +86,11 @@ test('shows the admin section only to admins', async ({ page }) => {
   await open(page, '/beete', 'Meine Beete');
   const nav = page.getByRole('navigation', { name: 'Hauptnavigation' }).filter({ visible: true });
   await expect(nav.getByRole('link', { name: 'Admin' })).toHaveCount(0);
-  await page.goto('/admin');
-  await expect(page.getByRole('heading', { level: 1, name: 'Meine Beete' })).toBeVisible();
+  // A direct call shows a 403 page instead of the admin area.
+  await open(page, '/admin', 'Kein Zugriff');
+  await expect(page.getByText(/Fehler 403/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Warteschlange' })).toHaveCount(0);
+  await open(page, `/admin/sorten/neu`, 'Kein Zugriff');
 });
 
 test('lists every page in pages.ts', () => {

@@ -69,9 +69,10 @@ describe('App', () => {
       expect(links.map((l) => l.textContent)).toEqual(['Beete', 'Katalog', 'Profil']);
     });
 
-    it('cannot open the admin page', async () => {
+    it('gets a 403 page for the admin area', async () => {
       await renderAt('/admin', 'user');
-      expect(await heading('Meine Beete')).toBeVisible();
+      expect(await heading('Kein Zugriff')).toBeVisible();
+      expect(screen.getByText(/Fehler 403/)).toBeVisible();
     });
 
     it('leaves the sign-in page for the app', async () => {

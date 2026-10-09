@@ -203,4 +203,77 @@ describe('mock API', () => {
     expect(names).toEqual(['Haferwurzel']);
     expect(await plantsOf('b@example.com')).toHaveLength(56);
   });
+
+  it('lets admins approve, reject and maintain global plants', async () => {
+    const admin = { Authorization: 'Bearer mock-id-token.admin@example.com|admins' };
+    const call = (path: string, method: string, headers: Record<string, string>, body?: unknown) =>
+      fetchFn(path, {
+        method,
+        headers: { ...headers, ...json },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    const fields = {
+      name: 'Haferwurzel',
+      category: 'GEMUESE',
+      family: 'Korbblütler',
+      feeder: 'SCHWACH',
+      spacingInRowCm: 10,
+      rowSpacingCm: 25,
+      lifecycle: { type: 'ANNUAL', cultureWeeks: 20 },
+      goodNeighbors: [],
+      badNeighbors: [],
+      color: '#c9a66b',
+      icon: 'category-gemuese',
+    };
+    const create = async (name: string) => {
+      const response = await call('/api/catalog/plants', 'POST', auth('a@example.com'), {
+        ...fields,
+        name,
+      });
+      const { id } = (await response.json()) as { id: string };
+      await call(`/api/catalog/plants/${id}/publication`, 'POST', auth('a@example.com'));
+      return id;
+    };
+    const approved = await create('Haferwurzel');
+    const rejected = await create('Zuckerhut');
+
+    // Not for normal users.
+    const forbidden = await call('/api/catalog/admin/publications', 'GET', auth('a@example.com'));
+    expect(forbidden.status).toBe(403);
+
+    const queue = (await (await call('/api/catalog/admin/publications', 'GET', admin)).json()) as {
+      requests: { plant: { id: string }; requestedBy: string }[];
+    };
+    expect(queue.requests.map((r) => [r.plant.id, r.requestedBy])).toEqual([
+      [approved, 'a@example.com'],
+      [rejected, 'a@example.com'],
+    ]);
+
+    await call(`/api/catalog/admin/publications/${approved}/approve`, 'POST', admin, {
+      corrections: { rowSpacingCm: 30 },
+    });
+    await call(`/api/catalog/admin/publications/${rejected}/reject`, 'POST', admin, {
+      comment: 'Gibt es schon als Endivie.',
+    });
+
+    // The approved plant is global now, with the same id, for everyone.
+    const other = (await plantsOf('b@example.com')).find((p) => p.id === approved);
+    expect(other).toMatchObject({ source: 'GLOBAL', rowSpacingCm: 30 });
+    const own = (await plantsOf('a@example.com')).filter((p) => p.source === 'OWN');
+    expect(own).toEqual([
+      expect.objectContaining({
+        id: rejected,
+        publication: { status: 'PRIVATE', rejectionComment: 'Gibt es schon als Endivie.' },
+      }),
+    ]);
+
+    const global = await call('/api/catalog/admin/plants', 'POST', admin, {
+      ...fields,
+      name: 'Yacón',
+    });
+    expect(global.status).toBe(201);
+    const { id } = (await global.json()) as { id: string };
+    await call(`/api/catalog/admin/plants/${id}`, 'PUT', admin, { ...fields, name: 'Yacon' });
+    expect((await plantsOf('b@example.com')).find((p) => p.id === id)?.name).toBe('Yacon');
+  });
 });

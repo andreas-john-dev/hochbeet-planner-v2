@@ -40,10 +40,18 @@ test('auth pages have no horizontal scrollbar at 375 px', async ({ page }) => {
 
 test('app pages have no horizontal scrollbar at 375 px', async ({ page }) => {
   await signInAs(page, 'admin');
-  // Pages that need data (the bed editor) all share the example garden.
+  // One user for all pages: the seeds of all pages that need data, merged.
+  const seeds = appPages.flatMap((p) => (p.seed ? [p.seed] : []));
+  const unique = (items: unknown[]) => [
+    ...new Map(items.map((item) => [(item as { id: string }).id, item])).values(),
+  ];
   await seedGarden(
     page,
-    appPages.find((p) => p.seed)?.seed ?? { beds: [], plantings: [] },
+    {
+      beds: unique(seeds.flatMap((s) => s.beds)),
+      plantings: unique(seeds.flatMap((s) => s.plantings)),
+      ownPlants: unique(seeds.flatMap((s) => s.ownPlants ?? [])),
+    },
     USERS.admin.email,
   );
   await page.setViewportSize({ width: 375, height: 812 });

@@ -7,8 +7,10 @@ import type {
   ListPlantsResponse,
   Planting,
   PlantingFields,
+  Plant,
   PlantFields,
   PlantOverride,
+  PublicationQueueResponse,
 } from '@hochbeet/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api-context';
@@ -17,6 +19,7 @@ export const queryKeys = {
   beds: ['beds'] as const,
   bed: (bedId: string) => ['beds', bedId] as const,
   plants: ['plants'] as const,
+  publications: ['publications'] as const,
 };
 
 export function useBeds() {
@@ -85,6 +88,57 @@ export function useRequestPublication(plantId: string) {
   return useMutation({
     mutationFn: () =>
       api<CatalogPlant>(`/api/catalog/plants/${plantId}/publication`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.plants }),
+  });
+}
+
+/** Admins: open publication requests, oldest first. */
+export function usePublicationQueue() {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.publications,
+    queryFn: async () =>
+      (await api<PublicationQueueResponse>('/api/catalog/admin/publications')).requests,
+  });
+}
+
+/** Admins: decide a request; afterwards queue and catalogue are reloaded. */
+export function useDecidePublication(plantId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      decision:
+        { approve: true; corrections: PlantOverride | null } | { approve: false; comment: string },
+    ) =>
+      decision.approve
+        ? api<Plant>(`/api/catalog/admin/publications/${plantId}/approve`, {
+            method: 'POST',
+            body: JSON.stringify(decision.corrections ? { corrections: decision.corrections } : {}),
+          })
+        : api<undefined>(`/api/catalog/admin/publications/${plantId}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ comment: decision.comment }),
+          }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.publications }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.plants }),
+      ]);
+    },
+  });
+}
+
+/** Admins: creates (without id) or changes a global plant. */
+export function useSaveGlobalPlant() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fields }: { id?: string; fields: PlantFields }) =>
+      api<Plant>(id ? `/api/catalog/admin/plants/${id}` : '/api/catalog/admin/plants', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(fields),
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.plants }),
   });
 }
