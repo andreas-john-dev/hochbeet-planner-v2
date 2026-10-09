@@ -99,3 +99,19 @@ Wer die Einrichtung schon vor der eigenen Domain gemacht hat, braucht einmalig:
 | `Prod-Certificate` hängt lange in `CREATE_IN_PROGRESS` | ACM wartet auf die DNS-Validierung; die Hosted Zone muss die öffentlich delegierte Zone von `andi-john-dev.de` sein. |
 | `This stack uses assets, so the toolkit stack must be deployed` | Schritt 1 fehlt. |
 | `Unable to fetch parameters [/hochbeet/prod/shared/…]` | `Prod-SharedStateful` ist nicht deployt; `cdk deploy --all` deployt ihn eigentlich vor `Prod-Frontend`. |
+| `… is in UPDATE_ROLLBACK_FAILED state and can not be updated` | Ein vorheriger Deploy ist gescheitert und auch sein Rollback. Der Stack muss einmal manuell weiterrollen, bevor die Pipeline wieder deployen kann (siehe unten). |
+| `Unable to find Route by key … within the provided RouteSettings` | Die Stage wurde vor der Route aktualisiert, die ihre `RouteSettings` nennen. `ServiceApiStack` setzt dafür eine explizite Abhängigkeit der Stage auf die öffentlichen Routen (seit dem Fix nach T-37). |
+
+### Stack in `UPDATE_ROLLBACK_FAILED`
+
+CloudFormation blockiert jedes weitere Update, bis der Rollback abgeschlossen ist. Mit Admin-Rechten im Konto (nicht über die Deploy-Rolle der Pipeline):
+
+1. In der Konsole unter CloudFormation → Stack → **Stack-Aktionen → Rollback für Update fortsetzen** öffnen und die Ressource überspringen, deren Rollback scheiterte (sie steht in den Stack-Events), oder per CLI:
+
+   ```bash
+   aws cloudformation continue-update-rollback --region eu-central-1 \
+     --stack-name Prod-CatalogStateless --resources-to-skip ApiDefaultStage189A7074
+   ```
+
+2. Warten, bis der Stack `UPDATE_ROLLBACK_COMPLETE` meldet.
+3. Den letzten Deploy-Lauf in GitHub neu starten (oder den Fix mergen); er bringt die übersprungene Ressource wieder auf den Stand des Codes.

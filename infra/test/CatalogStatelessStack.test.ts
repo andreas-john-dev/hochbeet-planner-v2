@@ -120,6 +120,19 @@ describe('CatalogStatelessStack', () => {
     template.allResourcesProperties('AWS::Logs::LogGroup', { RetentionInDays: 30 });
   });
 
+  it('creates the public route before the stage names it in its route settings', () => {
+    const [routeId] = Object.entries(template.findResources('AWS::ApiGatewayV2::Route')).find(
+      ([, r]) =>
+        (r as { Properties: { RouteKey: string } }).Properties.RouteKey ===
+        'GET /api/catalog/public/plants',
+    ) ?? [''];
+    expect(routeId).not.toBe('');
+    const [stage] = Object.values(template.findResources('AWS::ApiGatewayV2::Stage')) as {
+      DependsOn?: string[];
+    }[];
+    expect(stage?.DependsOn).toContain(routeId);
+  });
+
   it('publishes the API domain for CloudFront', () => {
     template.hasResourceProperties('AWS::SSM::Parameter', {
       Name: '/hochbeet/prod/catalog/api-domain',
