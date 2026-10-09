@@ -82,7 +82,9 @@ test.describe('editor on the phone', () => {
     await page.getByRole('button', { name: 'Pflanze hinzufügen' }).tap();
     const sheet = page.getByRole('dialog', { name: 'Pflanze hinzufügen' });
     await expect(sheet.getByRole('button', { name: 'Aubergine' })).toBeVisible();
-    await expect(page).toHaveScreenshot('palette-sheet.png');
+    // Only the sheet: the dimmed page behind it varied between CI runners and is covered by
+    // the other screenshots.
+    await expect(sheet).toHaveScreenshot('palette-sheet.png');
     await sheet.getByRole('searchbox', { name: 'Sorte suchen' }).fill('Tomate');
     await sheet.getByRole('button', { name: 'Tomate' }).tap();
     await expect(sheet).toBeHidden();
@@ -150,7 +152,7 @@ test.describe('editor on the phone', () => {
       const box = await target.boundingBox();
       expect(box?.height, await target.innerText()).toBeGreaterThanOrEqual(44);
     }
-    await expect(page).toHaveScreenshot('details-sheet.png');
+    await expect(sheet).toHaveScreenshot('details-sheet.png');
 
     await sheet.getByRole('button', { name: 'Auswahl aufheben' }).tap();
     await expect(sheet).toBeHidden();
