@@ -86,6 +86,10 @@ test('creates an own plant, uses it in a bed and asks for publication', async ({
   await expect(status).toHaveAttribute('data-state', 'pending');
   await expect(status.getByRole('heading')).toHaveText('Status: Angefragt');
   await expect(page.getByRole('button', { name: 'Für alle vorschlagen' })).toHaveCount(0);
+  // The click may have scrolled the button into view on small screens; compare from the top.
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
   await expect(page).toHaveScreenshot('own-plant-pending.png');
 });
 
