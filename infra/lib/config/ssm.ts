@@ -8,4 +8,6 @@ export const ssmParameters = (stage: StageConfig) => ({
   catalogApiDomain: `/hochbeet/${stage.name}/catalog/api-domain`,
   gardenTableName: `/hochbeet/${stage.name}/garden/table-name`,
   gardenApiDomain: `/hochbeet/${stage.name}/garden/api-domain`,
+  assistantQuotaTableName: `/hochbeet/${stage.name}/assistant/quota-table-name`,
+  assistantRuntimeArn: `/hochbeet/${stage.name}/assistant/runtime-arn`,
 });

@@ -6,6 +6,19 @@ export interface DomainConfig {
   readonly hostedZoneName: string;
 }
 
+export interface AssistantConfig {
+  /** Inference profile the agent calls (EU cross-region), e.g. `eu.anthropic.claude-…`. */
+  readonly modelId: string;
+  /** Foundation model behind the profile; the profile routes to it in several EU regions. */
+  readonly foundationModelId: string;
+  /** Questions per user and day (Europe/Berlin); the hard cost limit. */
+  readonly dailyMessageLimit: number;
+  /** Output tokens per answer. */
+  readonly maxTokens: number;
+  /** Cognito groups that may use the assistant; the runtime's authorizer checks them. */
+  readonly allowedGroups: readonly string[];
+}
+
 export interface StageConfig {
   /** Lower-case stage name, used in SSM parameter paths. */
   readonly name: string;
@@ -18,7 +31,14 @@ export interface StageConfig {
    * only when the deploy passes a password (GitHub secret SMOKE_USER_PASSWORD).
    */
   readonly smokeUserEmail: string;
+  /** Beet-Assistent on Bedrock AgentCore (Epic #89). */
+  readonly assistant: AssistantConfig;
+  /** Monthly AWS budget of the whole account in USD; alerts at 80 % and 100 %. */
+  readonly monthlyBudgetUsd: number;
 }
+
+/** Group of users who may try the assistant; admins may too. */
+export const AI_TESTERS_GROUP = 'ai-testers';
 
 /** Deployment stages. Only `prod` for now; `dev` can be added later. */
 export const stages: readonly StageConfig[] = [
@@ -32,6 +52,14 @@ export const stages: readonly StageConfig[] = [
       hostedZoneName: 'andi-john-dev.de',
     },
     smokeUserEmail: 'smoke-test@hochbeet.andi-john-dev.de',
+    assistant: {
+      modelId: 'eu.anthropic.claude-haiku-4-5-20251001-v1:0',
+      foundationModelId: 'anthropic.claude-haiku-4-5-20251001-v1:0',
+      dailyMessageLimit: 20,
+      maxTokens: 1024,
+      allowedGroups: [AI_TESTERS_GROUP, 'admins'],
+    },
+    monthlyBudgetUsd: 10,
   },
 ];
 

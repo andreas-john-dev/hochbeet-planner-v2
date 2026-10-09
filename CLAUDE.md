@@ -1,7 +1,7 @@
 # Hochbeet-Planer – Hinweise für Claude Code
 
 Web-App zum Planen von Hochbeeten mit Warnungen zu Pflanzabstand, Nachbarschaft, Starkzehrern und Fruchtfolge.
-TypeScript-Monorepo: React-Frontend, serverless AWS-Backend, CDK.
+TypeScript-Monorepo: React-Frontend, serverless AWS-Backend, CDK; dazu ein Python-Agent (Beet-Assistent auf Bedrock AgentCore).
 
 ## Referenzen
 
@@ -31,7 +31,7 @@ TypeScript-Monorepo: React-Frontend, serverless AWS-Backend, CDK.
 
 ## Befehle
 
-Node 22, pnpm 10 (über `packageManager` in `package.json`). Alle Root-Befehle laufen über Turborepo.
+Node 22, pnpm 10 (über `packageManager` in `package.json`), für den Agenten uv (Python 3.13 aus `.python-version`). Alle Root-Befehle laufen über Turborepo.
 
 ```bash
 pnpm install
@@ -50,10 +50,12 @@ pnpm --filter e2e screenshots    # Ganzseiten-Screenshots aller Seiten nach e2e/
 pnpm --filter e2e lighthouse     # Lighthouse mobil gegen den Produktions-Build (vite preview), Schwelle 90; Berichte in e2e/lighthouse-out/
 SMOKE_BASE_URL=https://… pnpm --filter e2e smoke   # Smoke-Tests gegen eine deployte Stage; mit SMOKE_USER_EMAIL/-PASSWORD auch angemeldet
 pnpm --filter infra cdk synth    # CDK-CLI direkt, z. B. auch `cdk diff` oder `cdk ls`
+(cd agents/bed-assistant && uv sync)   # Python-Umgebung des Agenten; pnpm lint/typecheck/test/build rufen ruff, mypy, pytest und scripts/build.sh über uv auf
+pnpm --filter @hochbeet/bed-assistant format   # ruff format für den Agenten (Prettier kennt kein Python)
 ```
 
 Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `packages/*`,
-`@hochbeet/catalog-service` und `@hochbeet/garden-service` (gemeinsamer Service-Code in `@hochbeet/service-kit`).
+`@hochbeet/catalog-service` und `@hochbeet/garden-service` (gemeinsamer Service-Code in `@hochbeet/service-kit`), `@hochbeet/bed-assistant` für den Agenten in `agents/bed-assistant`.
 Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
 Deployment: `deploy.yml` deployt jeden grünen `main`-Commit per OIDC nach `prod` und führt danach die Smoke-Tests aus;
 einmalige Einrichtung und Fehlersuche in `docs/deployment.md`.
@@ -103,6 +105,7 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 - UI-Texte und Fehlermeldungen auf Deutsch; Code, Bezeichner, Kommentare und Commits auf Englisch (Conventional Commits).
 - Region `eu-central-1`, Stage-Konfiguration in `infra/lib/config/stages.ts` (zunächst nur `prod`).
 - Werte zwischen Stacks über SSM-Parameter; Namen nur in `infra/lib/config/ssm.ts` definieren.
+- Beet-Assistent (`agents/bed-assistant`): Python 3.13 mit Strands Agents, ruff, mypy strict, pytest; Requests spiegeln `AssistantRequestSchema` aus `packages/contracts` (Grenzen reicht Infra als Umgebungsvariablen durch). Deployt als Code-Zip (`dist/` aus `scripts/build.sh`, Wheels für Linux ARM64) auf die AgentCore Runtime in `infra/lib/assistant/`; die Runtime-Rolle bekommt nur `bedrock:InvokeModel*` auf das konfigurierte Modell, nie Marketplace-Rechte. Kostengrenzen (Tageskontingent, `maxTokens`, Gruppen, Budget) nie lockern, ohne den User zu fragen.
 - cdk-nag 3: Ausnahmen per `Validations.of(construct).acknowledge({ id, reason })` (nicht `NagSuppressions`) und in `docs/architecture.md` unter „cdk-nag“ eintragen.
 
 ## Was nicht aus Sessions passiert

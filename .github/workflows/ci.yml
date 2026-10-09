@@ -30,6 +30,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # Python for the Beet-Assistent (agents/bed-assistant); the Python version comes from
+      # its .python-version, uv downloads it if the runner lacks it.
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: agents/*/uv.lock
+
       - run: pnpm install --frozen-lockfile
 
       # Local Turborepo cache: unchanged packages are restored instead of re-run.

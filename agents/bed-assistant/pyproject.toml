@@ -1,0 +1,51 @@
+[project]
+name = "bed-assistant"
+version = "0.0.0"
+description = "Beet-Assistent des Hochbeet-Planers auf Bedrock AgentCore (Strands Agents)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "bedrock-agentcore>=1.24,<2",
+  "boto3>=1.40,<2",
+  "strands-agents>=1.59,<2",
+]
+
+[dependency-groups]
+dev = [
+  "boto3-stubs[dynamodb]>=1.40",
+  "moto[dynamodb]>=5.1",
+  "mypy>=1.18",
+  "pytest>=8.4",
+  "pytest-asyncio>=1.2",
+  "ruff>=0.14",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S", "PT"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+mypy_path = "src"
+files = ["src", "tests", "main.py"]
+
+[[tool.mypy.overrides]]
+module = ["strands.*", "bedrock_agentcore.*", "moto.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# Third-party: bedrock-agentcore still uses class-based pydantic config.
+filterwarnings = ["ignore::pydantic.PydanticDeprecatedSince20"]

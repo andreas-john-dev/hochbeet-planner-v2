@@ -1,6 +1,18 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "agentGuidance": false,
+  "globalPassThroughEnv": [
+    "UV_*",
+    "PIP_*",
+    "SSL_CERT_FILE",
+    "REQUESTS_CA_BUNDLE",
+    "CURL_CA_BUNDLE",
+    "NODE_EXTRA_CA_CERTS",
+    "HTTPS_PROXY",
+    "https_proxy",
+    "NO_PROXY",
+    "no_proxy"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

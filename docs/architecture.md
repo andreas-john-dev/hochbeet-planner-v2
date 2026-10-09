@@ -258,6 +258,8 @@ hochbeet-planer/
 ├── services/
 │   ├── catalog/                # Lambdalith (Hono), Handler, Repository, Tests
 │   └── garden/
+├── agents/
+│   └── bed-assistant/          # Beet-Assistent: Python, Strands Agents, AgentCore Runtime
 ├── packages/
 │   ├── garden-rules/           # Regel-Engine (pure TS, Frontend + Backend)
 │   ├── contracts/              # Zod-Schemas = API-Typen für FE und BE
@@ -271,6 +273,7 @@ hochbeet-planer/
 │       ├── shared/SharedStatefulStack.ts
 │       ├── catalog/{Stateful,Stateless}Stack.ts
 │       ├── garden/{Stateful,Stateless}Stack.ts
+│       ├── assistant/Assistant{Stateful,}Stack.ts
 │       └── frontend/FrontendStack.ts
 ├── e2e/                        # Playwright
 ├── docs/                       # architecture.md, startkatalog.md
@@ -278,7 +281,7 @@ hochbeet-planer/
 └── .github/workflows/
 ```
 
-Weiteres Tooling: TypeScript im Strict-Mode, ESLint mit Prettier, Vitest als einheitlicher Test-Runner und Zod als einzige Quelle für API-Typen. Frontend und Lambdas importieren dieselben Schemas aus `packages/contracts`.
+Einzige Ausnahme von TypeScript ist der Agent in `agents/bed-assistant` (Python, siehe „Beet-Assistent“). Weiteres Tooling: TypeScript im Strict-Mode, ESLint mit Prettier, Vitest als einheitlicher Test-Runner und Zod als einzige Quelle für API-Typen. Frontend und Lambdas importieren dieselben Schemas aus `packages/contracts`.
 
 ## Backend
 
@@ -424,6 +427,35 @@ Meldet sich ein Gast an oder registriert sich, fragt die App nach der Übernahme
 - **Grenzen:** höchstens 50 Beete, 1000 Pflanzungen, 200 eigene Sorten und 200 Anpassungen je Import, mit deutscher Meldung; das reicht weit für alles, was ein Gast im Browser plant, und hält einen Request klein.
 - **Schreiben:** einzelne `PutItem`-Aufrufe, 25 parallel; die IAM-Policies der Lambdas bleiben unverändert.
 - **Frontend:** `GuestImportDialog` (im `AppShell`, nur angemeldet) liest die Gastdaten (`createGuestRepository()`), nennt, was in diesem Browser liegt, und bietet „Übernehmen“ bzw. „Lokale Beete hinzufügen“, wenn das Konto schon Beete hat, dazu „Verwerfen“ und „Später“. Nach Erfolg löscht es die Gastdaten und lädt alle Abfragen neu; bei Fehlern bleiben die Daten, und die Meldung kommt über `apiErrorMessage()`. Die Logik liegt in `src/lib/guest-import.ts`, die Mock-API bildet beide Endpunkte nach.
+
+### Beet-Assistent (Epic #89)
+
+Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Experiment mit Bedrock AgentCore, deshalb mit harten Kostengrenzen von Anfang an.
+
+**Agent (`agents/bed-assistant`, Python 3.13, T-40):**
+
+- Strands Agents mit `BedrockModel` (Claude Haiku 4.5 über das EU-Inference-Profil, `temperature` 0,3, höchstens 1024 Ausgabe-Tokens). Die Modell-ID steht in der Stage-Konfiguration und lässt sich für Vergleiche (T-45) austauschen.
+- Einstieg `main.py` → `bed_assistant.app`: `BedrockAgentCoreApp` mit einem Entrypoint. Er prüft der Reihe nach Aufrufer (401), Gruppe (403, zweite Verteidigungslinie nach dem Authorizer), Eingabe (400) und Tageskontingent (429) und streamt erst dann die Antwort.
+- Request wie `AssistantRequestSchema` in `packages/contracts/src/api/assistant.ts`: `message` (höchstens 2000 Zeichen, Infra reicht die Konstante als `MAX_INPUT_CHARS` an den Agenten) und optional `bed` (Beet mit Pflanzungen, als JSON vor die Frage gesetzt, auf 6000 Zeichen gekürzt). Python spiegelt das Schema mit pydantic.
+- Antwort als Server-Sent Events (`AssistantEventSchema`): `{"text"}` je Teilstück, am Ende `{"done": true, "remaining": n}`; scheitert das Modell mittendrin, `{"error"}` mit deutscher Meldung. Fehler vor dem Stream kommen als JSON `{"message"}` wie bei den Services. Der Header `X-Quota-Remaining` nennt die übrigen Fragen.
+- Der Aufrufer kommt aus dem ID-Token, das die Runtime bereits geprüft hat (Header `Authorization` ist dafür freigegeben); die `userId` ist wie überall `sub`.
+- Noch ohne Tools (T-41) und ohne Gedächtnis (T-44): ein frischer Agent pro Frage, also genau ein Modellaufruf.
+- Tooling über uv: ruff (Lint und Format), mypy strict, pytest mit moto für DynamoDB. Die Skripte in `package.json` binden das in Turborepo ein, `pnpm lint/typecheck/test/build` prüfen den Agenten also mit.
+
+**Kostengrenzen:**
+
+- Tageskontingent je User (Standard 20 Fragen, Tag nach Europe/Berlin) in `Prod-AssistantStateful`: ein Zähler-Item `USER#<sub>` / `DAY#<datum>`, per bedingtem `UpdateItem` hochgezählt, sodass auch parallele Anfragen die Grenze nicht überschreiten. Zähler laufen nach zwei Tagen per TTL ab.
+- Höchstens 1024 Ausgabe-Tokens, 2000 Zeichen Frage, 6000 Zeichen Beetkontext.
+- Zugang nur für die Cognito-Gruppen `ai-testers` und `admins`; Gäste nie.
+- AWS-Budget (`Prod-SharedStateful`) für das ganze Konto, 10 USD im Monat, Mails bei 80 % und 100 % der tatsächlichen Kosten an die GitHub-Variable `BUDGET_ALERT_EMAIL`.
+
+**Runtime (`Prod-Assistant`):**
+
+- Code-Deployment statt Container: `pnpm --filter @hochbeet/bed-assistant build` legt in `dist/` den Agenten samt aller Abhängigkeiten als Wheels für Linux ARM64 und Python 3.13 ab (rund 80 MB); CDK lädt das als Zip-Asset hoch (`AgentRuntimeArtifact.fromCodeAsset`). So braucht die Pipeline weder Docker noch ECR.
+- Eingehend ein JWT-Authorizer auf den Cognito User Pool: Audience ist der SPA-Client, und der Claim `cognito:groups` muss `ai-testers` oder `admins` enthalten (`CONTAINS_ANY`).
+- Die Rolle darf genau ein Modell aufrufen (Inference-Profil plus das Modell dahinter in den EU-Regionen) und im Kontingent zählen; keine Marketplace-Rechte. Claude-Modelle muss ein User mit Marketplace-Rechten einmal pro Konto selbst aufrufen, damit Bedrock das Abo anlegt (siehe `docs/deployment.md`).
+- Observability: X-Ray-Tracing und Usage-Logs nach CloudWatch (`/aws/vendedlogs/bedrock-agentcore/<stage>-bed-assistant-usage`); die Ausgaben des Agenten landen im Log der Runtime.
+- Aufruf: `POST https://bedrock-agentcore.<region>.amazonaws.com/runtimes/<URL-kodierte ARN>/invocations?qualifier=DEFAULT` mit `Authorization: Bearer <ID-Token>` und einer Session-ID von mindestens 33 Zeichen im Header `X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`. Die ARN steht im SSM-Parameter und als Stack-Output; die Smoke-Tests stellen nach jedem Deploy eine kurze Frage.
 
 ### Gemeinsamer Service-Code
 
@@ -615,15 +647,17 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
 
 ## IaC
 
-Eine CDK-App in TypeScript deployt sechs Stacks nach `eu-central-1` und den Zertifikat-Stack nach `us-east-1`. Werte zwischen Stacks fließen über SSM-Parameter statt CloudFormation-Exports, damit spätere Änderungen nicht an Export-Sperren scheitern. Einzige Ausnahme ist die Zertifikats-ARN: Sie kommt per `crossRegionReferences` von CDK, das den Wert selbst über SSM-Parameter in die andere Region überträgt.
+Eine CDK-App in TypeScript deployt acht Stacks nach `eu-central-1` und den Zertifikat-Stack nach `us-east-1`. Werte zwischen Stacks fließen über SSM-Parameter statt CloudFormation-Exports, damit spätere Änderungen nicht an Export-Sperren scheitern. Einzige Ausnahme ist die Zertifikats-ARN: Sie kommt per `crossRegionReferences` von CDK, das den Wert selbst über SSM-Parameter in die andere Region überträgt.
 
 | Stack | Inhalt | Liest aus SSM |
 | --- | --- | --- |
-| `Prod-SharedStateful` | Cognito User Pool, SPA-Client (ohne Secret, SRP), Gruppe `admins` | – |
+| `Prod-SharedStateful` | Cognito User Pool, SPA-Client (ohne Secret, SRP), Gruppen `admins` und `ai-testers`, monatliches AWS-Budget mit Alarm | – |
 | `Prod-CatalogStateful` | DynamoDB-Tabelle mit GSI, Seed per Custom Resource | – |
 | `Prod-CatalogStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
 | `Prod-GardenStateful` | DynamoDB-Tabelle | – |
 | `Prod-GardenStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
+| `Prod-AssistantStateful` | DynamoDB-Tabelle für das Tageskontingent des Assistenten (TTL) | – |
+| `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer, Tracing und Usage-Logs | User Pool, Kontingent-Tabelle |
 | `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
 | `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds | User Pool, API-URLs; Zertifikat per Cross-Region-Referenz |
 
@@ -661,6 +695,8 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 | `/hochbeet/<stage>/catalog/api-domain` | `Prod-CatalogStateless` | Domain der Catalog-HTTP-API, Origin für `/api/catalog/*` in CloudFront |
 | `/hochbeet/<stage>/garden/table-name` | `Prod-GardenStateful` | Name der Garden-Tabelle |
 | `/hochbeet/<stage>/garden/api-domain` | `Prod-GardenStateless` | Domain der Garden-HTTP-API, Origin für `/api/garden/*` in CloudFront |
+| `/hochbeet/<stage>/assistant/quota-table-name` | `Prod-AssistantStateful` | Tabelle der Tageskontingente, gelesen von `Prod-Assistant` |
+| `/hochbeet/<stage>/assistant/runtime-arn` | `Prod-Assistant` | ARN der AgentCore Runtime, für das Frontend (T-42) |
 
 ### Cognito-Konfiguration
 
@@ -686,6 +722,7 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Passwort-Funktion des Smoke-Testusers (`SharedStatefulStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; sonst darf die Funktion nur `AdminSetUserPassword` auf diesem User Pool. |
+| `AwsSolutions-IAM5` | Rolle der AgentCore Runtime (`AssistantStack`) | Das EU-Inference-Profil leitet auf dasselbe Modell in mehreren EU-Regionen, deshalb braucht die Modell-ARN eine Regions-Wildcard. Die übrigen Wildcards (eigene Logs, X-Ray, Metriken mit Namespace-Bedingung, Workload Identity, Lesezugriff auf den CDK-Asset-Bucket für den Code-Zip) erzeugt das L2-Construct selbst. Jeder Fund ist einzeln bestätigt. |
 | `AwsSolutions-L1`, `-IAM4`, `-IAM5` | Lambda von `BucketDeployment` | Von aws-cdk-lib erzeugt und verwaltet; Rolle und Runtime lassen sich nicht sinnvoll anpassen. Die IAM5-Funde sind einzeln bestätigt. |
 
 ## Testing & CI/CD

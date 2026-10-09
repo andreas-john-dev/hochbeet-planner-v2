@@ -16,7 +16,9 @@
     "constructs": "^10.8.1"
   },
   "devDependencies": {
+    "@hochbeet/bed-assistant": "workspace:*",
     "@hochbeet/catalog-service": "workspace:*",
+    "@hochbeet/contracts": "workspace:*",
     "@hochbeet/garden-service": "workspace:*",
     "aws-cdk": "^2.1144.0",
     "tsx": "^4.23.15",

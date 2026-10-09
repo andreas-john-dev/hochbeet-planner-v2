@@ -11,6 +11,7 @@ import {
   type StackProps,
   Validations,
 } from 'aws-cdk-lib';
+import * as budgets from 'aws-cdk-lib/aws-budgets';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -18,7 +19,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import { ssmParameters } from '../config/ssm';
-import type { StageConfig } from '../config/stages';
+import { AI_TESTERS_GROUP, type StageConfig } from '../config/stages';
 
 /**
  * Handler of Custom::SmokeUserPassword. Runs with the SDK of the Lambda runtime and answers
@@ -54,9 +55,14 @@ exports.handler = async (event) => {
 
 export interface SharedStatefulStackProps extends StackProps {
   readonly stage: StageConfig;
+  /**
+   * Receives the budget alerts. Comes from the GitHub variable BUDGET_ALERT_EMAIL via CDK
+   * context, so it never lands in the repository; without it the budget has no alerts.
+   */
+  readonly budgetAlertEmail?: string;
 }
 
-/** Cognito user pool shared by all services. Stateful: retained on delete. */
+/** Cognito user pool shared by all services, plus the account's cost budget. Retained on delete. */
 export class SharedStatefulStack extends Stack {
   readonly userPool: cognito.UserPool;
   readonly userPoolClient: cognito.UserPoolClient;
@@ -97,6 +103,11 @@ export class SharedStatefulStack extends Stack {
       groupName: 'admins',
       description: 'Admins maintain global plants and the publication queue',
     });
+    new cognito.UserPoolGroup(this, 'AiTestersGroup', {
+      userPool: this.userPool,
+      groupName: AI_TESTERS_GROUP,
+      description: 'May use the Beet-Assistent (Bedrock AgentCore) while it is being tried out',
+    });
 
     const names = ssmParameters(props.stage);
     new ssm.StringParameter(this, 'UserPoolIdParameter', {
@@ -109,6 +120,11 @@ export class SharedStatefulStack extends Stack {
     });
 
     this.addSmokeUser(props.stage.smokeUserEmail);
+    this.addBudget(
+      `hochbeet-${props.stage.name}-monthly`,
+      props.stage.monthlyBudgetUsd,
+      props.budgetAlertEmail,
+    );
 
     // Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag").
     Validations.of(this.userPool).acknowledge({
@@ -120,6 +136,33 @@ export class SharedStatefulStack extends Stack {
       id: 'AwsSolutions-COG8',
       reason:
         'Threat protection needs the Plus feature plan, which is billed per user; the app should cost close to nothing when idle.',
+    });
+  }
+
+  /**
+   * Monthly cost budget of the whole account; mails at 80 % and 100 % of actual costs.
+   * A runaway assistant (or anything else) shows up within a day.
+   */
+  private addBudget(name: string, limitUsd: number, email: string | undefined) {
+    const subscribers = email ? [{ subscriptionType: 'EMAIL', address: email }] : [];
+    new budgets.CfnBudget(this, 'MonthlyBudget', {
+      budget: {
+        budgetName: name,
+        budgetType: 'COST',
+        timeUnit: 'MONTHLY',
+        budgetLimit: { amount: limitUsd, unit: 'USD' },
+      },
+      notificationsWithSubscribers: subscribers.length
+        ? [80, 100].map((threshold) => ({
+            notification: {
+              notificationType: 'ACTUAL',
+              comparisonOperator: 'GREATER_THAN',
+              threshold,
+              thresholdType: 'PERCENTAGE',
+            },
+            subscribers,
+          }))
+        : undefined,
     });
   }
 
@@ -181,6 +224,14 @@ export class SharedStatefulStack extends Stack {
       },
     });
     passwordResource.node.addDependency(user);
+    // The smoke test also asks the assistant once.
+    const tester = new cognito.CfnUserPoolUserToGroupAttachment(this, 'SmokeUserAiTester', {
+      userPoolId: this.userPool.userPoolId,
+      username: email,
+      groupName: AI_TESTERS_GROUP,
+    });
+    tester.addResourceDependency(user);
+    tester.cfnOptions.condition = enabled;
     for (const construct of [logGroup, setter, passwordResource]) {
       for (const child of construct.node.findAll()) {
         if (child instanceof CfnResource) child.cfnOptions.condition = enabled;

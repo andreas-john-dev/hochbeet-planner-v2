@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ApprovePublicationRequestSchema,
+  AssistantEventSchema,
+  AssistantRequestSchema,
   BedWithPlantingsResponseSchema,
   ErrorResponseSchema,
   ImportCatalogRequestSchema,
@@ -83,6 +85,31 @@ describe('import contracts', () => {
         overrides: [{ plantId: tomato.id, fields: {} }],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('assistant contracts', () => {
+  it('takes a trimmed question with an optional bed', () => {
+    expect(AssistantRequestSchema.parse({ message: '  Was passt zu Tomaten? ' })).toEqual({
+      message: 'Was passt zu Tomaten?',
+    });
+    const withBed = { message: 'Und hier?', bed: { bed, plantings: [singlePlanting] } };
+    expect(AssistantRequestSchema.parse(withBed)).toEqual(withBed);
+  });
+
+  it('refuses empty and too long questions in German', () => {
+    expect(AssistantRequestSchema.safeParse({ message: '   ' }).error?.issues[0]?.message).toBe(
+      'Bitte schreib eine Frage an den Assistenten.',
+    );
+    expect(
+      AssistantRequestSchema.safeParse({ message: 'x'.repeat(2001) }).error?.issues[0]?.message,
+    ).toMatch(/höchstens 2000 Zeichen/);
+  });
+
+  it('streams text, then done with the questions left, or an error', () => {
+    for (const event of [{ text: 'Hallo' }, { done: true, remaining: 3 }, { error: 'Weg' }]) {
+      expect(AssistantEventSchema.parse(event)).toEqual(event);
+    }
   });
 });
 

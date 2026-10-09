@@ -65,6 +65,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # Python for the Beet-Assistent (agents/bed-assistant); the Python version comes from
+      # its .python-version, uv downloads it if the runner lacks it.
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: agents/*/uv.lock
+
       - run: pnpm install --frozen-lockfile
 
       - uses: aws-actions/configure-aws-credentials@v6
@@ -82,18 +89,28 @@ jobs:
         env:
           # Creates the smoke test user (Prod-SharedStateful); see docs/deployment.md.
           SMOKE_USER_PASSWORD: ${{ secrets.SMOKE_USER_PASSWORD }}
+          # Receives the AWS budget alerts (Prod-SharedStateful); a variable, not in the repo.
+          BUDGET_ALERT_EMAIL: ${{ vars.BUDGET_ALERT_EMAIL }}
         run: |
           params=()
+          context=()
+          if [ -n "$BUDGET_ALERT_EMAIL" ]; then
+            context=(-c "budgetAlertEmail=$BUDGET_ALERT_EMAIL")
+          else
+            echo "::warning title=Budget alerts off::Variable BUDGET_ALERT_EMAIL is not set; the AWS budget sends no alerts. See docs/deployment.md."
+          fi
           if [ -n "$SMOKE_USER_PASSWORD" ]; then
             params=(--parameters "Prod-SharedStateful:SmokeUserPassword=$SMOKE_USER_PASSWORD")
           else
             echo "::warning title=Smoke user missing::Secret SMOKE_USER_PASSWORD is not set; the signed-in smoke test is skipped. See docs/deployment.md."
           fi
-          pnpm exec cdk deploy --all --require-approval never --outputs-file cdk-outputs.json "${params[@]}"
+          pnpm exec cdk deploy --all --require-approval never --outputs-file cdk-outputs.json "${context[@]}" "${params[@]}"
           url=$(node -p "require('./cdk-outputs.json')['Prod-Frontend'].Url")
           email=$(node -p "require('./cdk-outputs.json')['Prod-SharedStateful']?.SmokeUserEmail ?? ''")
           echo "url=$url" >> "$GITHUB_OUTPUT"
+          assistant=$(node -p "require('./cdk-outputs.json')['Prod-Assistant']?.RuntimeArn ?? ''")
           echo "smoke-user-email=$email" >> "$GITHUB_OUTPUT"
+          echo "assistant-runtime-arn=$assistant" >> "$GITHUB_OUTPUT"
           echo "### Live: $url" >> "$GITHUB_STEP_SUMMARY"
 
       # Without --with-deps: the runner image already has Chromium's system libraries, and the
@@ -109,6 +126,7 @@ jobs:
           SMOKE_BASE_URL: ${{ steps.deploy.outputs.url }}
           SMOKE_USER_EMAIL: ${{ steps.deploy.outputs.smoke-user-email }}
           SMOKE_USER_PASSWORD: ${{ secrets.SMOKE_USER_PASSWORD }}
+          SMOKE_ASSISTANT_ARN: ${{ steps.deploy.outputs.assistant-runtime-arn }}
 
       - uses: actions/upload-artifact@v7
         if: failure()

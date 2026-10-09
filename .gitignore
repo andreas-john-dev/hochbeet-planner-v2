@@ -13,3 +13,10 @@ screenshots-out/
 lighthouse-out/
 # Login state of the Playwright setup project
 e2e/.auth/
+
+# Python (agents/*)
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
