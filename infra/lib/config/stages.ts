@@ -1,4 +1,4 @@
-import { ASSISTANT_GROUPS } from '@hochbeet/contracts';
+import { ASSISTANT_CONVERSATION_DAYS, ASSISTANT_GROUPS } from '@hochbeet/contracts';
 
 export interface DomainConfig {
   /** Fully qualified domain of the app, e.g. `hochbeet.andi-john-dev.de`. */
@@ -21,6 +21,10 @@ export interface AssistantConfig {
   readonly maxToolCalls: number;
   /** Rounds of suggest → check → revise for planting suggestions; each round is a model call. */
   readonly suggestionRounds: number;
+  /** Messages of a conversation the agent keeps in its context; older ones drop out. */
+  readonly historyMessages: number;
+  /** Days AgentCore Memory keeps the raw conversation events (7–365). */
+  readonly conversationRetentionDays: number;
   /** Cognito groups that may use the assistant; the runtime's authorizer checks them. */
   readonly allowedGroups: readonly string[];
 }
@@ -65,6 +69,9 @@ export const stages: readonly StageConfig[] = [
       maxTokens: 1024,
       maxToolCalls: 6,
       suggestionRounds: 2,
+      historyMessages: 20,
+      // The shortest retention AgentCore Memory allows; the profile names it (packages/contracts).
+      conversationRetentionDays: ASSISTANT_CONVERSATION_DAYS,
       // The app shows the chat to the same groups (packages/contracts).
       allowedGroups: [...ASSISTANT_GROUPS],
     },

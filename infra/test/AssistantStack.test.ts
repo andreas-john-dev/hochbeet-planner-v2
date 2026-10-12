@@ -48,8 +48,50 @@ describe('AssistantStack', () => {
         GATEWAY_URL: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Gateway'), 'GatewayUrl'] },
         MAX_TOOL_CALLS: '6',
         SUGGESTION_ROUNDS: '2',
+        MEMORY_ID: ssmParam('hochbeet/prod/assistant/memory-id'),
+        HISTORY_MESSAGES: '20',
       },
     });
+  });
+
+  it('may read, write and delete events and records of exactly the one memory', () => {
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          {
+            Effect: 'Allow',
+            Action: [
+              'bedrock-agentcore:CreateEvent',
+              'bedrock-agentcore:GetEvent',
+              'bedrock-agentcore:ListEvents',
+              'bedrock-agentcore:DeleteEvent',
+              'bedrock-agentcore:ListSessions',
+              'bedrock-agentcore:RetrieveMemoryRecords',
+              'bedrock-agentcore:ListMemoryRecords',
+              'bedrock-agentcore:BatchDeleteMemoryRecords',
+            ],
+            Resource: {
+              'Fn::Join': [
+                '',
+                [
+                  'arn:',
+                  { Ref: 'AWS::Partition' },
+                  ':bedrock-agentcore:eu-central-1:123456789012:memory/',
+                  ssmParam('hochbeet/prod/assistant/memory-id'),
+                ],
+              ],
+            },
+          },
+        ]),
+      },
+    });
+    // Never the memory's control plane (creating, changing or deleting the memory itself).
+    const actions = Object.values(template.findResources('AWS::IAM::Policy')).flatMap((p) =>
+      (
+        p as { Properties: { PolicyDocument: { Statement: { Action: string | string[] }[] } } }
+      ).Properties.PolicyDocument.Statement.flatMap((st) => st.Action),
+    );
+    expect(actions.filter((a) => /Memory$|MemoryStrateg/.test(a))).toEqual([]);
   });
 
   it('only lets ID tokens of the app client and the allowed groups through', () => {

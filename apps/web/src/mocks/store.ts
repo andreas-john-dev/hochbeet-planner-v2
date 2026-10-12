@@ -1,5 +1,5 @@
 import { seedPlants } from '@hochbeet/catalog-seed';
-import type { Plant } from '@hochbeet/contracts';
+import type { AssistantMemory, Plant } from '@hochbeet/contracts';
 import { emptyGarden, type GardenRepository, type LocalGarden } from '@/lib/local-api/store';
 
 const STORAGE_KEY = 'hochbeet-mock-api';
@@ -7,6 +7,8 @@ const CATALOG_KEY = 'hochbeet-mock-catalog';
 const IMPORTS_KEY = 'hochbeet-mock-imports';
 /** Questions to the mock assistant per user and day; Playwright sets it to test the limit. */
 export const ASSISTANT_QUOTA_KEY = 'hochbeet-mock-assistant';
+/** Preferences the mock assistant remembers per user; Playwright seeds it. */
+export const ASSISTANT_MEMORY_KEY = 'hochbeet-mock-assistant-memory';
 
 /**
  * Mock API data per user plus the global catalogue shared by all users (the start catalogue
@@ -72,6 +74,31 @@ export class MockStore {
     all[userId] = { day, count: used + 1 };
     this.storage.setItem(ASSISTANT_QUOTA_KEY, JSON.stringify(all));
     return limit - used - 1;
+  }
+
+  /** What the mock assistant remembers about `userId`, newest first. */
+  readMemories(userId: string): AssistantMemory[] {
+    return this.allMemories()[userId] ?? [];
+  }
+
+  remember(userId: string, memory: AssistantMemory) {
+    const all = this.allMemories();
+    all[userId] = [memory, ...(all[userId] ?? [])];
+    this.storage.setItem(ASSISTANT_MEMORY_KEY, JSON.stringify(all));
+  }
+
+  /** Deletes everything the mock assistant remembers about `userId`; returns how much. */
+  forget(userId: string): number {
+    const all = this.allMemories();
+    const count = all[userId]?.length ?? 0;
+    // An empty list rather than no entry: Playwright seeds only users without one.
+    this.storage.setItem(ASSISTANT_MEMORY_KEY, JSON.stringify({ ...all, [userId]: [] }));
+    return count;
+  }
+
+  private allMemories(): Record<string, AssistantMemory[]> {
+    const raw = this.storage.getItem(ASSISTANT_MEMORY_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, AssistantMemory[]>) : {};
   }
 
   private all(): Record<string, LocalGarden> {

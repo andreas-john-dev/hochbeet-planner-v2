@@ -8,8 +8,14 @@ import {
   MOCK_SUGGESTIONS,
   mockAnswer,
 } from '@/mocks/assistant';
-import { ApiError, apiErrorMessage, createApiStream } from './api';
-import { askAssistant, assistantEvents, canUseAssistant, newSessionId } from './assistant';
+import { ApiError, apiErrorMessage, createApiClient, createApiStream } from './api';
+import {
+  ASSISTANT_PATH,
+  askAssistant,
+  assistantEvents,
+  canUseAssistant,
+  newSessionId,
+} from './assistant';
 
 const BED = '01J9ZQ3W8D6V2K5M7N8P9R0S1A';
 
@@ -224,3 +230,49 @@ class MemoryStorage implements Storage {
     this.items.set(key, value);
   }
 }
+
+describe('mock assistant memory', () => {
+  const token = (email: string) => `mock-id-token.${email}|admins`;
+  const client = (fetchFn: typeof fetch, email: string) =>
+    createApiClient(() => Promise.resolve(token(email)), fetchFn);
+  const memory = (fetchFn: typeof fetch, email: string, action: 'list' | 'forget') =>
+    client(fetchFn, email)<unknown>(ASSISTANT_PATH, {
+      method: 'POST',
+      body: JSON.stringify({ memory: action }),
+    });
+  const tell = (fetchFn: typeof fetch, email: string, message: string) =>
+    askAssistant(
+      createApiStream(() => Promise.resolve(token(email)), fetchFn),
+      {
+        message,
+        sessionId: newSessionId(),
+        onText: () => undefined,
+      },
+    );
+
+  it('remembers statements about the user, for that user only, without using quota', async () => {
+    const store = new MockStore(new MemoryStorage());
+    const fetchFn = createMockFetch(store);
+    await tell(fetchFn, 'a@example.com', 'Ich mag keinen Fenchel.');
+    await tell(fetchFn, 'a@example.com', 'Was passt zu Tomaten?');
+    await tell(fetchFn, 'b@example.com', 'Ich gärtnere in Hamburg.');
+    const listed = await memory(fetchFn, 'a@example.com', 'list');
+    expect(listed).toEqual({
+      memories: [expect.objectContaining({ text: 'Ich mag keinen Fenchel.' })],
+    });
+    await memory(fetchFn, 'a@example.com', 'list');
+    const day = new Date().toISOString().slice(0, 10);
+    // Two questions so far (this is the third); listing did not count.
+    expect(store.takeAssistantQuestion('a@example.com', day, 99)).toBe(99 - 3);
+  });
+
+  it('forgets everything about the user and nothing about others', async () => {
+    const store = new MockStore(new MemoryStorage());
+    const fetchFn = createMockFetch(store);
+    await tell(fetchFn, 'a@example.com', 'Ich mag keinen Fenchel.');
+    await tell(fetchFn, 'b@example.com', 'Ich gärtnere in Hamburg.');
+    expect(await memory(fetchFn, 'a@example.com', 'forget')).toEqual({ memories: 1, events: 0 });
+    expect(await memory(fetchFn, 'a@example.com', 'list')).toEqual({ memories: [] });
+    expect(store.readMemories('b@example.com')).toHaveLength(1);
+  });
+});

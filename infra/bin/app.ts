@@ -59,7 +59,7 @@ for (const stage of stages) {
   );
   const assistant = new AssistantStack(app, `${stage.stackPrefix}-Assistant`, { env, stage });
   assistant.addStackDependency(shared, 'JWT authorizer reads the user pool ids from SSM');
-  assistant.addStackDependency(assistantStateful, 'reads the quota table name from SSM');
+  assistant.addStackDependency(assistantStateful, 'reads the quota table and memory ids from SSM');
 
   const certificate = new CertificateStack(app, `${stage.stackPrefix}-Certificate`, {
     env: { account: env.account, region: CLOUDFRONT_CERTIFICATE_REGION },

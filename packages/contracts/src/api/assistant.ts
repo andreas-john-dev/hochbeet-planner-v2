@@ -34,6 +34,41 @@ export const AssistantRequestSchema = z.object({
 });
 export type AssistantRequest = z.infer<typeof AssistantRequestSchema>;
 
+/**
+ * Days the assistant keeps conversations (AgentCore Memory events); the shortest retention it
+ * allows. Infra configures the memory with it, the profile names it.
+ */
+export const ASSISTANT_CONVERSATION_DAYS = 7;
+
+/**
+ * Body of a request about the assistant's long-term memory (T-44), on the same path as the
+ * questions: `list` returns the user's remembered preferences, `forget` deletes everything the
+ * assistant has stored about the user. Neither counts against the daily quota.
+ */
+export const AssistantMemoryRequestSchema = z.object({ memory: z.enum(['list', 'forget']) });
+export type AssistantMemoryRequest = z.infer<typeof AssistantMemoryRequestSchema>;
+
+/** One preference the assistant remembers, as AgentCore Memory extracted it. */
+export const AssistantMemorySchema = z.object({
+  id: z.string().min(1),
+  text: z.string(),
+  createdAt: z.iso.datetime({ offset: true }).optional(),
+});
+export type AssistantMemory = z.infer<typeof AssistantMemorySchema>;
+
+/** Answer to `{ memory: 'list' }`: newest first. */
+export const AssistantMemoriesResponseSchema = z.object({
+  memories: z.array(AssistantMemorySchema),
+});
+export type AssistantMemoriesResponse = z.infer<typeof AssistantMemoriesResponseSchema>;
+
+/** Answer to `{ memory: 'forget' }`: how many preferences and conversation events were deleted. */
+export const AssistantForgetResponseSchema = z.object({
+  memories: z.number().int().min(0),
+  events: z.number().int().min(0),
+});
+export type AssistantForgetResponse = z.infer<typeof AssistantForgetResponseSchema>;
+
 /** Most suggestions one answer may carry. */
 export const MAX_SUGGESTIONS = 6;
 

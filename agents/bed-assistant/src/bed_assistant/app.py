@@ -1,5 +1,6 @@
 """AgentCore entry point: checks caller, input and quota, then streams the answer as SSE."""
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Mapping
@@ -10,9 +11,16 @@ import boto3
 from bedrock_agentcore import BedrockAgentCoreApp
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
-from .auth import caller_from_headers
+from .auth import Caller, caller_from_headers
 from .config import Settings
-from .prompt import InvalidRequestError, parse_request, user_prompt
+from .memory import AgentCoreMemoryStore, MemoryStore
+from .prompt import (
+    InvalidRequestError,
+    MemoryRequest,
+    parse_memory_request,
+    parse_request,
+    user_prompt,
+)
 from .quota import DailyQuota, Quota, QuotaExceededError
 from .responder import Responder, StrandsResponder
 from .suggest import SuggestionError, SuggestionResult
@@ -20,6 +28,7 @@ from .suggest import SuggestionError, SuggestionResult
 logger = logging.getLogger("bed_assistant")
 
 UNAVAILABLE = "Der Assistent ist gerade nicht erreichbar. Bitte versuche es gleich noch einmal."
+MEMORY_UNAVAILABLE = "Das Gedächtnis des Assistenten ist gerade nicht erreichbar."
 
 
 def error(message: str, status: int) -> JSONResponse:
@@ -50,6 +59,8 @@ async def handle(
     settings: Settings,
     quota: Quota,
     responder: Responder,
+    memory: MemoryStore | None = None,
+    session_id: str | None = None,
 ) -> Response:
     caller = caller_from_headers(headers)
     if caller is None:
@@ -57,6 +68,12 @@ async def handle(
     # The runtime's authorizer checks the groups already; this is the second line of defence.
     if not caller.groups & settings.allowed_groups:
         return error("Der Assistent ist noch nicht für dein Konto freigeschaltet.", 403)
+    if isinstance(payload, dict) and "memory" in payload:
+        try:
+            memory_request = parse_memory_request(payload)
+        except InvalidRequestError as invalid:
+            return error(str(invalid), 400)
+        return await memory_response(memory_request, caller, memory)
     try:
         request = parse_request(payload, settings.max_input_chars)
     except InvalidRequestError as invalid:
@@ -70,15 +87,33 @@ async def handle(
         )
     logger.info("question", extra={"userId": caller.user_id, "remaining": remaining})
     stream = (
-        suggestion_events(responder, request.message, caller.token, request.bed_id, remaining)
+        suggestion_events(responder, request.message, caller, request.bed_id, remaining)
         if request.suggest and request.bed_id
-        else events(responder.stream(user_prompt(request), caller.token), remaining)
+        else events(responder.stream(user_prompt(request), caller, session_id), remaining)
     )
     return StreamingResponse(
         stream,
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Quota-Remaining": str(remaining)},
     )
+
+
+async def memory_response(
+    request: MemoryRequest, caller: Caller, memory: MemoryStore | None
+) -> Response:
+    """Lists or forgets what the assistant remembers about the caller; never about others."""
+    if memory is None:
+        return error(MEMORY_UNAVAILABLE, 503)
+    try:
+        if request.memory == "list":
+            memories = await asyncio.to_thread(memory.preferences, caller.user_id)
+            return JSONResponse({"memories": memories})
+        records, conversation = await asyncio.to_thread(memory.forget, caller.user_id)
+    except Exception:
+        logger.exception("memory request failed")
+        return error(MEMORY_UNAVAILABLE, 503)
+    logger.info("forgot", extra={"userId": caller.user_id, "memories": records})
+    return JSONResponse({"memories": records, "events": conversation})
 
 
 def suggestion_text(result: SuggestionResult) -> str:
@@ -92,11 +127,11 @@ def suggestion_text(result: SuggestionResult) -> str:
 
 
 async def suggestion_events(
-    responder: Responder, question: str, token: str, bed_id: str, remaining: int
+    responder: Responder, question: str, caller: Caller, bed_id: str, remaining: int
 ) -> AsyncIterator[str]:
     """The summary as text, then the checked suggestions with remaining warnings, then done."""
     try:
-        result = await responder.suggest(question, token, bed_id)
+        result = await responder.suggest(question, caller, bed_id)
     except SuggestionError as failed:
         yield sse({"error": str(failed)})
         return
@@ -118,10 +153,18 @@ async def suggestion_events(
 
 
 @cache
-def dependencies() -> tuple[Settings, Quota, Responder]:
+def dependencies() -> tuple[Settings, Quota, Responder, MemoryStore | None]:
     settings = Settings.from_env()
     table = boto3.resource("dynamodb", region_name=settings.region).Table(settings.quota_table)
-    return settings, DailyQuota(table, settings.daily_limit), StrandsResponder(settings)
+    memory = (
+        AgentCoreMemoryStore(
+            boto3.client("bedrock-agentcore", region_name=settings.region), settings.memory_id
+        )
+        if settings.memory_id
+        else None
+    )
+    responder = StrandsResponder(settings, memory=memory)
+    return settings, DailyQuota(table, settings.daily_limit), responder, memory
 
 
 app = BedrockAgentCoreApp()
@@ -129,6 +172,14 @@ app = BedrockAgentCoreApp()
 
 @app.entrypoint
 async def invoke(payload: dict[str, Any], context: Any) -> Response:
-    settings, quota, responder = dependencies()
+    settings, quota, responder, memory = dependencies()
     headers: Mapping[str, str] = getattr(context, "request_headers", None) or {}
-    return await handle(payload, headers, settings=settings, quota=quota, responder=responder)
+    return await handle(
+        payload,
+        headers,
+        settings=settings,
+        quota=quota,
+        responder=responder,
+        memory=memory,
+        session_id=getattr(context, "session_id", None),
+    )

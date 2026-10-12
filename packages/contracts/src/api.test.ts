@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ApprovePublicationRequestSchema,
   AssistantEventSchema,
+  AssistantForgetResponseSchema,
+  AssistantMemoriesResponseSchema,
+  AssistantMemoryRequestSchema,
   AssistantRequestSchema,
   EvaluateBedToolInputSchema,
   FindPlantsToolInputSchema,
@@ -118,6 +121,19 @@ describe('assistant contracts', () => {
     expect(
       AssistantRequestSchema.safeParse({ message: 'x'.repeat(2001) }).error?.issues[0]?.message,
     ).toMatch(/höchstens 2000 Zeichen/);
+  });
+
+  it('lists or forgets the remembered preferences', () => {
+    expect(AssistantMemoryRequestSchema.parse({ memory: 'forget' })).toEqual({ memory: 'forget' });
+    expect(AssistantMemoryRequestSchema.safeParse({ memory: 'everything' }).success).toBe(false);
+    const list = {
+      memories: [{ id: 'mem-1', text: 'Mag keinen Fenchel.', createdAt: '2026-10-07T08:00:00Z' }],
+    };
+    expect(AssistantMemoriesResponseSchema.parse(list)).toEqual(list);
+    expect(AssistantForgetResponseSchema.parse({ memories: 2, events: 5 })).toEqual({
+      memories: 2,
+      events: 5,
+    });
   });
 
   it('streams text, then done with the questions left, or an error', () => {

@@ -1,10 +1,13 @@
 import {
   ASSISTANT_GROUPS,
   type AssistantEvent,
+  type AssistantForgetResponse,
+  type AssistantMemoriesResponse,
+  AssistantMemoryRequestSchema,
   AssistantRequestSchema,
   type Suggestion,
 } from '@hochbeet/contracts';
-import { error, parseJson, route, type Route } from '@/lib/local-api/router';
+import { error, json, parseJson, route, type Route } from '@/lib/local-api/router';
 import { ASSISTANT_PATH } from '@/lib/assistant';
 import type { MockUser } from './handlers';
 import type { MockStore } from './store';
@@ -55,15 +58,34 @@ export const MOCK_SUGGESTION_SUMMARY = 'Zwei Vorschläge für die freie Fläche 
 const sse = (event: AssistantEvent) => `data: ${JSON.stringify(event)}\n\n`;
 
 /**
+ * Statements about the user ("Ich mag keinen Fenchel.") are what the real memory extracts
+ * preferences from; the mock simply remembers them as they are.
+ */
+export const isPreference = (message: string) => /^ich\b/i.test(message.trim());
+
+/**
  * The Beet-Assistent without AWS for the dev server and Playwright: same checks and statuses
  * as the agent (403 without group, 400, 429 over the daily limit), then a fixed answer as
- * server-sent events, chunk by chunk.
+ * server-sent events, chunk by chunk. Lists and forgets remembered preferences like the agent
+ * (without counting questions).
  */
 export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
   return [
     route('POST', ASSISTANT_PATH, async ({ request }) => {
       if (!user.groups.some((g) => (ASSISTANT_GROUPS as readonly string[]).includes(g))) {
         return error('Der Assistent ist noch nicht für dein Konto freigeschaltet.', 403);
+      }
+      const raw: unknown = await request
+        .clone()
+        .json()
+        .catch(() => undefined);
+      if (raw && typeof raw === 'object' && 'memory' in raw) {
+        const memory = await parseJson(request, AssistantMemoryRequestSchema);
+        if (memory.response) return memory.response;
+        if (memory.data.memory === 'list') {
+          return json<AssistantMemoriesResponse>({ memories: store.readMemories(user.id) });
+        }
+        return json<AssistantForgetResponse>({ memories: store.forget(user.id), events: 0 });
       }
       const parsed = await parseJson(request, AssistantRequestSchema);
       if (parsed.response) return parsed.response;
@@ -82,6 +104,13 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
         );
       }
       const suggest = parsed.data.suggest === true && parsed.data.bedId !== undefined;
+      if (!suggest && isPreference(parsed.data.message)) {
+        store.remember(user.id, {
+          id: crypto.randomUUID(),
+          text: parsed.data.message,
+          createdAt: new Date().toISOString(),
+        });
+      }
       const chunks = suggest ? [MOCK_SUGGESTION_SUMMARY] : mockAnswer(parsed.data.bedId);
       const encoder = new TextEncoder();
       let cancelled = false;
