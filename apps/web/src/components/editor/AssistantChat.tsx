@@ -114,7 +114,10 @@ export function AssistantChat({
   };
 
   return (
-    <section aria-label="Beet-Assistent" className={cn('flex min-h-0 flex-col gap-3', className)}>
+    <section
+      aria-label="Beet-Assistent"
+      className={cn('flex min-h-0 flex-col gap-3 overflow-y-auto', className)}
+    >
       <div
         ref={log}
         role="log"
@@ -123,7 +126,7 @@ export function AssistantChat({
         aria-busy={busy}
         // Scrollable, so keyboard users must be able to reach it.
         tabIndex={0}
-        className="focus-visible:ring-ring/50 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto rounded-md outline-none focus-visible:ring-[3px]"
+        className="focus-visible:ring-ring/50 flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto rounded-md outline-none focus-visible:ring-[3px]"
       >
         {messages.length === 0 ? (
           <p className="text-muted-foreground text-sm">

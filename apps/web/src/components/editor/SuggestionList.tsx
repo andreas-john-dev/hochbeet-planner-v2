@@ -1,6 +1,6 @@
 import type { Severity } from '@hochbeet/garden-rules';
 import { Check, CheckCheck, X } from 'lucide-react';
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ShownSuggestion } from '@/lib/editor/suggestions';
 import { cn } from '@/lib/utils';
@@ -30,10 +30,17 @@ export function SuggestionList({
   onDiscard: () => void;
 }) {
   const headingId = useId();
+  const section = useRef<HTMLElement>(null);
+  // New suggestions come in below the conversation: bring them into view.
+  useEffect(() => {
+    section.current?.scrollIntoView({ block: 'nearest' });
+  }, []);
   return (
     <section
       aria-labelledby={headingId}
-      className="bg-muted/40 flex max-h-72 flex-col gap-2 overflow-y-auto rounded-lg border p-2"
+      ref={section}
+      // Keeps its height; the chat around it scrolls when the panel is too short.
+      className="bg-muted/40 flex shrink-0 flex-col gap-2 rounded-lg border p-2"
     >
       <h3 id={headingId} className="text-sm font-semibold">
         Pflanzvorschläge im Beet

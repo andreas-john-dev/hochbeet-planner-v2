@@ -41,4 +41,6 @@ export async function requestSuggestions(page: Page) {
   await expect(page.getByRole('region', { name: 'Pflanzvorschläge im Beet' })).toBeVisible();
   await expect(page.getByTestId('suggestion-0')).toHaveCount(1);
   await expect(page.getByTestId('suggestion-1')).toHaveCount(1);
+  // The list scrolls into view, possibly under the pointer: no hover state in checks and shots.
+  await page.mouse.move(0, 0);
 }
