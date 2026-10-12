@@ -1,9 +1,9 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// The Beet-Assistent on Bedrock AgentCore (T-40, T-41): the smoke user (group ai-testers) asks
-// one short question, which uses one of the user's daily questions; the tool gateway lists its
-// tools and reads the smoke user's beds without any model call. Requests without a token are
-// refused.
+// The Beet-Assistent on Bedrock AgentCore (T-40, T-41, T-44): the smoke user (group ai-testers)
+// asks one short question, which uses one of the user's daily questions, then lists and deletes
+// what the assistant remembers about it; the tool gateway lists its tools and reads the smoke
+// user's beds without any model call. Requests without a token are refused.
 
 const email = process.env.SMOKE_USER_EMAIL;
 const password = process.env.SMOKE_USER_PASSWORD;
@@ -77,6 +77,31 @@ test.describe('assistant runtime', () => {
     expect(response.headers()['content-type']).toContain('text/event-stream');
     expect(body).toContain('"text"');
     expect(body).toMatch(/"done": ?true/);
+  });
+
+  // Memory (T-44): reading and deleting the smoke user's own memory, without a model call.
+  test('lists and forgets what it remembers about the smoke user', async ({ page }) => {
+    test.skip(!email || !password, 'SMOKE_USER_EMAIL and SMOKE_USER_PASSWORD are not set');
+    test.setTimeout(90_000);
+    const idToken = await signIn(page);
+    const memory = (action: 'list' | 'forget') =>
+      page.request.post('/api/assistant/invocations', {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': sessionId(),
+        },
+        data: { memory: action },
+        timeout: 60_000,
+      });
+
+    const listed = await memory('list');
+    expect(listed.status(), await listed.text()).toBe(200);
+    expect(Array.isArray(((await listed.json()) as { memories: unknown }).memories)).toBe(true);
+    // Also cleans up the conversation of the question above.
+    const forgotten = await memory('forget');
+    expect(forgotten.status(), await forgotten.text()).toBe(200);
+    const counts = (await forgotten.json()) as { memories: unknown; events: unknown };
+    expect([typeof counts.memories, typeof counts.events]).toEqual(['number', 'number']);
   });
 });
 

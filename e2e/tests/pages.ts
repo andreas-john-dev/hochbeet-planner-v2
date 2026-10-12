@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { askAssistant, requestSuggestions } from './assistant-helpers';
+import { askAssistant, requestSuggestions, showRememberedPreferences } from './assistant-helpers';
 import { EXAMPLE_BED_ID, exampleGarden, type Garden, PENDING_ID, pendingRequest } from './garden';
 
 /**
@@ -86,6 +86,14 @@ export const appPages: readonly AppPage[] = [
     access: 'user',
   },
   { id: 'profil', path: '/profil', heading: 'Profil', access: 'user', navLabel: 'Profil' },
+  {
+    // Admins may use the assistant: the profile lists what it remembers about them.
+    id: 'profil-assistent',
+    path: '/profil',
+    heading: 'Profil',
+    access: 'admin',
+    setup: showRememberedPreferences,
+  },
   {
     id: 'admin',
     path: '/admin',

@@ -1,6 +1,7 @@
 """System prompt and the request the agent answers, with its limits."""
 
 import re
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -21,6 +22,9 @@ Regeln:
 - Längen in cm, Daten als Wochen bzw. Monate.
 - Erfinde keine Pflanzungen oder Beete; stütze dich auf die Werkzeuge.
 - Nenne Beete und Sorten beim Namen, nie mit ihrer ID.
+- Vorlieben des Users, die du dir gemerkt hast, stehen vor seiner Frage in <user_context>.
+  Berücksichtige sie, ohne sie aufzuzählen. Was du dir merkst, sieht und löscht der User
+  im Profil.
 - Bist du dir unsicher, sag es. Warnungen des Planers ersetzt du nicht, du erklärst sie.
 - Lehne Fragen ohne Bezug zu Garten, Pflanzen oder dem Planer freundlich ab.
 """
@@ -71,6 +75,19 @@ def parse_request(payload: object, max_input_chars: int) -> AssistantRequest:
             "Zeichen)."
         )
     return request
+
+
+class MemoryRequest(BaseModel):
+    """Mirrors AssistantMemoryRequestSchema: list or forget what the assistant remembers."""
+
+    memory: Literal["list", "forget"]
+
+
+def parse_memory_request(payload: object) -> MemoryRequest:
+    try:
+        return MemoryRequest.model_validate(payload)
+    except ValidationError as error:
+        raise InvalidRequestError("Unbekannte Anfrage an das Gedächtnis.") from error
 
 
 def user_prompt(request: AssistantRequest) -> str:

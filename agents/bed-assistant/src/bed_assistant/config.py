@@ -20,6 +20,10 @@ class Settings:
     max_tool_calls: int = 6
     #: Rounds of suggest → check → revise for planting suggestions.
     suggestion_rounds: int = 2
+    #: AgentCore Memory for conversations and preferences; empty means no memory.
+    memory_id: str = ""
+    #: Messages of a conversation the agent keeps in its context (older ones drop out).
+    history_messages: int = 20
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "Settings":
@@ -36,4 +40,6 @@ class Settings:
             gateway_url=env.get("GATEWAY_URL", ""),
             max_tool_calls=int(env.get("MAX_TOOL_CALLS", "6")),
             suggestion_rounds=int(env.get("SUGGESTION_ROUNDS", "2")),
+            memory_id=env.get("MEMORY_ID", ""),
+            history_messages=int(env.get("HISTORY_MESSAGES", "20")),
         )

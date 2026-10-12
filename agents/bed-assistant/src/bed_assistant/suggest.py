@@ -148,14 +148,23 @@ class McpGardenTools:
         return data
 
 
-def suggestion_prompt(question: str, bed_id: str, today: date) -> str:
+def suggestion_prompt(
+    question: str, bed_id: str, today: date, preferences: Sequence[str] = ()
+) -> str:
+    known = (
+        "Bekannte Vorlieben des Users (berücksichtigen):\n"
+        + "".join(f"- {p}\n" for p in preferences)
+        + "\n"
+        if preferences
+        else ""
+    )
     return (
         f"Heute ist {today.isoformat()}. Mache Pflanzvorschläge für das Beet mit der ID {bed_id}"
         f" (höchstens {MAX_SUGGESTIONS}).\n"
         "Lies das Beet mit get_bed und suche passende Sorten mit find_plants (für die plantId).\n"
         "Positionen in cm im Beet auf dem 5-cm-Raster, Abstände der Sorten beachten, "
         "startDate ist der Montag der Pflanzwoche. Begründe jeden Vorschlag kurz.\n\n"
-        f"Wunsch des Users:\n{question}"
+        f"{known}Wunsch des Users:\n{question}"
     )
 
 
@@ -178,13 +187,14 @@ async def suggest(
     question: str,
     rounds: int,
     today: date,
+    preferences: Sequence[str] = (),
 ) -> SuggestionResult:
     """
     Runs the check loop: `ask` returns the model's structured answer for a prompt (the same
     conversation across rounds); `evaluate_bed` checks the sanitized suggestions.
     """
     bed = Bed.from_tool(await tools.call("get_bed", {"bedId": bed_id}))
-    prompt = suggestion_prompt(question, bed_id, today)
+    prompt = suggestion_prompt(question, bed_id, today, preferences)
     suggestions: list[dict[str, Any]] = []
     warnings: list[str] = []
     summary = ""

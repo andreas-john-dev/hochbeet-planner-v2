@@ -1,7 +1,9 @@
 import { SignOutButton } from '@/components/layout/AppShell';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { AssistantMemoryCard } from '@/components/profile/AssistantMemoryCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { canUseAssistant } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth/context';
 import { isAdmin } from '@/lib/auth/types';
 import { useTheme, type Theme } from '@/lib/theme';
@@ -14,7 +16,7 @@ const options: { value: Theme; label: string }[] = [
 
 export function ProfilePage() {
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, guest } = useAuth();
 
   return (
     <>
@@ -56,6 +58,7 @@ export function ProfilePage() {
             </div>
           </CardContent>
         </Card>
+        {canUseAssistant(user, guest) && <AssistantMemoryCard />}
       </div>
     </>
   );

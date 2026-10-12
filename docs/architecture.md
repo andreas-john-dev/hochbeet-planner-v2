@@ -440,13 +440,14 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 - Request wie `AssistantRequestSchema` in `packages/contracts/src/api/assistant.ts`: `message` (höchstens 2000 Zeichen, Infra reicht die Konstante als `MAX_INPUT_CHARS` an den Agenten) und optional `bedId` (das Beet, das der User gerade sieht; der Agent liest es selbst über die Tools). Python spiegelt das Schema mit pydantic.
 - Antwort als Server-Sent Events (`AssistantEventSchema`): `{"text"}` je Teilstück, am Ende `{"done": true, "remaining": n}`; scheitert das Modell mittendrin, `{"error"}` mit deutscher Meldung. Fehler vor dem Stream kommen als JSON `{"message"}` wie bei den Services. Der Header `X-Quota-Remaining` nennt die übrigen Fragen.
 - Der Aufrufer kommt aus dem ID-Token, das die Runtime bereits geprüft hat (Header `Authorization` ist dafür freigegeben); die `userId` ist wie überall `sub`.
-- Tools kommen über MCP vom AgentCore Gateway (siehe unten, T-41); der Agent verbindet sich pro Frage mit dem ID-Token des Aufrufers (`MCPClient` von Strands) und schließt die Session nach der Antwort. Noch ohne Gedächtnis (T-44): ein frischer Agent pro Frage.
+- Tools kommen über MCP vom AgentCore Gateway (siehe unten, T-41); der Agent verbindet sich pro Frage mit dem ID-Token des Aufrufers (`MCPClient` von Strands) und schließt die Session nach der Antwort. Pro Frage entsteht ein frischer Agent; den Gesprächsverlauf und die Vorlieben des Users holt er aus AgentCore Memory (siehe „Gedächtnis“, T-44).
 - Tooling über uv: ruff (Lint und Format), mypy strict, pytest mit moto für DynamoDB. Die Skripte in `package.json` binden das in Turborepo ein, `pnpm lint/typecheck/test/build` prüfen den Agenten also mit.
 
 **Kostengrenzen:**
 
 - Tageskontingent je User (Standard 20 Fragen, Tag nach Europe/Berlin) in `Prod-AssistantStateful`: ein Zähler-Item `USER#<sub>` / `DAY#<datum>`, per bedingtem `UpdateItem` hochgezählt, sodass auch parallele Anfragen die Grenze nicht überschreiten. Zähler laufen nach zwei Tagen per TTL ab.
 - Höchstens 1024 Ausgabe-Tokens je Modellaufruf, 2000 Zeichen Frage und 6 Tool-Aufrufe je Frage (`maxToolCalls` in der Stage-Konfiguration); weitere Aufrufe lehnt ein Hook (`ToolCallLimit`) mit einer Meldung an das Modell ab. Pflanzvorschläge brauchen höchstens `suggestionRounds` (2) Modellrunden.
+- Vom Gesprächsverlauf behält der Agent höchstens `historyMessages` (20) Nachrichten im Kontext (Sliding Window); alte Tool-Ergebnisse werden beim Wiederherstellen weggelassen. So wächst eine Frage in einem langen Gespräch nicht beliebig. Vorlieben kommen höchstens fünf pro Frage dazu.
 - Zugang nur für die Cognito-Gruppen `ai-testers` und `admins`; Gäste nie.
 - AWS-Budget (`Prod-SharedStateful`) für das ganze Konto, 10 USD im Monat, Mails bei 80 % und 100 % der tatsächlichen Kosten an die GitHub-Variable `BUDGET_ALERT_EMAIL`.
 
@@ -490,6 +491,19 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 - Antwort: erst die Zusammenfassung als `{"text"}`, dann `{"suggestions", "warnings"}`, dann `done`. Eine Vorschlagsanfrage zählt wie eine Frage gegen das Tageskontingent.
 - Editor: Vorschläge erscheinen gestrichelt im Beet (`data-testid="suggestion-<n>"`) mit Status der Regel-Engine (`data-status`, berechnet zusammen mit den Pflanzungen, `src/lib/editor/suggestions.ts`), daneben eine Liste mit Begründung. „Übernehmen“ (einzeln oder alle) legt normale Pflanzungen über `commit({ before: null, after })` an, also gespeichert und rückgängig machbar; „Verwerfen“ entfernt die Vorschläge. Nichts wird automatisch gespeichert, Warnungen blockieren das Übernehmen nicht. Die Umwandlung in eine Pflanzung (`candidatePlanting()` in `@hochbeet/garden-rules`) teilen Tool-Lambda und App.
 - Mock: `suggest: true` liefert zwei feste Vorschläge für das Beispielbeet der Playwright-Tests.
+
+**Gedächtnis (T-44):**
+
+- Eine AgentCore Memory `<stage>_bed_assistant_memory` in `Prod-AssistantStateful` (bleibt beim Löschen des Stacks erhalten); die ID geht per SSM an die Runtime (`MEMORY_ID`). Alle Daten liegen pro User unter dem Actor `sub` aus dem geprüften Token; das Modell kann keinen anderen User angeben.
+- **Kurzzeitgedächtnis:** Jede Nachricht einer Unterhaltung wird als Event gespeichert (Strands `AgentCoreMemorySessionManager`), Session ist die Runtime-Session-ID des Chats. Bei der nächsten Frage stellt der Agent den Verlauf wieder her, deshalb versteht er Rückfragen wie „ja“. „Neue Unterhaltung“ im Chat erzeugt eine neue Session-ID, der Agent kennt den alten Verlauf dann nicht mehr. Events laufen nach `ASSISTANT_CONVERSATION_DAYS` (7) Tagen ab, der kürzesten Frist, die AgentCore Memory erlaubt.
+- **Langzeitgedächtnis:** Die eingebaute Strategie für Nutzervorlieben (`preferences`) zieht im Hintergrund Vorlieben aus den Events, etwa Abneigungen, Standort oder Sonnenlage, und legt sie unter `/users/<sub>/preferences` ab. Keine Zusammenfassungen oder allgemeinen Fakten. Vor jeder Frage sucht der Session-Manager die passenden Vorlieben (höchstens 5, Relevanz ab 0,3) und stellt sie in `<user_context>` vor die Frage; bei Pflanzvorschlägen stehen sie im Prompt. Vorschlagsrunden selbst werden nicht als Gespräch gespeichert. Vorlieben bleiben, bis der User sie löscht.
+- **Profil:** Unter `/profil` sehen Mitglieder von `ai-testers` und `admins` ihre gemerkten Vorlieben und löschen mit „Alles löschen“ (Bestätigung) alle Vorlieben und alle gespeicherten Gespräche. Der Weg ist derselbe wie für Fragen (`POST /api/assistant/invocations`) mit dem Body `{ "memory": "list" }` bzw. `{ "memory": "forget" }` (`AssistantMemoryRequestSchema`); Antworten `AssistantMemoriesResponseSchema` bzw. `AssistantForgetResponseSchema`. Das zählt nicht gegen das Tageskontingent.
+- **Trennung der User:** IAM kann bei einer gemeinsamen Runtime-Rolle nicht pro User einschränken; der Code tut es: Jeder Aufruf nutzt Actor und Namespace aus `sub`, und weil die API Namespaces als Präfix filtert, verwirft der Agent alle Datensätze, die nicht genau im Namespace des Users liegen. Tests in `agents/bed-assistant/tests/test_memory.py` und `test_app.py` prüfen, dass ein User nichts von anderen sieht oder löscht.
+- **Rechte der Runtime:** auf genau diese Memory `CreateEvent`, `GetEvent`, `ListEvents`, `DeleteEvent`, `ListSessions`, `RetrieveMemoryRecords`, `ListMemoryRecords` und `BatchDeleteMemoryRecords`; keine Rechte an der Memory selbst (Control Plane).
+- Ist keine Memory konfiguriert oder die Session-ID ungültig, antwortet der Agent ohne Gedächtnis; die Profil-Anfragen liefern dann 503 mit deutscher Meldung.
+- Mock: Der Mock-Assistent merkt sich Aussagen, die mit „Ich“ beginnen, wörtlich als Vorliebe (im `MockStore` pro User) und beantwortet die beiden Profil-Anfragen.
+- Smoke-Test nach jedem Deploy: Der Smoke-User listet seine Vorlieben und löscht danach alles, was der Assistent über ihn weiß (auch die Smoke-Frage).
+- Kosten: AgentCore Memory rechnet nach Events, gespeicherten Vorlieben und Abrufen ab, jeweils unter 1 USD je Tausend. Bei höchstens 20 Fragen pro User und Tag (einige Events und ein Abruf je Frage) bleibt das bei den wenigen Testern im Bereich von Cent; das Kontingent begrenzt auch diese Kosten.
 
 ### Gemeinsamer Service-Code
 
@@ -690,7 +704,7 @@ Eine CDK-App in TypeScript deployt acht Stacks nach `eu-central-1` und den Zerti
 | `Prod-CatalogStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
 | `Prod-GardenStateful` | DynamoDB-Tabelle | – |
 | `Prod-GardenStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
-| `Prod-AssistantStateful` | DynamoDB-Tabelle für das Tageskontingent des Assistenten (TTL) | – |
+| `Prod-AssistantStateful` | DynamoDB-Tabelle für das Tageskontingent des Assistenten (TTL), AgentCore Memory des Assistenten (T-44) | – |
 | `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer und Usage-Logs; AgentCore Gateway mit Tool-Lambda und Request-Interceptor | User Pool, Kontingent-Tabelle; Garden- und Catalog-API über die Domain |
 | `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
 | `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds; `/api/assistant/*` zur AgentCore Runtime | User Pool, API-URLs, Runtime-ARN; Zertifikat per Cross-Region-Referenz |
@@ -730,6 +744,7 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 | `/hochbeet/<stage>/garden/table-name` | `Prod-GardenStateful` | Name der Garden-Tabelle |
 | `/hochbeet/<stage>/garden/api-domain` | `Prod-GardenStateless` | Domain der Garden-HTTP-API, Origin für `/api/garden/*` in CloudFront |
 | `/hochbeet/<stage>/assistant/quota-table-name` | `Prod-AssistantStateful` | Tabelle der Tageskontingente, gelesen von `Prod-Assistant` |
+| `/hochbeet/<stage>/assistant/memory-id` | `Prod-AssistantStateful` | ID der AgentCore Memory, gelesen von `Prod-Assistant` |
 | `/hochbeet/<stage>/assistant/runtime-arn` | `Prod-Assistant` | ARN der AgentCore Runtime, gelesen von `Prod-Frontend` für `/api/assistant/*` |
 
 ### Cognito-Konfiguration

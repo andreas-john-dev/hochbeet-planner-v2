@@ -44,3 +44,40 @@ export async function requestSuggestions(page: Page) {
   // The list scrolls into view, possibly under the pointer: no hover state in checks and shots.
   await page.mouse.move(0, 0);
 }
+
+/** Preferences the mock assistant remembers per user (MockStore, ASSISTANT_MEMORY_KEY). */
+const MEMORY_KEY = 'hochbeet-mock-assistant-memory';
+
+/** Example preferences, as AgentCore Memory would extract them from conversations. */
+export const EXAMPLE_PREFERENCES = [
+  'Mag keinen Fenchel.',
+  'Gärtnert auf einem Balkon in Hamburg.',
+  'Das Hochbeet steht im Halbschatten.',
+];
+
+/** Lets the mock assistant remember `texts` about `email`, before the page loads. */
+export async function seedAssistantMemories(page: Page, email: string, texts: string[]) {
+  await page.addInitScript(
+    ([key, user, memories]) => {
+      const all = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+      if (!(user in all)) {
+        all[user] = memories.map((text, index) => ({
+          id: `memory-${String(index)}`,
+          text,
+          createdAt: '2026-10-05T08:00:00.000Z',
+        }));
+        localStorage.setItem(key, JSON.stringify(all));
+      }
+    },
+    [MEMORY_KEY, email, texts] as const,
+  );
+}
+
+/** Seeds the example preferences of the admin and reloads the profile, for page checks. */
+export async function showRememberedPreferences(page: Page) {
+  await seedAssistantMemories(page, 'admin@example.com', EXAMPLE_PREFERENCES);
+  await page.reload();
+  await expect(
+    page.getByRole('list', { name: 'Gemerkte Vorlieben' }).getByRole('listitem'),
+  ).toHaveCount(EXAMPLE_PREFERENCES.length);
+}

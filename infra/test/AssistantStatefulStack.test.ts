@@ -1,4 +1,4 @@
-import { Template } from 'aws-cdk-lib/assertions';
+import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AssistantStatefulStack } from '../lib/assistant/AssistantStatefulStack';
 import { createApp, env, stage, synthAndCollectNagViolations } from './helpers';
@@ -44,6 +44,33 @@ describe('AssistantStatefulStack', () => {
   it('publishes the table name for the runtime', () => {
     template.hasResourceProperties('AWS::SSM::Parameter', {
       Name: '/hochbeet/prod/assistant/quota-table-name',
+    });
+  });
+
+  it('keeps conversations a week and only preferences for good, per user', () => {
+    template.hasResource('AWS::BedrockAgentCore::Memory', {
+      DeletionPolicy: 'Retain',
+      UpdateReplacePolicy: 'Retain',
+      Properties: {
+        Name: 'prod_bed_assistant_memory',
+        EventExpiryDuration: 7,
+        MemoryStrategies: [
+          {
+            UserPreferenceMemoryStrategy: Match.objectLike({
+              Name: 'preferences',
+              Namespaces: ['/users/{actorId}/preferences'],
+            }),
+          },
+        ],
+      },
+    });
+    template.resourceCountIs('AWS::BedrockAgentCore::Memory', 1);
+  });
+
+  it('publishes the memory id for the runtime', () => {
+    template.hasResourceProperties('AWS::SSM::Parameter', {
+      Name: '/hochbeet/prod/assistant/memory-id',
+      Value: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Memory'), 'MemoryId'] },
     });
   });
 

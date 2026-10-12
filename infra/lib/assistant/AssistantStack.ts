@@ -92,6 +92,7 @@ export class AssistantStack extends Stack {
     const userPoolId = read(names.userPoolId);
     const userPoolClientId = read(names.userPoolClientId);
     const quotaTableName = read(names.assistantQuotaTableName);
+    const memoryId = read(names.assistantMemoryId);
 
     // Only ID tokens of this app's client and of the allowed groups get through.
     const authorizer = agentcore.RuntimeAuthorizerConfiguration.usingJWT(
@@ -202,6 +203,8 @@ export class AssistantStack extends Stack {
         GATEWAY_URL: gatewayUrl,
         MAX_TOOL_CALLS: String(assistant.maxToolCalls),
         SUGGESTION_ROUNDS: String(assistant.suggestionRounds),
+        MEMORY_ID: memoryId,
+        HISTORY_MESSAGES: String(assistant.historyMessages),
       },
       // X-Ray tracing needs Transaction Search enabled in the account (see docs/architecture.md).
       tracingEnabled: false,
@@ -228,6 +231,30 @@ export class AssistantStack extends Stack {
         actions: ['dynamodb:UpdateItem'],
         resources: [
           this.formatArn({ service: 'dynamodb', resource: 'table', resourceName: quotaTableName }),
+        ],
+      }),
+    );
+
+    // Memory (T-44): conversations and preferences of all users in one memory; the agent
+    // separates them by actor (`sub` from the verified token), IAM cannot per user.
+    this.runtime.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'bedrock-agentcore:CreateEvent',
+          'bedrock-agentcore:GetEvent',
+          'bedrock-agentcore:ListEvents',
+          'bedrock-agentcore:DeleteEvent',
+          'bedrock-agentcore:ListSessions',
+          'bedrock-agentcore:RetrieveMemoryRecords',
+          'bedrock-agentcore:ListMemoryRecords',
+          'bedrock-agentcore:BatchDeleteMemoryRecords',
+        ],
+        resources: [
+          this.formatArn({
+            service: 'bedrock-agentcore',
+            resource: 'memory',
+            resourceName: memoryId,
+          }),
         ],
       }),
     );

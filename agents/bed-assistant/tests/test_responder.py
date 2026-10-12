@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from bed_assistant import responder as module
+from bed_assistant.auth import Caller
 from bed_assistant.config import Settings
 from bed_assistant.responder import (
     TOOL_LIMIT_MESSAGE,
@@ -17,6 +18,11 @@ from bed_assistant.suggest import SuggestionError
 from .helpers import token
 
 USER_TOKEN = token({"sub": "u-1", "cognito:groups": ["ai-testers"]})
+USER = Caller("u-1", frozenset({"ai-testers"}), USER_TOKEN)
+
+
+def caller(sub: str) -> Caller:
+    return Caller(sub, frozenset(), token({"sub": sub}))
 
 
 def settings(**env: str) -> Settings:
@@ -98,7 +104,7 @@ async def test_uses_the_gateway_tools_with_the_callers_token(agents: list[FakeAg
     responder = StrandsResponder(
         settings(GATEWAY_URL="https://gw.example/mcp", MAX_TOOL_CALLS="4"), FakeGateway
     )
-    text = await collect(responder.stream("Was steht im Beet?", USER_TOKEN))
+    text = await collect(responder.stream("Was steht im Beet?", USER, None))
     assert text == ["Im Beet ", "stehen Tomaten."]
     [agent] = agents
     assert agent.kwargs["tools"] == [FakeGateway("https://gw.example/mcp", USER_TOKEN)]
@@ -112,8 +118,8 @@ async def test_uses_the_gateway_tools_with_the_callers_token(agents: list[FakeAg
 
 async def test_a_new_agent_and_session_per_request(agents: list[FakeAgent]) -> None:
     responder = StrandsResponder(settings(GATEWAY_URL="https://gw.example/mcp"), FakeGateway)
-    await collect(responder.stream("Erste", token({"sub": "a"})))
-    await collect(responder.stream("Zweite", token({"sub": "b"})))
+    await collect(responder.stream("Erste", caller("a"), None))
+    await collect(responder.stream("Zweite", caller("b"), None))
     tokens = [agent.kwargs["tools"][0].token for agent in agents]
     assert tokens == [token({"sub": "a"}), token({"sub": "b"})]
 
@@ -122,7 +128,7 @@ async def test_answers_without_tools_when_no_gateway_is_configured(
     agents: list[FakeAgent],
 ) -> None:
     responder = StrandsResponder(settings(), FakeGateway)
-    await collect(responder.stream("Hallo", USER_TOKEN))
+    await collect(responder.stream("Hallo", USER, None))
     assert agents[0].kwargs["tools"] == []
 
 
@@ -158,7 +164,7 @@ async def test_text_after_a_tool_call_starts_a_new_paragraph(
 
     monkeypatch.setattr(module, "Agent", fake_agent)
     responder = StrandsResponder(settings(GATEWAY_URL="https://gw.example/mcp"), FakeGateway)
-    text = await collect(responder.stream("Was steht im Beet?", USER_TOKEN))
+    text = await collect(responder.stream("Was steht im Beet?", USER, None))
     assert "".join(text) == "Ich schaue nach.\n\nIm Beet stehen Tomaten."
 
 
@@ -168,7 +174,7 @@ async def test_suggestions_use_structured_output_and_check_with_the_gateway(
     responder = StrandsResponder(
         settings(GATEWAY_URL="https://gw.example/mcp", SUGGESTION_ROUNDS="2"), FakeGateway
     )
-    result = await responder.suggest("Was passt noch?", USER_TOKEN, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
+    result = await responder.suggest("Was passt noch?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
     # Corrected onto the grid and the Monday.
     assert result.suggestions[0] | {} == {
         "plantId": "01M49THV00QS1SEJEM64991JH5",
@@ -188,7 +194,7 @@ async def test_suggestions_use_structured_output_and_check_with_the_gateway(
 
 async def test_no_suggestions_without_gateway(agents: list[FakeAgent]) -> None:
     with pytest.raises(SuggestionError, match="nicht verfügbar"):
-        await StrandsResponder(settings(), FakeGateway).suggest("?", USER_TOKEN, "B")
+        await StrandsResponder(settings(), FakeGateway).suggest("?", USER, "B")
 
 
 def test_the_gateway_client_sends_the_token_as_bearer(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -203,3 +209,84 @@ def test_the_gateway_client_sends_the_token_as_bearer(monkeypatch: pytest.Monkey
     assert built == [
         {"url": "https://gw.example/mcp", "headers": {"Authorization": f"Bearer {USER_TOKEN}"}}
     ]
+
+
+@dataclass
+class FakeSessions:
+    """Records which memory sessions the responder opens, instead of AgentCore Memory."""
+
+    opened: list[tuple[str, str, str]] = field(default_factory=list)
+
+    def __call__(self, settings: Settings, user_id: str, session_id: str) -> str:
+        self.opened.append((settings.memory_id, user_id, session_id))
+        return f"session:{user_id}:{session_id}"
+
+
+async def test_continues_the_conversation_of_the_callers_own_session(
+    agents: list[FakeAgent],
+) -> None:
+    sessions = FakeSessions()
+    responder = StrandsResponder(
+        settings(MEMORY_ID="mem-1", HISTORY_MESSAGES="12"), FakeGateway, session_factory=sessions
+    )
+    await collect(responder.stream("ja", caller("a"), "chat-1234"))
+    await collect(responder.stream("ja", caller("b"), "chat-1234"))
+    # The actor is always the caller from the token, so two users never share a conversation.
+    assert sessions.opened == [("mem-1", "a", "chat-1234"), ("mem-1", "b", "chat-1234")]
+    assert [a.kwargs["session_manager"] for a in agents] == [
+        "session:a:chat-1234",
+        "session:b:chat-1234",
+    ]
+    assert agents[0].kwargs["conversation_manager"].window_size == 12
+
+
+async def test_no_memory_session_without_memory_or_a_valid_session_id(
+    agents: list[FakeAgent],
+) -> None:
+    sessions = FakeSessions()
+    without = StrandsResponder(settings(), FakeGateway, session_factory=sessions)
+    await collect(without.stream("Hallo", USER, "chat-1234"))
+    with_memory = StrandsResponder(settings(MEMORY_ID="m"), FakeGateway, session_factory=sessions)
+    await collect(with_memory.stream("Hallo", USER, None))
+    await collect(with_memory.stream("Hallo", USER, "../other user"))
+    assert sessions.opened == []
+    assert all("session_manager" not in a.kwargs for a in agents)
+
+
+class FakeRecall:
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.users: list[str] = []
+
+    def preferences(self, user_id: str) -> list[dict[str, str]]:
+        return []
+
+    def recall(self, user_id: str, query: str) -> list[str]:
+        self.users.append(user_id)
+        if self.fail:
+            raise RuntimeError("AgentCore down")
+        return ["Mag keinen Fenchel."]
+
+    def forget(self, user_id: str) -> tuple[int, int]:
+        return 0, 0
+
+
+async def test_suggestions_know_the_callers_preferences(agents: list[FakeAgent]) -> None:
+    recall = FakeRecall()
+    responder = StrandsResponder(
+        settings(GATEWAY_URL="https://gw.example/mcp", MEMORY_ID="m"), FakeGateway, memory=recall
+    )
+    await responder.suggest("Was passt noch?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
+    assert recall.users == ["u-1"]
+    assert "- Mag keinen Fenchel." in agents[0].kwargs["prompts"][0]
+    # Suggestion rounds are not stored as conversation.
+    assert "session_manager" not in agents[0].kwargs
+
+
+async def test_suggestions_work_when_recalling_fails(agents: list[FakeAgent]) -> None:
+    responder = StrandsResponder(
+        settings(GATEWAY_URL="https://gw.example/mcp"), FakeGateway, memory=FakeRecall(fail=True)
+    )
+    result = await responder.suggest("Was passt noch?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
+    assert result.summary == "Eine Tomate."
+    assert "Vorlieben" not in agents[0].kwargs["prompts"][0]

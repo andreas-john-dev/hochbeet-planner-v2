@@ -1,5 +1,5 @@
 import { MAX_ASSISTANT_MESSAGE_CHARS, type Suggestion } from '@hochbeet/contracts';
-import { Bot, Send, Sprout, Square } from 'lucide-react';
+import { Bot, MessageSquarePlus, Send, Sprout, Square } from 'lucide-react';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -29,7 +29,8 @@ export const DEFAULT_SUGGESTION_QUESTION = 'Was kann ich in dieses Beet noch pfl
 
 /**
  * Chat with the Beet-Assistent about the bed on screen. Answers stream in and can be
- * cancelled; the quota left today shows after each answer. One runtime session per chat.
+ * cancelled; the quota left today shows after each answer. One runtime session per
+ * conversation: the agent remembers it, „Neue Unterhaltung“ starts a fresh one.
  */
 export function AssistantChat({
   bedId,
@@ -48,7 +49,7 @@ export function AssistantChat({
   className?: string;
 }) {
   const stream = useApiStream();
-  const [sessionId] = useState(newSessionId);
+  const [sessionId, setSessionId] = useState(newSessionId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string>();
@@ -104,6 +105,14 @@ export function AssistantChat({
       setBusy(false);
       abort.current = null;
     }
+  };
+
+  /** A new session: the agent no longer knows the previous messages (preferences stay). */
+  const restart = () => {
+    setMessages([]);
+    setError(undefined);
+    setSessionId(newSessionId());
+    input.current?.focus();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -176,9 +185,23 @@ export function AssistantChat({
           placeholder="Was passt gut zu Tomaten?"
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-muted-foreground text-xs" aria-live="polite">
-            {remaining !== undefined && `Noch ${String(remaining)} Fragen heute.`}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-2">
+            <p className="text-muted-foreground text-xs" aria-live="polite">
+              {remaining !== undefined && `Noch ${String(remaining)} Fragen heute.`}
+            </p>
+            {messages.length > 0 && !busy && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-11 px-2 md:h-8"
+                onClick={restart}
+              >
+                <MessageSquarePlus aria-hidden />
+                Neue Unterhaltung
+              </Button>
+            )}
+          </div>
           {busy ? (
             <Button
               type="button"
