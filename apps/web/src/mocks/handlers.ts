@@ -27,6 +27,7 @@ import type { MockStore } from './store';
 export interface MockUser {
   id: string;
   admin: boolean;
+  groups: string[];
 }
 
 /**
@@ -36,8 +37,9 @@ export interface MockUser {
 export function userOf(request: Request): MockUser | undefined {
   const token = request.headers.get('Authorization')?.replace(/^Bearer /, '');
   if (!token?.startsWith('mock-id-token.')) return undefined;
-  const [id = '', groups = ''] = token.slice('mock-id-token.'.length).split('|');
-  return { id, admin: groups.split(',').includes('admins') };
+  const [id = '', groupList = ''] = token.slice('mock-id-token.'.length).split('|');
+  const groups = groupList.split(',').filter(Boolean);
+  return { id, admin: groups.includes('admins'), groups };
 }
 
 const NO_REQUEST = 'Für diese Sorte gibt es keine offene Anfrage.';

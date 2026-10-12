@@ -36,6 +36,10 @@ export interface WebConfig {
 }
 
 const SPA_REWRITE_CODE = readFileSync(new URL('./spa-rewrite.js', import.meta.url), 'utf8');
+const ASSISTANT_REWRITE_CODE = readFileSync(
+  new URL('./assistant-rewrite.js', import.meta.url),
+  'utf8',
+);
 
 /** Private S3 bucket behind CloudFront that serves the SPA, its config and later the APIs. */
 export class FrontendStack extends Stack {
@@ -173,6 +177,39 @@ export class FrontendStack extends Stack {
       cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
     });
+  }
+
+  /**
+   * Routes `/api/assistant/invocations` to the AgentCore Runtime of the Beet-Assistent, so the
+   * app calls it on its own domain without CORS, like the services. A CloudFront Function maps
+   * the path to the runtime's invocation URL; all viewer headers except Host (Authorization,
+   * the runtime session id) reach the runtime, which checks the ID token itself. Answers are
+   * streamed (SSE) and never cached; the read timeout covers tool calls before the first token.
+   */
+  addAssistantBehavior(runtimeArn: string) {
+    const rewrite = new cloudfront.Function(this, 'AssistantRewrite', {
+      code: cloudfront.FunctionCode.fromInline(
+        ASSISTANT_REWRITE_CODE.replace('__RUNTIME_ARN__', runtimeArn),
+      ),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+      comment: 'Map /api/assistant/invocations to the AgentCore Runtime',
+    });
+    this.distribution.addBehavior(
+      '/api/assistant/*',
+      new origins.HttpOrigin(`bedrock-agentcore.${this.region}.amazonaws.com`, {
+        protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+        readTimeout: Duration.seconds(60),
+      }),
+      {
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        functionAssociations: [
+          { function: rewrite, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
+        ],
+      },
+    );
   }
 
   /**

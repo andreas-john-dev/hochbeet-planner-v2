@@ -6,6 +6,12 @@ import { DirectionSchema, IsoDateSchema, UlidSchema } from '../primitives';
 // Python (agents/bed-assistant); its pydantic model mirrors this schema, and infra passes the
 // limit below to it, so both sides check the same length.
 
+/** Cognito groups that may use the assistant; infra's stage config and the app use these. */
+export const ASSISTANT_GROUPS = ['ai-testers', 'admins'] as const;
+
+/** Header with the runtime session id (at least 33 characters), sent with every question. */
+export const ASSISTANT_SESSION_HEADER = 'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id';
+
 /** Longest question the assistant accepts. */
 export const MAX_ASSISTANT_MESSAGE_CHARS = 2000;
 

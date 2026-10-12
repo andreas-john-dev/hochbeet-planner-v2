@@ -1,5 +1,6 @@
 import { localRoutes } from '@/lib/local-api/routes';
 import { error, handle, toRequest } from '@/lib/local-api/router';
+import { assistantRoutes } from './assistant';
 import { mockRoutes, publicRoutes, userOf } from './handlers';
 import { MockStore } from './store';
 
@@ -21,6 +22,7 @@ export function createMockFetch(store = new MockStore()): typeof fetch {
     const routes = [
       ...localRoutes({ repo: store.repository(user.id), globals: () => store.readCatalog() }),
       ...mockRoutes(store, user),
+      ...assistantRoutes(store, user),
     ];
     return handle(routes, request);
   };

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
-import { createApiClient, shouldRetry } from '@/lib/api';
-import { ApiContext } from '@/lib/api-context';
+import { ApiError, createApiClient, createApiStream, shouldRetry } from '@/lib/api';
+import { ApiContext, ApiStreamContext } from '@/lib/api-context';
 import { useAuth } from '@/lib/auth/context';
 
 /**
@@ -26,12 +26,22 @@ export function ApiProvider({
         : createApiClient(() => adapter.getIdToken(), fetchFn),
     [guest, localFetch, adapter, fetchFn],
   );
+  // Streams exist only for signed-in users (the assistant); guests never reach them.
+  const stream = useMemo(
+    () =>
+      guest
+        ? () => Promise.reject(new ApiError(403, undefined))
+        : createApiStream(() => adapter.getIdToken(), fetchFn),
+    [guest, adapter, fetchFn],
+  );
   const identity = guest ? 'guest' : (user?.userId ?? 'signed-out');
   const queryClient = useMemo(() => newQueryClient(identity), [identity]);
 
   return (
     <ApiContext value={api}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <ApiStreamContext value={stream}>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </ApiStreamContext>
     </ApiContext>
   );
 }

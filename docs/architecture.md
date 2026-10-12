@@ -473,6 +473,15 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 
 **Abweichung vom Issue (T-41):** Statt eines Rules-Lambda-Targets plus OpenAPI-Targets für die Lese-Endpunkte gibt es ein Lambda-Target für alle vier Tools. OpenAPI-Targets verlangen einen eigenen ausgehenden Credential Provider (API-Key oder OAuth-Client-Credentials) und kennen das User-Token nicht; außerdem gingen die vollen Service-Antworten (alle Felder, IDs statt Namen) ungefiltert an das Modell. Die Lambda bekommt das Token über den Interceptor, ruft dieselben Endpunkte mit dem User-Token auf und liefert knappe, für das Modell aufbereitete Antworten.
 
+**Chat im Editor (T-42):**
+
+- Weg vom Browser zur Runtime: über CloudFront auf der eigenen Domain unter `POST /api/assistant/invocations` (`FrontendStack.addAssistantBehavior()`). Eine CloudFront Function (`assistant-rewrite.js`) schreibt den Pfad auf `/runtimes/<URL-kodierte ARN>/invocations?qualifier=DEFAULT` um; andere Pfade und Methoden beantwortet sie mit 404. Origin ist `bedrock-agentcore.<region>.amazonaws.com`, ohne Cache, mit allen Viewer-Headern außer Host (also `Authorization` und die Session-ID), Read-Timeout 60 s für Tool-Aufrufe vor dem ersten Token. Die ARN liest der Frontend-Stack aus SSM.
+- Begründung: Same-Origin wie bei den Services, also kein CORS (die Runtime bietet keine CORS-Konfiguration), keine Runtime-URL im Frontend-Build, dieselbe Domain-Logik für App und Smoke-Tests. Die Runtime prüft das ID-Token selbst; CloudFront reicht es nur durch.
+- Frontend: Button „Assistent“ in der Editor-Leiste nur für `ai-testers` und `admins` (`canUseAssistant()` in `src/lib/assistant.ts`, Gruppen als `ASSISTANT_GROUPS` in `packages/contracts`, auch von der Stage-Konfiguration genutzt), nie für Gäste. Desktop: Seitenleiste rechts neben dem Beet, die beim Schließen das Gespräch behält; unter `md`: Bottom-Sheet. Beim Öffnen steht der Fokus im Fragefeld; Enter sendet, Umschalt+Enter macht eine neue Zeile.
+- `askAssistant()` schickt Frage und `bedId` mit einer Session-ID pro Chat (`X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`) über `useApiStream()` (wie `useApi()`, aber mit dem Response-Stream) und liest die Server-Sent Events gegen `AssistantEventSchema`. Text erscheint Stück für Stück; „Abbrechen“ bricht den Request ab. Nach jeder Antwort zeigt der Chat die übrigen Fragen des Tages. Fehler (403, 429, Abbruch mittendrin) kommen als deutsche Meldung über `apiErrorMessage()`.
+- Ein Hinweis unter dem Chat sagt, dass Antworten von einer KI stammen und falsch sein können.
+- Mock (`apps/web/src/mocks/assistant.ts`): dieselben Prüfungen wie der Agent (403 ohne Gruppe, 400, 429 über 20 Fragen am Tag, gezählt im `MockStore`), dann eine feste Antwort als SSE in Stücken; so laufen Dev-Server und Playwright ohne AWS.
+
 ### Gemeinsamer Service-Code
 
 `packages/service-kit` (`@hochbeet/service-kit`) enthält, was alle Lambdaliths teilen:
@@ -675,7 +684,7 @@ Eine CDK-App in TypeScript deployt acht Stacks nach `eu-central-1` und den Zerti
 | `Prod-AssistantStateful` | DynamoDB-Tabelle für das Tageskontingent des Assistenten (TTL) | – |
 | `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer und Usage-Logs; AgentCore Gateway mit Tool-Lambda und Request-Interceptor | User Pool, Kontingent-Tabelle; Garden- und Catalog-API über die Domain |
 | `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
-| `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds | User Pool, API-URLs; Zertifikat per Cross-Region-Referenz |
+| `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds; `/api/assistant/*` zur AgentCore Runtime | User Pool, API-URLs, Runtime-ARN; Zertifikat per Cross-Region-Referenz |
 
 CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP API und alles andere auf den Bucket. Damit gibt es nur eine Origin und keine CORS-Konfiguration. Die Origin-Request-Policy reicht den `Authorization`-Header durch, für `/api/*` ist Caching aus. Einzige Ausnahme ist der öffentliche Katalog unter `/api/catalog/public/*`: Er wird ohne Viewer-Header weitergereicht und 5 Minuten gecacht.
 
@@ -712,7 +721,7 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 | `/hochbeet/<stage>/garden/table-name` | `Prod-GardenStateful` | Name der Garden-Tabelle |
 | `/hochbeet/<stage>/garden/api-domain` | `Prod-GardenStateless` | Domain der Garden-HTTP-API, Origin für `/api/garden/*` in CloudFront |
 | `/hochbeet/<stage>/assistant/quota-table-name` | `Prod-AssistantStateful` | Tabelle der Tageskontingente, gelesen von `Prod-Assistant` |
-| `/hochbeet/<stage>/assistant/runtime-arn` | `Prod-Assistant` | ARN der AgentCore Runtime, für das Frontend (T-42) |
+| `/hochbeet/<stage>/assistant/runtime-arn` | `Prod-Assistant` | ARN der AgentCore Runtime, gelesen von `Prod-Frontend` für `/api/assistant/*` |
 
 ### Cognito-Konfiguration
 

@@ -38,6 +38,30 @@ export function createApiClient(getIdToken: TokenProvider, fetchFn: typeof fetch
   };
 }
 
+/**
+ * Like `createApiClient`, but resolves with the response itself so the caller can read a
+ * stream (e.g. the assistant's server-sent events). Non-2xx responses still throw `ApiError`
+ * with the parsed body.
+ */
+export function createApiStream(getIdToken: TokenProvider, fetchFn: typeof fetch = fetch) {
+  return async function apiStream(
+    path: `/api/${string}`,
+    init: RequestInit = {},
+  ): Promise<Response> {
+    const headers = new Headers(init.headers);
+    const token = await getIdToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (init.body !== undefined && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    const response = await fetchFn(path, { ...init, headers });
+    if (!response.ok) throw new ApiError(response.status, parseBody(await response.text()));
+    return response;
+  };
+}
+
+export type ApiStream = ReturnType<typeof createApiStream>;
+
 /** JSON body, or undefined for empty and non-JSON bodies (e.g. a proxy's HTML error page). */
 function parseBody(text: string): unknown {
   if (!text) return undefined;
@@ -61,6 +85,7 @@ export function apiErrorMessage(error: unknown): string {
     if (error.status === 401) return 'Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.';
     if (error.status === 403) return 'Dafür fehlt dir die Berechtigung.';
     if (error.status === 404) return 'Das gibt es nicht mehr. Bitte lade die Seite neu.';
+    if (error.status === 429) return 'Zu viele Anfragen. Bitte versuche es später noch einmal.';
     if (error.status >= 500) {
       return 'Der Server hat gerade ein Problem. Bitte versuche es gleich noch einmal.';
     }

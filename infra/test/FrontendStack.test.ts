@@ -26,6 +26,8 @@ function fakeWebDist() {
 
 interface CacheBehavior {
   PathPattern: string;
+  TargetOriginId?: string;
+  FunctionAssociations?: { EventType: string }[];
   CachePolicyId?: unknown;
   OriginRequestPolicyId?: unknown;
   AllowedMethods?: string[];
@@ -50,6 +52,9 @@ describe('FrontendStack', () => {
     const catalog = new HttpOrigin('catalog.example.com');
     stack.addPublicApiBehavior('/api/catalog/public/*', catalog, Duration.minutes(5));
     stack.addApiBehavior('/api/catalog/*', catalog);
+    stack.addAssistantBehavior(
+      'arn:aws:bedrock-agentcore:eu-central-1:123456789012:runtime/prod_bed_assistant-Ab1',
+    );
     nagViolations = synthAndCollectNagViolations(app, outdir);
     template = Template.fromStack(stack);
   });
@@ -99,6 +104,35 @@ describe('FrontendStack', () => {
           ViewerProtocolPolicy: 'redirect-to-https',
           FunctionAssociations: [Match.objectLike({ EventType: 'viewer-request' })],
         }),
+      }),
+    });
+  });
+
+  it('routes the assistant to the AgentCore Runtime on the own domain, uncached and streamed', () => {
+    const assistant = behavior('/api/assistant/*');
+    expect(assistant?.CachePolicyId).toBe(CACHING_DISABLED);
+    // Authorization and the runtime session id reach the runtime; Host must not.
+    expect(assistant?.OriginRequestPolicyId).toBe(ALL_VIEWER_EXCEPT_HOST_HEADER);
+    expect(assistant?.AllowedMethods).toContain('POST');
+    expect(assistant?.FunctionAssociations).toEqual([
+      expect.objectContaining({ EventType: 'viewer-request' }),
+    ]);
+    template.hasResourceProperties('AWS::CloudFront::Function', {
+      FunctionCode: Match.stringLikeRegexp(
+        "RUNTIME_ARN = 'arn:aws:bedrock-agentcore:eu-central-1:123456789012:runtime/prod_bed_assistant-Ab1'",
+      ),
+    });
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        Origins: Match.arrayWith([
+          Match.objectLike({
+            DomainName: 'bedrock-agentcore.eu-central-1.amazonaws.com',
+            CustomOriginConfig: Match.objectLike({
+              OriginProtocolPolicy: 'https-only',
+              OriginReadTimeout: 60,
+            }),
+          }),
+        ]),
       }),
     });
   });

@@ -1,3 +1,5 @@
+import { ASSISTANT_GROUPS } from '@hochbeet/contracts';
+
 export interface DomainConfig {
   /** Fully qualified domain of the app, e.g. `hochbeet.andi-john-dev.de`. */
   readonly name: string;
@@ -60,7 +62,8 @@ export const stages: readonly StageConfig[] = [
       dailyMessageLimit: 20,
       maxTokens: 1024,
       maxToolCalls: 6,
-      allowedGroups: [AI_TESTERS_GROUP, 'admins'],
+      // The app shows the chat to the same groups (packages/contracts).
+      allowedGroups: [...ASSISTANT_GROUPS],
     },
     monthlyBudgetUsd: 10,
   },
