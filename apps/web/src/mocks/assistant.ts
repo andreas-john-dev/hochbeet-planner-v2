@@ -1,4 +1,9 @@
-import { ASSISTANT_GROUPS, type AssistantEvent, AssistantRequestSchema } from '@hochbeet/contracts';
+import {
+  ASSISTANT_GROUPS,
+  type AssistantEvent,
+  AssistantRequestSchema,
+  type Suggestion,
+} from '@hochbeet/contracts';
 import { error, parseJson, route, type Route } from '@/lib/local-api/router';
 import { ASSISTANT_PATH } from '@/lib/assistant';
 import type { MockUser } from './handlers';
@@ -20,6 +25,33 @@ export function mockAnswer(bedId: string | undefined): string[] {
   ];
 }
 
+/**
+ * Fixed suggestions of the mock (free spots of the e2e example bed, week of 5 October 2026):
+ * a lettuce and a row of radishes.
+ */
+export const MOCK_SUGGESTIONS: Suggestion[] = [
+  {
+    plantId: '01M49THV00RK9E9PC83NEE87CJ',
+    kind: 'SINGLE',
+    x: 130,
+    y: 50,
+    startDate: '2026-10-05',
+    reason: 'Kopfsalat wächst schnell und füllt die Lücke zwischen den Reihen.',
+  },
+  {
+    plantId: '01M49THV00NAC3VGAMQF7XGNWF',
+    kind: 'ROW',
+    x: 145,
+    y: 35,
+    orientation: 'V',
+    lengthCm: 30,
+    startDate: '2026-10-05',
+    reason: 'Radieschen sind nach wenigen Wochen erntereif.',
+  },
+];
+
+export const MOCK_SUGGESTION_SUMMARY = 'Zwei Vorschläge für die freie Fläche in der Mitte.';
+
 const sse = (event: AssistantEvent) => `data: ${JSON.stringify(event)}\n\n`;
 
 /**
@@ -35,6 +67,9 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
       }
       const parsed = await parseJson(request, AssistantRequestSchema);
       if (parsed.response) return parsed.response;
+      if (parsed.data.suggest && !parsed.data.bedId) {
+        return error('Für Pflanzvorschläge brauche ich ein Beet.', 400);
+      }
       const remaining = store.takeAssistantQuestion(
         user.id,
         new Date().toISOString().slice(0, 10),
@@ -46,7 +81,8 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
           429,
         );
       }
-      const chunks = mockAnswer(parsed.data.bedId);
+      const suggest = parsed.data.suggest === true && parsed.data.bedId !== undefined;
+      const chunks = suggest ? [MOCK_SUGGESTION_SUMMARY] : mockAnswer(parsed.data.bedId);
       const encoder = new TextEncoder();
       let cancelled = false;
       const body = new ReadableStream<Uint8Array>({
@@ -55,6 +91,11 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
             await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
             if (cancelled) return;
             controller.enqueue(encoder.encode(sse({ text })));
+          }
+          if (suggest) {
+            controller.enqueue(
+              encoder.encode(sse({ suggestions: MOCK_SUGGESTIONS, warnings: [] })),
+            );
           }
           controller.enqueue(encoder.encode(sse({ done: true, remaining })));
           controller.close();

@@ -1,4 +1,5 @@
 import {
+  type CandidatePlanting,
   type CatalogPlant,
   type EvaluateBedToolOutput,
   EvaluateBedToolInputSchema,
@@ -11,7 +12,7 @@ import {
   type Planting,
   type ToolError,
 } from '@hochbeet/contracts';
-import { evaluateBed } from '@hochbeet/garden-rules';
+import { candidatePlanting, evaluateBed } from '@hochbeet/garden-rules';
 import { z } from 'zod';
 import { type GardenReader, ToolFailure } from './api';
 
@@ -38,7 +39,7 @@ export const TOOL_DEFINITIONS = {
   },
   evaluate_bed: {
     description:
-      'Prüft ein Beet mit der Regel-Engine des Planers (Abstand, Nachbarn, Starkzehrer, Fruchtfolge, Beetrand) und liefert die Hinweise.',
+      'Prüft ein Beet mit der Regel-Engine des Planers (Abstand, Nachbarn, Starkzehrer, Fruchtfolge, Beetrand), optional zusammen mit geplanten Pflanzungen, und liefert die Hinweise.',
     input: EvaluateBedToolInputSchema,
   },
 } as const;
@@ -124,15 +125,31 @@ async function findPlants(api: GardenReader, query?: string): Promise<FindPlants
   };
 }
 
+/** Id of a candidate planting while it is checked; never stored. */
+const candidateId = (index: number) => `candidate-${String(index)}`;
+
 async function evaluate(
   api: GardenReader,
   bedId: string,
   week?: string,
+  candidates: readonly CandidatePlanting[] = [],
 ): Promise<EvaluateBedToolOutput> {
   const [{ bed, plantings }, { plants }] = await Promise.all([api.getBed(bedId), api.listPlants()]);
   const names = plantNames(plants);
-  const plantOf = new Map(plantings.map((p) => [p.id, names.get(p.plantId) ?? 'Unbekannte Sorte']));
-  const findings = evaluateBed(bed, plantings, plants, week ? { week } : {});
+  const byId = new Map(plants.map((plant) => [plant.id, plant]));
+  const unknownCandidates: number[] = [];
+  const planned = candidates.flatMap((candidate, index) => {
+    const plant = byId.get(candidate.plantId);
+    if (!plant) {
+      unknownCandidates.push(index);
+      return [];
+    }
+    return [candidatePlanting(candidate, bed, plant, candidateId(index))];
+  });
+  const all = [...plantings, ...planned];
+  const plantOf = new Map(all.map((p) => [p.id, names.get(p.plantId) ?? 'Unbekannte Sorte']));
+  const indexOf = new Map(planned.map((p) => [p.id, Number(p.id.slice('candidate-'.length))]));
+  const findings = evaluateBed(bed, all, plants, week ? { week } : {});
   return {
     findings: findings.map((finding) => ({
       severity: finding.severity,
@@ -140,7 +157,9 @@ async function evaluate(
       plants: finding.plantingIds.map((id) => plantOf.get(id) ?? 'Unbekannte Sorte'),
       from: finding.period.start,
       until: finding.period.end,
+      candidates: finding.plantingIds.flatMap((id) => indexOf.get(id) ?? []),
     })),
+    unknownCandidates,
   };
 }
 
@@ -181,7 +200,7 @@ export async function runTool(
             error: 'Bitte gib eine gültige Beet-ID und optional ein Datum (JJJJ-MM-TT) an.',
           };
         }
-        return await evaluate(api, input.data.bedId, input.data.week);
+        return await evaluate(api, input.data.bedId, input.data.week, input.data.candidates);
       }
     }
   } catch (cause) {

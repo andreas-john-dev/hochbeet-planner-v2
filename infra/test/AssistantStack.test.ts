@@ -47,6 +47,7 @@ describe('AssistantStack', () => {
         ALLOWED_GROUPS: 'ai-testers,admins',
         GATEWAY_URL: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Gateway'), 'GatewayUrl'] },
         MAX_TOOL_CALLS: '6',
+        SUGGESTION_ROUNDS: '2',
       },
     });
   });
@@ -215,6 +216,10 @@ describe('AssistantStack', () => {
       'evaluate_bed',
     ]);
     expect(tools.find((t) => t.Name === 'get_bed')?.InputSchema.Required).toEqual(['bedId']);
+    // evaluate_bed also checks planned plantings (suggestions) before they exist.
+    expect(JSON.stringify(tools.find((t) => t.Name === 'evaluate_bed')?.InputSchema)).toContain(
+      '"candidates":{"Description"',
+    );
     for (const tool of tools) expect(tool.Description).toMatch(/[äöüß]|Beet/);
     // Nothing that writes: names only read, list, find or evaluate.
     expect(tools.every((t) => /^(list|get|find|evaluate)_/.test(t.Name))).toBe(true);

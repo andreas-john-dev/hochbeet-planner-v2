@@ -94,7 +94,9 @@ test('shows the admin section only to admins', async ({ page }) => {
 });
 
 test('lists every page in pages.ts once', () => {
-  // Guest pages share paths with the signed-in pages, so a page is path plus access.
+  // Guest pages share paths with the signed-in pages, so a page is path plus access; states
+  // of a page (with `setup`, e.g. an open panel) share its path too.
   expect(new Set(appPages.map((p) => p.id)).size).toBe(appPages.length);
-  expect(new Set(appPages.map((p) => `${p.access} ${p.path}`)).size).toBe(appPages.length);
+  const pages = appPages.filter((p) => !p.setup);
+  expect(new Set(pages.map((p) => `${p.access} ${p.path}`)).size).toBe(pages.length);
 });

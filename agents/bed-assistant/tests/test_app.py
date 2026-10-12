@@ -7,6 +7,7 @@ from starlette.responses import Response, StreamingResponse
 from bed_assistant.app import UNAVAILABLE, handle
 from bed_assistant.config import Settings
 from bed_assistant.quota import QuotaExceededError
+from bed_assistant.suggest import SuggestionError, SuggestionResult
 
 from .helpers import token
 
@@ -33,6 +34,27 @@ class FakeResponder:
         self.fail = fail
         self.prompts: list[str] = []
         self.tokens: list[str] = []
+
+    async def suggest(self, question: str, token: str, bed_id: str) -> SuggestionResult:
+        self.prompts.append(f"suggest:{bed_id}:{question}")
+        self.tokens.append(token)
+        if self.fail:
+            raise SuggestionError("Das Beet gibt es nicht.")
+        return SuggestionResult(
+            suggestions=[
+                {
+                    "plantId": "P",
+                    "kind": "SINGLE",
+                    "x": 10,
+                    "y": 20,
+                    "startDate": "2026-05-04",
+                    "reason": "r",
+                }
+            ],
+            warnings=["Zu dicht."],
+            summary="Ein Vorschlag.",
+            rounds=2,
+        )
 
     async def stream(self, prompt: str, token: str) -> AsyncIterator[str]:
         self.prompts.append(prompt)
@@ -119,3 +141,36 @@ async def test_a_model_error_ends_the_stream_with_a_german_message() -> None:
     responder = FakeResponder(["Teil"], fail=True)
     response = await call({"message": "Hi"}, headers(["admins"]), responder=responder)
     assert await body_events(response) == [{"text": "Teil"}, {"error": UNAVAILABLE}]
+
+
+BED = "01J9ZQ3W8D6V2K5M7N8P9R0S1A"
+
+
+async def test_suggestions_come_as_text_then_an_event_with_the_remaining_warnings() -> None:
+    responder = FakeResponder([])
+    response = await call(
+        {"message": "Was passt noch?", "bedId": BED, "suggest": True},
+        headers(["ai-testers"]),
+        FakeQuota(remaining=5),
+        responder,
+    )
+    events = await body_events(response)
+    assert events[0] == {"text": "Ein Vorschlag.\n\nDie Regel-Engine meldet noch: Zu dicht."}
+    assert events[1]["warnings"] == ["Zu dicht."]
+    assert events[1]["suggestions"][0]["plantId"] == "P"
+    assert events[2] == {"done": True, "remaining": 5}
+    assert responder.prompts == [f"suggest:{BED}:Was passt noch?"]
+
+
+async def test_suggestions_need_a_bed_and_report_failures_in_german() -> None:
+    no_bed = await call({"message": "Vorschläge?", "suggest": True}, headers(["admins"]))
+    assert no_bed.status_code == 400
+    assert "brauche ich ein Beet" in message(no_bed)
+
+    failing = FakeResponder([], fail=True)
+    response = await call(
+        {"message": "Vorschläge?", "bedId": BED, "suggest": True},
+        headers(["admins"]),
+        responder=failing,
+    )
+    assert await body_events(response) == [{"error": "Das Beet gibt es nicht."}]

@@ -15,6 +15,7 @@ from .config import Settings
 from .prompt import InvalidRequestError, parse_request, user_prompt
 from .quota import DailyQuota, Quota, QuotaExceededError
 from .responder import Responder, StrandsResponder
+from .suggest import SuggestionError, SuggestionResult
 
 logger = logging.getLogger("bed_assistant")
 
@@ -68,11 +69,52 @@ async def handle(
             429,
         )
     logger.info("question", extra={"userId": caller.user_id, "remaining": remaining})
+    stream = (
+        suggestion_events(responder, request.message, caller.token, request.bed_id, remaining)
+        if request.suggest and request.bed_id
+        else events(responder.stream(user_prompt(request), caller.token), remaining)
+    )
     return StreamingResponse(
-        events(responder.stream(user_prompt(request), caller.token), remaining),
+        stream,
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Quota-Remaining": str(remaining)},
     )
+
+
+def suggestion_text(result: SuggestionResult) -> str:
+    """What the chat shows with the suggestions: the summary and any warnings left."""
+    if not result.suggestions:
+        return result.summary or "Ich habe gerade keinen passenden Vorschlag für dieses Beet."
+    text = result.summary or f"{len(result.suggestions)} Vorschläge für dein Beet."
+    if result.warnings:
+        text += "\n\nDie Regel-Engine meldet noch: " + " ".join(result.warnings)
+    return text
+
+
+async def suggestion_events(
+    responder: Responder, question: str, token: str, bed_id: str, remaining: int
+) -> AsyncIterator[str]:
+    """The summary as text, then the checked suggestions with remaining warnings, then done."""
+    try:
+        result = await responder.suggest(question, token, bed_id)
+    except SuggestionError as failed:
+        yield sse({"error": str(failed)})
+        return
+    except Exception:
+        logger.exception("suggestions failed")
+        yield sse({"error": UNAVAILABLE})
+        return
+    logger.info(
+        "suggestions",
+        extra={
+            "count": len(result.suggestions),
+            "warnings": len(result.warnings),
+            "rounds": result.rounds,
+        },
+    )
+    yield sse({"text": suggestion_text(result)})
+    yield sse({"suggestions": result.suggestions, "warnings": result.warnings})
+    yield sse({"done": True, "remaining": remaining})
 
 
 @cache

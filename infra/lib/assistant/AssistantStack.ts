@@ -201,6 +201,7 @@ export class AssistantStack extends Stack {
         ALLOWED_GROUPS: assistant.allowedGroups.join(','),
         GATEWAY_URL: gatewayUrl,
         MAX_TOOL_CALLS: String(assistant.maxToolCalls),
+        SUGGESTION_ROUNDS: String(assistant.suggestionRounds),
       },
       // X-Ray tracing needs Transaction Search enabled in the account (see docs/architecture.md).
       tracingEnabled: false,
