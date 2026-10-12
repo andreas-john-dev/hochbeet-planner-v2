@@ -18,6 +18,8 @@ class Settings:
     gateway_url: str = ""
     #: Tool calls per question; further calls are refused.
     max_tool_calls: int = 6
+    #: Rounds of suggest → check → revise for planting suggestions.
+    suggestion_rounds: int = 2
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "Settings":
@@ -33,4 +35,5 @@ class Settings:
             ),
             gateway_url=env.get("GATEWAY_URL", ""),
             max_tool_calls=int(env.get("MAX_TOOL_CALLS", "6")),
+            suggestion_rounds=int(env.get("SUGGESTION_ROUNDS", "2")),
         )

@@ -4,6 +4,7 @@ import {
   type AssistantEvent,
   AssistantEventSchema,
   type AssistantRequest,
+  type Suggestion,
 } from '@hochbeet/contracts';
 import { ApiError, type ApiStream } from './api';
 import type { AuthUser } from './auth/types';
@@ -78,6 +79,8 @@ export interface AskOptions extends AssistantRequest {
   signal?: AbortSignal;
   /** Called with every text chunk as it arrives. */
   onText: (text: string) => void;
+  /** Called with checked planting suggestions (`suggest: true`) and their remaining warnings. */
+  onSuggestions?: (suggestions: Suggestion[], warnings: string[]) => void;
 }
 
 /**
@@ -87,18 +90,19 @@ export interface AskOptions extends AssistantRequest {
  */
 export async function askAssistant(
   stream: ApiStream,
-  { message, bedId, sessionId, signal, onText }: AskOptions,
+  { message, bedId, suggest, sessionId, signal, onText, onSuggestions }: AskOptions,
 ): Promise<{ remaining: number }> {
   const response = await stream(ASSISTANT_PATH, {
     method: 'POST',
     headers: { [ASSISTANT_SESSION_HEADER]: sessionId, Accept: 'text/event-stream' },
-    body: JSON.stringify(bedId ? { message, bedId } : { message }),
+    body: JSON.stringify({ message, ...(bedId ? { bedId } : {}), ...(suggest ? { suggest } : {}) }),
     ...(signal ? { signal } : {}),
   });
   if (!response.body) throw new ApiError(502, { message: INTERRUPTED });
   for await (const event of assistantEvents(response.body, signal)) {
     signal?.throwIfAborted();
     if ('text' in event) onText(event.text);
+    else if ('suggestions' in event) onSuggestions?.(event.suggestions, event.warnings);
     else if ('error' in event) throw new ApiError(502, { message: event.error });
     else return { remaining: event.remaining };
   }

@@ -1,4 +1,4 @@
 {
   "extends": "@hochbeet/tsconfig/base.json",
-  "include": ["src", "*.ts"]
+  "include": ["src", "scripts", "*.ts"]
 }

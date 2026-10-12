@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { CategorySchema, FeederSchema, LifecycleSchema } from '../domain';
-import { DirectionSchema, IsoDateSchema, UlidSchema } from '../primitives';
+import { CategorySchema, FeederSchema, LifecycleSchema, PositiveGridCmSchema } from '../domain';
+import { DirectionSchema, GridCmSchema, IsoDateSchema, UlidSchema } from '../primitives';
 
 // Beet-Assistent on Bedrock AgentCore (docs/architecture.md, "Beet-Assistent"). The agent is
 // Python (agents/bed-assistant); its pydantic model mirrors this schema, and infra passes the
@@ -29,8 +29,38 @@ export const AssistantRequestSchema = z.object({
       `Deine Frage ist zu lang. Bitte fasse dich kürzer (höchstens ${String(MAX_ASSISTANT_MESSAGE_CHARS)} Zeichen).`,
     ),
   bedId: UlidSchema.optional(),
+  /** Asks for checked planting suggestions for `bedId` instead of a plain answer. */
+  suggest: z.boolean().optional(),
 });
 export type AssistantRequest = z.infer<typeof AssistantRequestSchema>;
+
+/** Most suggestions one answer may carry. */
+export const MAX_SUGGESTIONS = 6;
+
+/**
+ * A planting the assistant suggests, as the model writes it (structured output). The end
+ * follows from the plant's lifecycle when the user takes it over. Exported as JSON Schema to
+ * `schemas/` (`pnpm --filter @hochbeet/contracts schemas`); the agent generates its pydantic
+ * model from there.
+ */
+export const SuggestionSchema = z.object({
+  plantId: UlidSchema.describe('ID der Sorte aus find_plants.'),
+  kind: z.enum(['SINGLE', 'ROW']).describe('SINGLE: Einzelpflanze, ROW: Reihe.'),
+  x: GridCmSchema.describe('Position in cm vom linken Beetrand, Vielfaches von 5.'),
+  y: GridCmSchema.describe('Position in cm vom oberen Beetrand, Vielfaches von 5.'),
+  lengthCm: PositiveGridCmSchema.optional().describe('Nur für Reihen: Länge in cm.'),
+  orientation: DirectionSchema.optional().describe('Nur für Reihen: H waagerecht, V senkrecht.'),
+  startDate: IsoDateSchema.describe('Montag der Pflanzwoche (JJJJ-MM-TT).'),
+  reason: z.string().min(1).max(300).describe('Kurze Begründung auf Deutsch.'),
+});
+export type Suggestion = z.infer<typeof SuggestionSchema>;
+
+/** The structured answer of the suggestion mode. */
+export const SuggestionListSchema = z.object({
+  suggestions: z.array(SuggestionSchema).max(MAX_SUGGESTIONS),
+  summary: z.string().max(800).describe('Kurze Zusammenfassung der Vorschläge auf Deutsch.'),
+});
+export type SuggestionList = z.infer<typeof SuggestionListSchema>;
 
 /**
  * One server-sent event of the answer stream (`data: <json>`): text chunks, then `done` with
@@ -38,6 +68,8 @@ export type AssistantRequest = z.infer<typeof AssistantRequestSchema>;
  */
 export const AssistantEventSchema = z.union([
   z.object({ text: z.string() }),
+  // Checked suggestions plus the warnings the rule engine still reports for them.
+  z.object({ suggestions: z.array(SuggestionSchema), warnings: z.array(z.string()) }),
   z.object({ done: z.literal(true), remaining: z.number().int().min(0) }),
   z.object({ error: z.string() }),
 ]);
@@ -55,10 +87,19 @@ export const GetBedToolInputSchema = z.object({
   bedId: UlidSchema.describe('ID des Beets, z. B. aus list_beds.'),
 });
 
+/** A planting to check together with the bed before it exists (suggestions). */
+export const CandidatePlantingSchema = SuggestionSchema.omit({ reason: true });
+export type CandidatePlanting = z.infer<typeof CandidatePlantingSchema>;
+
 export const EvaluateBedToolInputSchema = GetBedToolInputSchema.extend({
   week: IsoDateSchema.optional().describe(
     'Ein Tag (JJJJ-MM-TT) der Woche, für die die Hinweise gelten sollen. Ohne Angabe: alle Hinweise der Beet-Historie.',
   ),
+  candidates: z
+    .array(CandidatePlantingSchema)
+    .max(MAX_SUGGESTIONS)
+    .optional()
+    .describe('Geplante Pflanzungen, die zusammen mit dem Beet geprüft werden sollen.'),
 });
 
 export const FindPlantsToolInputSchema = z.object({
@@ -131,8 +172,12 @@ export const EvaluateBedToolOutputSchema = z.object({
       plants: z.array(z.string()),
       from: IsoDateSchema,
       until: IsoDateSchema.nullable(),
+      /** Indexes of the candidates this finding involves; empty for the bed alone. */
+      candidates: z.array(z.number().int().min(0)),
     }),
   ),
+  /** Indexes of candidates with an unknown plant; they were not checked. */
+  unknownCandidates: z.array(z.number().int().min(0)),
 });
 
 /** What a tool returns when it cannot answer: a German message the agent passes on. */

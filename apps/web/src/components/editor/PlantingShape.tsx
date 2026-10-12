@@ -68,8 +68,9 @@ export function PlantingShape({
   /**
    * `preview`: the planting about to be placed, drawn lighter and dashed.
    * `ghost`: a predecessor or successor at the same place in another week, drawn faintly.
+   * `suggestion`: a planting the assistant suggests, dashed until the user takes it over.
    */
-  variant?: 'planted' | 'preview' | 'ghost';
+  variant?: 'planted' | 'preview' | 'ghost' | 'suggestion';
   selected?: boolean;
   /** For ghosts: before or after the planting of the shown week. */
   relation?: 'before' | 'after';
@@ -87,8 +88,9 @@ export function PlantingShape({
   const positions = plantPositions(planting, plant);
   const preview = variant === 'preview';
   const ghost = variant === 'ghost';
-  // Previews and ghosts are pictures only: not focusable, not clickable.
-  const inert = preview || ghost;
+  const suggestion = variant === 'suggestion';
+  // Previews, ghosts and suggestions are pictures only: not focusable, not clickable.
+  const inert = preview || ghost || suggestion;
   const outline = {
     fill: plant.color,
     fillOpacity: 0.3,
@@ -100,7 +102,7 @@ export function PlantingShape({
           ? '#dc2626'
           : plant.color,
     strokeWidth: highlighted ? 4 : selected ? 2.5 : status === 'WARNING' ? 2 : 1.5,
-    strokeDasharray: preview ? '4 3' : ghost ? '2 3' : undefined,
+    strokeDasharray: preview ? '4 3' : ghost ? '2 3' : suggestion ? '6 3' : undefined,
     vectorEffect: 'non-scaling-stroke' as const,
   };
   const label =
@@ -110,7 +112,13 @@ export function PlantingShape({
   return (
     <g
       data-testid={
-        preview ? 'placement-preview' : ghost ? `ghost-${planting.id}` : `planting-${planting.id}`
+        preview
+          ? 'placement-preview'
+          : ghost
+            ? `ghost-${planting.id}`
+            : suggestion
+              ? planting.id
+              : `planting-${planting.id}`
       }
       data-planting-id={inert ? undefined : planting.id}
       data-ghost={relation}
@@ -127,7 +135,7 @@ export function PlantingShape({
       aria-label={inert ? undefined : status ? `${label} (${STATUS_LABEL[status]})` : label}
       aria-pressed={inert ? undefined : selected}
       aria-hidden={inert || undefined}
-      opacity={preview ? 0.75 : ghost ? 0.3 : undefined}
+      opacity={preview ? 0.75 : ghost ? 0.3 : suggestion ? 0.7 : undefined}
       className={inert ? 'pointer-events-none' : 'cursor-move outline-none'}
       onFocus={onFocus}
     >

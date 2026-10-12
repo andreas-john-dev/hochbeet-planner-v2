@@ -12,6 +12,7 @@ from bed_assistant.responder import (
     ToolCallLimit,
     gateway_client,
 )
+from bed_assistant.suggest import SuggestionError
 
 from .helpers import token
 
@@ -24,10 +25,19 @@ def settings(**env: str) -> Settings:
 
 @dataclass
 class FakeGateway:
-    """Stands in for the MCP client of the gateway; records how it was built."""
+    """Stands in for the MCP client of the gateway; records how it was built and calls."""
 
     url: str
     token: str
+    calls: list[str] = field(default_factory=list)
+
+    async def call_tool_async(self, _id: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        self.calls.append(name)
+        if name == "garden___get_bed":
+            text = '{"bed": {"widthCm": 200, "depthCm": 100, "mainRowDirection": "H"}}'
+        else:
+            text = '{"findings": [], "unknownCandidates": []}'
+        return {"status": "success", "content": [{"text": text}]}
 
 
 @dataclass
@@ -35,14 +45,33 @@ class FakeAgent:
     """Captures what the responder builds and streams like a Strands agent."""
 
     kwargs: dict[str, Any]
-    chunks: list[str] = field(default_factory=lambda: ["Im Beet ", "stehen Tomaten."])
+    chunks: list[Any] = field(default_factory=lambda: ["Im Beet ", "stehen Tomaten."])
     cleaned_up: bool = False
 
     async def stream_async(self, prompt: str) -> AsyncIterator[dict[str, Any]]:
         self.kwargs["prompt"] = prompt
         yield {"init_event_loop": True}
         for chunk in self.chunks:
-            yield {"data": chunk}
+            yield {"data": chunk} if isinstance(chunk, str) else chunk
+
+    async def invoke_async(self, prompt: str, structured_output_model: Any) -> Any:
+        self.kwargs.setdefault("prompts", []).append(prompt)
+        answer = structured_output_model.model_validate(
+            {
+                "suggestions": [
+                    {
+                        "plantId": "01M49THV00QS1SEJEM64991JH5",
+                        "kind": "SINGLE",
+                        "x": 52,
+                        "y": 40,
+                        "startDate": "2026-05-06",
+                        "reason": "Sonnig.",
+                    }
+                ],
+                "summary": "Eine Tomate.",
+            }
+        )
+        return type("Result", (), {"structured_output": answer})()
 
     def cleanup(self) -> None:
         self.cleaned_up = True
@@ -99,6 +128,7 @@ async def test_answers_without_tools_when_no_gateway_is_configured(
 
 @dataclass
 class FakeToolCall:
+    tool_use: dict[str, Any] = field(default_factory=lambda: {"name": "garden___get_bed"})
     cancel_tool: bool | str = False
 
 
@@ -108,6 +138,57 @@ def test_refuses_tool_calls_beyond_the_limit() -> None:
     for call in calls:
         limit.before_tool_call(call)  # type: ignore[arg-type]
     assert [c.cancel_tool for c in calls] == [False, False, TOOL_LIMIT_MESSAGE, TOOL_LIMIT_MESSAGE]
+
+
+def test_the_structured_output_tool_does_not_count() -> None:
+    limit = ToolCallLimit(1)
+    gateway, structured = FakeToolCall(), FakeToolCall({"name": "SuggestionList"})
+    for call in (gateway, structured):
+        limit.before_tool_call(call)  # type: ignore[arg-type]
+    assert (gateway.cancel_tool, structured.cancel_tool, limit.calls) == (False, False, 1)
+
+
+async def test_text_after_a_tool_call_starts_a_new_paragraph(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = {"current_tool_use": {"name": "garden___get_bed"}}
+
+    def fake_agent(**kwargs: Any) -> FakeAgent:
+        return FakeAgent(kwargs, chunks=[tool, "Ich schaue nach.", tool, "Im Beet stehen Tomaten."])
+
+    monkeypatch.setattr(module, "Agent", fake_agent)
+    responder = StrandsResponder(settings(GATEWAY_URL="https://gw.example/mcp"), FakeGateway)
+    text = await collect(responder.stream("Was steht im Beet?", USER_TOKEN))
+    assert "".join(text) == "Ich schaue nach.\n\nIm Beet stehen Tomaten."
+
+
+async def test_suggestions_use_structured_output_and_check_with_the_gateway(
+    agents: list[FakeAgent],
+) -> None:
+    responder = StrandsResponder(
+        settings(GATEWAY_URL="https://gw.example/mcp", SUGGESTION_ROUNDS="2"), FakeGateway
+    )
+    result = await responder.suggest("Was passt noch?", USER_TOKEN, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
+    # Corrected onto the grid and the Monday.
+    assert result.suggestions[0] | {} == {
+        "plantId": "01M49THV00QS1SEJEM64991JH5",
+        "kind": "SINGLE",
+        "x": 50,
+        "y": 40,
+        "startDate": "2026-05-04",
+        "reason": "Sonnig.",
+    }
+    assert (result.warnings, result.summary, result.rounds) == ([], "Eine Tomate.", 1)
+    [agent] = agents
+    gateway = agent.kwargs["tools"][0]
+    assert gateway.token == USER_TOKEN
+    assert gateway.calls == ["garden___get_bed", "garden___evaluate_bed"]
+    assert agent.cleaned_up
+
+
+async def test_no_suggestions_without_gateway(agents: list[FakeAgent]) -> None:
+    with pytest.raises(SuggestionError, match="nicht verfügbar"):
+        await StrandsResponder(settings(), FakeGateway).suggest("?", USER_TOKEN, "B")
 
 
 def test_the_gateway_client_sends_the_token_as_bearer(monkeypatch: pytest.MonkeyPatch) -> None:

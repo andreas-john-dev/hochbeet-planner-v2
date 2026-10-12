@@ -33,3 +33,12 @@ export async function askAssistant(page: Page, question = 'Was passt zu Tomaten?
   await expect(page.getByRole('log').getByText(MOCK_ANSWER)).toBeVisible();
   await expect(page.getByText('Noch 19 Fragen heute.')).toBeVisible();
 }
+
+/** Asks for planting suggestions and waits until the mock's two suggestions are in the bed. */
+export async function requestSuggestions(page: Page) {
+  await openAssistant(page);
+  await page.getByRole('button', { name: 'Pflanzvorschläge' }).click();
+  await expect(page.getByRole('region', { name: 'Pflanzvorschläge im Beet' })).toBeVisible();
+  await expect(page.getByTestId('suggestion-0')).toHaveCount(1);
+  await expect(page.getByTestId('suggestion-1')).toHaveCount(1);
+}

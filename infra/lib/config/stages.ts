@@ -19,6 +19,8 @@ export interface AssistantConfig {
   readonly maxTokens: number;
   /** Tool calls per question; further calls are refused, so one question stays cheap. */
   readonly maxToolCalls: number;
+  /** Rounds of suggest → check → revise for planting suggestions; each round is a model call. */
+  readonly suggestionRounds: number;
   /** Cognito groups that may use the assistant; the runtime's authorizer checks them. */
   readonly allowedGroups: readonly string[];
 }
@@ -62,6 +64,7 @@ export const stages: readonly StageConfig[] = [
       dailyMessageLimit: 20,
       maxTokens: 1024,
       maxToolCalls: 6,
+      suggestionRounds: 2,
       // The app shows the chat to the same groups (packages/contracts).
       allowedGroups: [...ASSISTANT_GROUPS],
     },

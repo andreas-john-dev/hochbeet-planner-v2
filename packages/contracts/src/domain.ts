@@ -10,7 +10,7 @@ import {
 const NameSchema = z.string().trim().min(1, 'Bitte einen Namen angeben.').max(60);
 
 /** Positive grid length, e.g. bed size or row length. */
-const PositiveGridCmSchema = GridCmSchema.min(5, 'Mindestens 5 cm.');
+export const PositiveGridCmSchema = GridCmSchema.min(5, 'Mindestens 5 cm.');
 
 // ---------------------------------------------------------------------------
 // Bed

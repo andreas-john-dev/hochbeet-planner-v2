@@ -28,8 +28,8 @@ def test_refuses_too_long_questions() -> None:
 def test_names_the_bed_on_screen_before_the_question() -> None:
     request = parse_request({"message": "Passt das?", "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A"}, 100)
     assert user_prompt(request) == (
-        "Der User sieht gerade das Beet mit der ID 01J9ZQ3W8D6V2K5M7N8P9R0S1A.\n\n"
-        "Frage:\nPasst das?"
+        "Der User sieht gerade das Beet mit der ID 01J9ZQ3W8D6V2K5M7N8P9R0S1A (nur für die "
+        "Werkzeuge, nicht in der Antwort nennen).\n\nFrage:\nPasst das?"
     )
     assert user_prompt(AssistantRequest(message="Nur Text")) == "Nur Text"
 

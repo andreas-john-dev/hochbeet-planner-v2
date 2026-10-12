@@ -4,6 +4,7 @@ import { useStore } from 'zustand';
 import { isTempId, LONG_PRESS_MS, moveByKey, newPlanting, snapToBed } from '@/lib/editor/placement';
 import { withDraft } from '@/lib/editor/plantings';
 import type { EditorStore } from '@/lib/editor/store';
+import type { ShownSuggestion } from '@/lib/editor/suggestions';
 import type { Ghost } from '@/lib/editor/timeline';
 import type { Severity } from '@hochbeet/garden-rules';
 import { toCm, viewBox } from '@/lib/editor/viewport';
@@ -48,6 +49,7 @@ export function BedCanvas({
   svgRef,
   today,
   ghosts = [],
+  suggestions = [],
   statuses,
   describedBy,
   onPlace,
@@ -62,6 +64,8 @@ export function BedCanvas({
   today: Date;
   /** Predecessors and successors at the same place, drawn faintly. */
   ghosts?: readonly Ghost[];
+  /** The assistant's suggestions, drawn dashed on top until taken over or discarded. */
+  suggestions?: readonly ShownSuggestion[];
   /** Most serious finding of the shown week per planting id (`preview` for the preview). */
   statuses?: ReadonlyMap<string, Severity>;
   /** Id of the element with the keyboard instructions. */
@@ -385,6 +389,18 @@ export function BedCanvas({
             onFocus={() => {
               if (store.getState().selectedId !== planting.id) store.getState().select(planting.id);
             }}
+          />
+        ))}
+      </g>
+      <g data-testid="suggestions">
+        {suggestions.map(({ planting, plant, status }) => (
+          <PlantingShape
+            key={planting.id}
+            planting={planting}
+            plant={plant}
+            variant="suggestion"
+            status={status}
+            scale={viewport.scale}
           />
         ))}
       </g>

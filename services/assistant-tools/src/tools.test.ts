@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApiReader } from './api';
 import { createToolHandler, tokenOf, toolNameOf } from './handler';
 import { interceptRequest, TOKEN_ARGUMENT } from './interceptor';
-import { bed, catalog, fakeApi, planting, tokenFor } from './test-utils';
+import { bed, catalog, fakeApi, planting, plantId, tokenFor } from './test-utils';
 import { MAX_PLANTS, runTool, toolInputJsonSchemas, TOOL_DEFINITIONS } from './tools';
 
 const BED_A = '01J9ZQ3W8D6V2K5M7N8P9R0S1A';
@@ -123,7 +123,32 @@ describe('tools through the gateway path', () => {
       bedId: BED_A,
       week: '2026-12-07',
     });
-    expect(winter.result).toEqual({ findings: [] });
+    expect(winter.result).toEqual({ findings: [], unknownCandidates: [] });
+  });
+
+  it('checks planned plantings together with the bed and marks them', async () => {
+    const { result } = await callAsUser('user-a', 'evaluate_bed', {
+      bedId: BED_A,
+      week: '2026-06-10',
+      candidates: [
+        // Right next to the tomatoes: too close.
+        { plantId: plantId('Tomate'), kind: 'SINGLE', x: 35, y: 55, startDate: '2026-05-04' },
+        {
+          plantId: '01J9ZQ3W8D6V2K5M7N8P9R0Z99',
+          kind: 'SINGLE',
+          x: 100,
+          y: 40,
+          startDate: '2026-05-04',
+        },
+      ],
+    });
+    const output = EvaluateBedToolOutputSchema.parse(result);
+    expect(output.unknownCandidates).toEqual([1]);
+    expect(output.findings).toContainEqual(
+      expect.objectContaining({ severity: 'WARNING', candidates: [0] }),
+    );
+    // Findings of the bed alone carry no candidate.
+    expect(output.findings.some((f) => f.candidates.length === 0)).toBe(true);
   });
 
   it('finds plants with neighbours by name', async () => {

@@ -1,4 +1,4 @@
-import type { Bed, Plant, Planting } from '@hochbeet/contracts';
+import type { Bed, Plant, Planting, Suggestion } from '@hochbeet/contracts';
 import { type Finding, isActiveInWeek, soilRenewalsIn } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import {
@@ -34,6 +34,7 @@ import { BedCanvas } from '@/components/editor/BedCanvas';
 import { FindingsList } from '@/components/editor/FindingsList';
 import { PlantingDetails } from '@/components/editor/PlantingDetails';
 import { PlantPalette, type PaletteDragData } from '@/components/editor/PlantPalette';
+import { SuggestionList } from '@/components/editor/SuggestionList';
 import { WeekSlider } from '@/components/editor/WeekSlider';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
@@ -47,6 +48,7 @@ import type { Change, Step } from '@/lib/editor/history';
 import { bedCentre, isTempId, newPlanting, snapToBed } from '@/lib/editor/placement';
 import { withDraft } from '@/lib/editor/plantings';
 import { createEditorStore, type EditorStore } from '@/lib/editor/store';
+import { adoptedPlanting, type ShownSuggestion, showSuggestions } from '@/lib/editor/suggestions';
 import { seasonFindings, statusByPlanting, weekOfFinding } from '@/lib/editor/warnings';
 import { ghosts, withPlants, type Ghost } from '@/lib/editor/timeline';
 import { toCm } from '@/lib/editor/viewport';
@@ -84,6 +86,25 @@ function BedEditor({ bedId }: { bedId: string }) {
   const { history, week } = useStore(store);
   const weekDate = parseISO(week);
   const queryClient = useQueryClient();
+  // The assistant's suggestions, shown in the bed until taken over or discarded; never saved.
+  const [suggested, setSuggested] = useState<{
+    items: { index: number; suggestion: Suggestion }[];
+    warnings: string[];
+  } | null>(null);
+  const suggestionBed = details.data?.bed;
+  const suggestions = useMemo(
+    () =>
+      suggested && suggestionBed && plants.data
+        ? showSuggestions(
+            suggested.items,
+            suggestionBed,
+            details.data?.plantings ?? [],
+            plants.data,
+            week,
+          )
+        : [],
+    [suggested, suggestionBed, details.data?.plantings, plants.data, week],
+  );
   // Undo and redo run one after another, each after all running requests have finished,
   // so that temporary ids are resolved first and no key press gets lost.
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -124,6 +145,36 @@ function BedEditor({ bedId }: { bedId: string }) {
     // Errors are shown below the editor; the optimistic update rolls itself back.
     apply({ target: change.after, current: change.before }).catch(() => undefined);
   };
+
+  const receiveSuggestions = (list: Suggestion[], warnings: string[]) => {
+    setSuggested({ items: list.map((suggestion, index) => ({ index, suggestion })), warnings });
+  };
+  const dropSuggestions = (indexes: readonly number[]) => {
+    setSuggested((current) => {
+      const items = current?.items.filter((i) => !indexes.includes(i.index)) ?? [];
+      return current && items.length > 0 ? { ...current, items } : null;
+    });
+  };
+  // Taking over is an ordinary new planting: saved like one placed by hand, undoable.
+  const adopt = (items: readonly ShownSuggestion[]) => {
+    for (const item of items) commit({ before: null, after: adoptedPlanting(item) });
+    dropSuggestions(items.map((i) => i.index));
+  };
+  const suggestionList = suggested && (
+    <SuggestionList
+      items={suggestions}
+      warnings={suggested.warnings}
+      onAdopt={(item) => {
+        adopt([item]);
+      }}
+      onAdoptAll={() => {
+        adopt(suggestions);
+      }}
+      onDiscard={() => {
+        setSuggested(null);
+      }}
+    />
+  );
 
   const travel = (direction: 'undo' | 'redo') => {
     queue.current = queue.current
@@ -313,6 +364,7 @@ function BedEditor({ bedId }: { bedId: string }) {
               plantings={shown}
               allPlantings={details.data?.plantings ?? []}
               ghosts={faint}
+              suggestions={suggestions}
               store={store}
               week={weekDate}
               onCommit={commit}
@@ -349,7 +401,13 @@ function BedEditor({ bedId }: { bedId: string }) {
                 <X />
               </Button>
             </div>
-            <AssistantChat bedId={bed.id} active={assistantOpen} className="flex-1" />
+            <AssistantChat
+              bedId={bed.id}
+              active={assistantOpen}
+              onSuggestions={receiveSuggestions}
+              suggestions={suggestionList}
+              className="flex-1"
+            />
           </aside>
         )}
       </div>
@@ -359,7 +417,12 @@ function BedEditor({ bedId }: { bedId: string }) {
         <Sheet open={!isDesktop && assistantOpen} onOpenChange={setAssistantOpen}>
           <SheetContent aria-describedby={undefined} className="h-[85dvh]">
             <SheetTitle>Beet-Assistent</SheetTitle>
-            <AssistantChat bedId={bed.id} className="flex-1" />
+            <AssistantChat
+              bedId={bed.id}
+              onSuggestions={receiveSuggestions}
+              suggestions={suggestionList}
+              className="flex-1"
+            />
           </SheetContent>
         </Sheet>
       )}
@@ -419,6 +482,7 @@ function Workspace({
   plantings,
   allPlantings,
   ghosts,
+  suggestions,
   store,
   week,
   onCommit,
@@ -430,6 +494,8 @@ function Workspace({
   /** All plantings of the bed over time, for the rules. */
   allPlantings: readonly Planting[];
   ghosts: readonly Ghost[];
+  /** The assistant's suggestions, drawn on top of the bed. */
+  suggestions: readonly ShownSuggestion[];
   store: EditorStore;
   /** The week the editor shows; new plantings start on its Monday. */
   week: Date;
@@ -612,6 +678,7 @@ function Workspace({
               svgRef={svgRef}
               today={week}
               ghosts={ghosts}
+              suggestions={suggestions}
               statuses={statuses}
               describedBy={hintId}
               onPlace={place}

@@ -1,6 +1,14 @@
-import { MAX_ASSISTANT_MESSAGE_CHARS } from '@hochbeet/contracts';
-import { Bot, Send, Square } from 'lucide-react';
-import { type KeyboardEvent, type SyntheticEvent, useEffect, useId, useRef, useState } from 'react';
+import { MAX_ASSISTANT_MESSAGE_CHARS, type Suggestion } from '@hochbeet/contracts';
+import { Bot, Send, Sprout, Square } from 'lucide-react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  type SyntheticEvent,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,6 +24,9 @@ interface Message {
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
 
+/** Question sent with „Pflanzvorschläge“ when the field is empty. */
+export const DEFAULT_SUGGESTION_QUESTION = 'Was kann ich in dieses Beet noch pflanzen?';
+
 /**
  * Chat with the Beet-Assistent about the bed on screen. Answers stream in and can be
  * cancelled; the quota left today shows after each answer. One runtime session per chat.
@@ -23,11 +34,17 @@ const isAbort = (error: unknown) => error instanceof DOMException && error.name 
 export function AssistantChat({
   bedId,
   active = true,
+  onSuggestions,
+  suggestions,
   className,
 }: {
   bedId: string;
   /** Focuses the question field whenever the chat is shown (e.g. the panel opens). */
   active?: boolean;
+  /** Receives checked planting suggestions; without it the chat offers none. */
+  onSuggestions?: (suggestions: Suggestion[], warnings: string[]) => void;
+  /** The suggestions currently shown in the bed, rendered below the conversation. */
+  suggestions?: ReactNode;
   className?: string;
 }) {
   const stream = useApiStream();
@@ -60,9 +77,9 @@ export function AssistantChat({
     });
   };
 
-  const ask = async (event?: SyntheticEvent) => {
+  const ask = async (event?: SyntheticEvent, suggest = false) => {
     event?.preventDefault();
-    const message = draft.trim();
+    const message = draft.trim() || (suggest ? DEFAULT_SUGGESTION_QUESTION : '');
     if (!message || busy) return;
     const controller = new AbortController();
     abort.current = controller;
@@ -77,6 +94,7 @@ export function AssistantChat({
         sessionId,
         signal: controller.signal,
         onText: appendToAnswer,
+        ...(suggest && onSuggestions ? { suggest, onSuggestions } : {}),
       });
       setRemaining(result.remaining);
     } catch (cause) {
@@ -103,7 +121,9 @@ export function AssistantChat({
         aria-label="Unterhaltung mit dem Assistenten"
         aria-live="polite"
         aria-busy={busy}
-        className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto"
+        // Scrollable, so keyboard users must be able to reach it.
+        tabIndex={0}
+        className="focus-visible:ring-ring/50 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto rounded-md outline-none focus-visible:ring-[3px]"
       >
         {messages.length === 0 ? (
           <p className="text-muted-foreground text-sm">
@@ -135,6 +155,7 @@ export function AssistantChat({
         )}
       </div>
       {error && <FormMessage tone="error">{error}</FormMessage>}
+      {suggestions}
       <form className="flex flex-col gap-2" onSubmit={(e) => void ask(e)}>
         <Label htmlFor={inputId}>Frage an den Assistenten</Label>
         <textarea
@@ -151,7 +172,7 @@ export function AssistantChat({
           className="bg-card placeholder:text-muted-foreground focus-visible:ring-ring/50 min-h-16 w-full resize-y rounded-md border px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm"
           placeholder="Was passt gut zu Tomaten?"
         />
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs" aria-live="polite">
             {remaining !== undefined && `Noch ${String(remaining)} Fragen heute.`}
           </p>
@@ -166,10 +187,24 @@ export function AssistantChat({
               Abbrechen
             </Button>
           ) : (
-            <Button type="submit" className="h-11" disabled={!draft.trim()}>
-              <Send aria-hidden />
-              Fragen
-            </Button>
+            <div className="flex gap-2">
+              {onSuggestions && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11"
+                  title="Geprüfte Pflanzvorschläge für dieses Beet, zu deiner Frage oder allgemein"
+                  onClick={(e) => void ask(e, true)}
+                >
+                  <Sprout aria-hidden />
+                  Pflanzvorschläge
+                </Button>
+              )}
+              <Button type="submit" className="h-11" disabled={!draft.trim()}>
+                <Send aria-hidden />
+                Fragen
+              </Button>
+            </div>
           )}
         </div>
       </form>

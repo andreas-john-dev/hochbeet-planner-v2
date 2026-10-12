@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { askAssistant } from './assistant-helpers';
+import { askAssistant, requestSuggestions } from './assistant-helpers';
 import { EXAMPLE_BED_ID, exampleGarden, type Garden, PENDING_ID, pendingRequest } from './garden';
 
 /**
@@ -56,6 +56,15 @@ export const appPages: readonly AppPage[] = [
     access: 'admin',
     seed: exampleGarden,
     setup: askAssistant,
+  },
+  {
+    // Checked planting suggestions of the assistant, drawn in the bed and listed in the chat.
+    id: 'beet-editor-vorschlaege',
+    path: `/beete/${EXAMPLE_BED_ID}`,
+    heading: 'Hochbeet Süd',
+    access: 'admin',
+    seed: exampleGarden,
+    setup: requestSuggestions,
   },
   {
     id: 'katalog',

@@ -2,7 +2,12 @@ import { ASSISTANT_SESSION_HEADER } from '@hochbeet/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '@/mocks/fetch';
 import { MockStore } from '@/mocks/store';
-import { MOCK_ASSISTANT_DAILY_LIMIT, mockAnswer } from '@/mocks/assistant';
+import {
+  MOCK_ASSISTANT_DAILY_LIMIT,
+  MOCK_SUGGESTION_SUMMARY,
+  MOCK_SUGGESTIONS,
+  mockAnswer,
+} from '@/mocks/assistant';
 import { ApiError, apiErrorMessage, createApiStream } from './api';
 import { askAssistant, assistantEvents, canUseAssistant, newSessionId } from './assistant';
 
@@ -167,6 +172,26 @@ describe('mock assistant', () => {
       store.takeAssistantQuestion('a@example.com', new Date().toISOString().slice(0, 10), 99);
     }
     await expect(ask(fetchFn).catch(apiErrorMessage)).resolves.toMatch(/schon 20 Fragen gestellt/);
+  });
+
+  it('answers a suggestion request with text, checked suggestions and done', async () => {
+    const fetchFn = createMockFetch(new MockStore(new MemoryStorage()));
+    const chunks: string[] = [];
+    const received: unknown[] = [];
+    const result = await askAssistant(
+      createApiStream(() => Promise.resolve(token('|admins')), fetchFn),
+      {
+        message: 'Was passt noch?',
+        bedId: BED,
+        suggest: true,
+        sessionId: newSessionId(),
+        onText: (t) => chunks.push(t),
+        onSuggestions: (suggestions, warnings) => received.push({ suggestions, warnings }),
+      },
+    );
+    expect(chunks).toEqual([MOCK_SUGGESTION_SUMMARY]);
+    expect(received).toEqual([{ suggestions: MOCK_SUGGESTIONS, warnings: [] }]);
+    expect(result.remaining).toBe(MOCK_ASSISTANT_DAILY_LIMIT - 1);
   });
 
   it('stops streaming when the question is cancelled', async () => {

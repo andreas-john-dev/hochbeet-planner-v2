@@ -9,3 +9,4 @@ export { neighborsRule } from './rules/neighbors';
 export { heavyFeedersRule } from './rules/heavy-feeders';
 export { cropRotationRule } from './rules/crop-rotation';
 export { evaluateBed, type EvaluateOptions } from './engine';
+export { candidatePlanting, DEFAULT_CANDIDATE_ROW_CM } from './candidates';

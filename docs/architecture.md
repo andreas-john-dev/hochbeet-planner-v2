@@ -446,7 +446,7 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 **Kostengrenzen:**
 
 - Tageskontingent je User (Standard 20 Fragen, Tag nach Europe/Berlin) in `Prod-AssistantStateful`: ein Zähler-Item `USER#<sub>` / `DAY#<datum>`, per bedingtem `UpdateItem` hochgezählt, sodass auch parallele Anfragen die Grenze nicht überschreiten. Zähler laufen nach zwei Tagen per TTL ab.
-- Höchstens 1024 Ausgabe-Tokens je Modellaufruf, 2000 Zeichen Frage und 6 Tool-Aufrufe je Frage (`maxToolCalls` in der Stage-Konfiguration); weitere Aufrufe lehnt ein Hook (`ToolCallLimit`) mit einer Meldung an das Modell ab.
+- Höchstens 1024 Ausgabe-Tokens je Modellaufruf, 2000 Zeichen Frage und 6 Tool-Aufrufe je Frage (`maxToolCalls` in der Stage-Konfiguration); weitere Aufrufe lehnt ein Hook (`ToolCallLimit`) mit einer Meldung an das Modell ab. Pflanzvorschläge brauchen höchstens `suggestionRounds` (2) Modellrunden.
 - Zugang nur für die Cognito-Gruppen `ai-testers` und `admins`; Gäste nie.
 - AWS-Budget (`Prod-SharedStateful`) für das ganze Konto, 10 USD im Monat, Mails bei 80 % und 100 % der tatsächlichen Kosten an die GitHub-Variable `BUDGET_ALERT_EMAIL`.
 
@@ -481,6 +481,15 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 - `askAssistant()` schickt Frage und `bedId` mit einer Session-ID pro Chat (`X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`) über `useApiStream()` (wie `useApi()`, aber mit dem Response-Stream) und liest die Server-Sent Events gegen `AssistantEventSchema`. Text erscheint Stück für Stück; „Abbrechen“ bricht den Request ab. Nach jeder Antwort zeigt der Chat die übrigen Fragen des Tages. Fehler (403, 429, Abbruch mittendrin) kommen als deutsche Meldung über `apiErrorMessage()`.
 - Ein Hinweis unter dem Chat sagt, dass Antworten von einer KI stammen und falsch sein können.
 - Mock (`apps/web/src/mocks/assistant.ts`): dieselben Prüfungen wie der Agent (403 ohne Gruppe, 400, 429 über 20 Fragen am Tag, gezählt im `MockStore`), dann eine feste Antwort als SSE in Stücken; so laufen Dev-Server und Playwright ohne AWS.
+
+**Geprüfte Pflanzvorschläge (T-43):**
+
+- Der Chat hat den Knopf „Pflanzvorschläge“: Der Request trägt `suggest: true` und die `bedId` (ohne Beet 400). Die Frage im Feld wird zum Wunsch, sonst gilt eine Standardfrage.
+- Strukturierte Ausgabe: `SuggestionListSchema` in `packages/contracts` (Sorte als `plantId`, Art, Position in cm, bei Reihen Länge und Richtung, Montag der Pflanzwoche, Begründung; höchstens 6). `pnpm --filter @hochbeet/contracts schemas` exportiert es als JSON Schema nach `agents/bed-assistant/src/bed_assistant/schemas/`; ein Test schlägt fehl, wenn die Datei veraltet ist. Der Agent baut daraus zur Laufzeit sein pydantic-Modell (`schema_model.py`) für Strands' Structured Output, mit Typen, Pflichtfeldern, Enums und Beschreibungen, aber ohne Raster- und Musterprüfung, damit leicht danebenliegende Werte korrigiert statt verworfen werden.
+- Prüfschleife im Agent (`suggest.py`): Beet per `get_bed` lesen, Modell schlägt vor, der Code setzt die Vorschläge aufs 5-cm-Raster und auf den Montag und verwirft solche außerhalb des Beets, ohne gültige Sorte oder Datum, dann prüft `evaluate_bed` mit `candidates` (geplante Pflanzungen werden zusammen mit dem Beet bewertet; jede Fundstelle nennt die beteiligten Kandidaten, unbekannte Sorten stehen in `unknownCandidates`). Bleiben Warnungen zu den Vorschlägen, bekommt das Modell sie zurück und überarbeitet, höchstens `suggestionRounds` Runden (Stage-Konfiguration, Standard 2). Danach verbleibende Warnungen nennt die Antwort offen. Die Werkzeuge ruft der Code dabei direkt über die MCP-Session mit dem Token des Users auf, nicht über das Modell.
+- Antwort: erst die Zusammenfassung als `{"text"}`, dann `{"suggestions", "warnings"}`, dann `done`. Eine Vorschlagsanfrage zählt wie eine Frage gegen das Tageskontingent.
+- Editor: Vorschläge erscheinen gestrichelt im Beet (`data-testid="suggestion-<n>"`) mit Status der Regel-Engine (`data-status`, berechnet zusammen mit den Pflanzungen, `src/lib/editor/suggestions.ts`), daneben eine Liste mit Begründung. „Übernehmen“ (einzeln oder alle) legt normale Pflanzungen über `commit({ before: null, after })` an, also gespeichert und rückgängig machbar; „Verwerfen“ entfernt die Vorschläge. Nichts wird automatisch gespeichert, Warnungen blockieren das Übernehmen nicht. Die Umwandlung in eine Pflanzung (`candidatePlanting()` in `@hochbeet/garden-rules`) teilen Tool-Lambda und App.
+- Mock: `suggest: true` liefert zwei feste Vorschläge für das Beispielbeet der Playwright-Tests.
 
 ### Gemeinsamer Service-Code
 

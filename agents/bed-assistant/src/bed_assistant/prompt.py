@@ -20,6 +20,7 @@ Regeln:
 - Antworte immer auf Deutsch, knapp und konkret, höchstens etwa 150 Wörter.
 - Längen in cm, Daten als Wochen bzw. Monate.
 - Erfinde keine Pflanzungen oder Beete; stütze dich auf die Werkzeuge.
+- Nenne Beete und Sorten beim Namen, nie mit ihrer ID.
 - Bist du dir unsicher, sag es. Warnungen des Planers ersetzt du nicht, du erklärst sie.
 - Lehne Fragen ohne Bezug zu Garten, Pflanzen oder dem Planer freundlich ab.
 """
@@ -39,6 +40,8 @@ class AssistantRequest(BaseModel):
     message: str = Field(min_length=1)
     #: The bed the user is looking at; the agent reads it itself with get_bed.
     bed_id: str | None = Field(default=None, alias="bedId")
+    #: Planting suggestions for `bed_id` instead of a plain answer.
+    suggest: bool = False
 
     @field_validator("message")
     @classmethod
@@ -60,6 +63,8 @@ def parse_request(payload: object, max_input_chars: int) -> AssistantRequest:
         raise InvalidRequestError("Bitte schreib eine Frage an den Assistenten.") from error
     if not request.message:
         raise InvalidRequestError("Bitte schreib eine Frage an den Assistenten.")
+    if request.suggest and request.bed_id is None:
+        raise InvalidRequestError("Für Pflanzvorschläge brauche ich ein Beet.")
     if len(request.message) > max_input_chars:
         raise InvalidRequestError(
             f"Deine Frage ist zu lang. Bitte fasse dich kürzer (höchstens {max_input_chars} "
@@ -73,5 +78,6 @@ def user_prompt(request: AssistantRequest) -> str:
     if request.bed_id is None:
         return request.message
     return (
-        f"Der User sieht gerade das Beet mit der ID {request.bed_id}.\n\nFrage:\n{request.message}"
+        f"Der User sieht gerade das Beet mit der ID {request.bed_id} (nur für die Werkzeuge, "
+        f"nicht in der Antwort nennen).\n\nFrage:\n{request.message}"
     )
