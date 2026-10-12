@@ -1,7 +1,6 @@
 import pytest
 
 from bed_assistant.prompt import (
-    MAX_CONTEXT_CHARS,
     AssistantRequest,
     InvalidRequestError,
     parse_request,
@@ -26,10 +25,15 @@ def test_refuses_too_long_questions() -> None:
         parse_request({"message": "x" * 11}, 10)
 
 
-def test_puts_the_bed_before_the_question_and_cuts_huge_beds() -> None:
-    small = user_prompt(AssistantRequest(message="Passt das?", bed={"name": "Süd"}))
-    assert small == 'Aktuelles Beet (JSON):\n{"name":"Süd"}\n\nFrage:\nPasst das?'
-    huge = user_prompt(AssistantRequest(message="?", bed={"x": "y" * (MAX_CONTEXT_CHARS * 2)}))
-    assert "…(gekürzt)" in huge
-    assert len(huge) < MAX_CONTEXT_CHARS + 100
+def test_names_the_bed_on_screen_before_the_question() -> None:
+    request = parse_request({"message": "Passt das?", "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S1A"}, 100)
+    assert user_prompt(request) == (
+        "Der User sieht gerade das Beet mit der ID 01J9ZQ3W8D6V2K5M7N8P9R0S1A.\n\n"
+        "Frage:\nPasst das?"
+    )
     assert user_prompt(AssistantRequest(message="Nur Text")) == "Nur Text"
+
+
+def test_refuses_a_bed_id_that_is_no_ulid() -> None:
+    with pytest.raises(InvalidRequestError):
+        parse_request({"message": "Hi", "bedId": "../admin"}, 100)

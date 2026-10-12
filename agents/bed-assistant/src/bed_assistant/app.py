@@ -69,7 +69,7 @@ async def handle(
         )
     logger.info("question", extra={"userId": caller.user_id, "remaining": remaining})
     return StreamingResponse(
-        events(responder.stream(user_prompt(request)), remaining),
+        events(responder.stream(user_prompt(request), caller.token), remaining),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Quota-Remaining": str(remaining)},
     )

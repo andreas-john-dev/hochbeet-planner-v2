@@ -15,6 +15,8 @@ export interface AssistantConfig {
   readonly dailyMessageLimit: number;
   /** Output tokens per answer. */
   readonly maxTokens: number;
+  /** Tool calls per question; further calls are refused, so one question stays cheap. */
+  readonly maxToolCalls: number;
   /** Cognito groups that may use the assistant; the runtime's authorizer checks them. */
   readonly allowedGroups: readonly string[];
 }
@@ -57,6 +59,7 @@ export const stages: readonly StageConfig[] = [
       foundationModelId: 'anthropic.claude-haiku-4-5-20251001-v1:0',
       dailyMessageLimit: 20,
       maxTokens: 1024,
+      maxToolCalls: 6,
       allowedGroups: [AI_TESTERS_GROUP, 'admins'],
     },
     monthlyBudgetUsd: 10,

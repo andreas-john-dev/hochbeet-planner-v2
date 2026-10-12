@@ -45,6 +45,8 @@ describe('AssistantStack', () => {
         MAX_TOKENS: '1024',
         MAX_INPUT_CHARS: '2000',
         ALLOWED_GROUPS: 'ai-testers,admins',
+        GATEWAY_URL: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Gateway'), 'GatewayUrl'] },
+        MAX_TOOL_CALLS: '6',
       },
     });
   });
@@ -142,6 +144,105 @@ describe('AssistantStack', () => {
       Name: '/hochbeet/prod/assistant/runtime-arn',
     });
     template.hasOutput('RuntimeArn', {});
+  });
+
+  it('offers the tools through an MCP gateway for the same ID tokens and groups', () => {
+    template.hasResourceProperties('AWS::BedrockAgentCore::Gateway', {
+      Name: 'prod-bed-assistant-tools',
+      ProtocolType: 'MCP',
+      // No semantic tool search: it would add embedding costs for four tools.
+      ProtocolConfiguration: {
+        Mcp: { SupportedVersions: ['2025-03-26', '2025-06-18'], SearchType: Match.absent() },
+      },
+      AuthorizerType: 'CUSTOM_JWT',
+      AuthorizerConfiguration: {
+        CustomJWTAuthorizer: Match.objectLike({
+          AllowedAudience: [ssmParam('hochbeet/prod/shared/user-pool-client-id')],
+          CustomClaims: [
+            Match.objectLike({
+              InboundTokenClaimName: 'cognito:groups',
+              AuthorizingClaimMatchValue: {
+                ClaimMatchOperator: 'CONTAINS_ANY',
+                ClaimMatchValue: { MatchValueStringList: ['ai-testers', 'admins'] },
+              },
+            }),
+          ],
+        }),
+      },
+      // The interceptor needs the Authorization header to hand the token to the tools.
+      InterceptorConfigurations: [
+        {
+          InterceptionPoints: ['REQUEST'],
+          InputConfiguration: { PassRequestHeaders: true },
+          Interceptor: {
+            Lambda: { Arn: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Interceptor'), 'Arn'] } },
+          },
+        },
+      ],
+    });
+  });
+
+  it('declares the read-only tools with German descriptions on one Lambda target', () => {
+    template.resourceCountIs('AWS::BedrockAgentCore::GatewayTarget', 1);
+    const [target] = Object.values(template.findResources('AWS::BedrockAgentCore::GatewayTarget'));
+    const lambdaTarget = (
+      target as {
+        Properties: {
+          Name: string;
+          TargetConfiguration: {
+            Mcp: {
+              Lambda: {
+                LambdaArn: unknown;
+                ToolSchema: {
+                  InlinePayload: {
+                    Name: string;
+                    Description: string;
+                    InputSchema: { Required?: string[] };
+                  }[];
+                };
+              };
+            };
+          };
+        };
+      }
+    ).Properties;
+    expect(lambdaTarget.Name).toBe('garden');
+    const tools = lambdaTarget.TargetConfiguration.Mcp.Lambda.ToolSchema.InlinePayload;
+    expect(tools.map((t) => t.Name)).toEqual([
+      'list_beds',
+      'get_bed',
+      'find_plants',
+      'evaluate_bed',
+    ]);
+    expect(tools.find((t) => t.Name === 'get_bed')?.InputSchema.Required).toEqual(['bedId']);
+    for (const tool of tools) expect(tool.Description).toMatch(/[äöüß]|Beet/);
+    // Nothing that writes: names only read, list, find or evaluate.
+    expect(tools.every((t) => /^(list|get|find|evaluate)_/.test(t.Name))).toBe(true);
+  });
+
+  it('lets the tools read through the public API and nothing else in AWS', () => {
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      Description: Match.stringLikeRegexp('Read-only tools'),
+      Runtime: 'nodejs24.x',
+      Architectures: ['arm64'],
+      Environment: {
+        Variables: Match.objectLike({ API_BASE_URL: `https://${stage.domain.name}` }),
+      },
+    });
+    // The gateway may only invoke the tool and interceptor functions.
+    const gatewayPolicy = Object.entries(template.findResources('AWS::IAM::Policy')).find(([id]) =>
+      id.startsWith('GatewayServiceRole'),
+    )?.[1] as { Properties: { PolicyDocument: { Statement: { Action: string }[] } } } | undefined;
+    expect(gatewayPolicy?.Properties.PolicyDocument.Statement.map((s) => s.Action)).toEqual([
+      'lambda:InvokeFunction',
+      'lambda:InvokeFunction',
+    ]);
+    // The functions themselves get no policy beyond their logs (no table or model access).
+    const functionPolicies = Object.keys(template.findResources('AWS::IAM::Policy')).filter((id) =>
+      /^(Tools|Interceptor)/.test(id),
+    );
+    expect(functionPolicies).toEqual([]);
+    template.hasOutput('GatewayUrl', {});
   });
 
   it('has no unacknowledged cdk-nag AwsSolutions findings', () => {

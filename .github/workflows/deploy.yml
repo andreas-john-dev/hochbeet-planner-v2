@@ -111,6 +111,8 @@ jobs:
           assistant=$(node -p "require('./cdk-outputs.json')['Prod-Assistant']?.RuntimeArn ?? ''")
           echo "smoke-user-email=$email" >> "$GITHUB_OUTPUT"
           echo "assistant-runtime-arn=$assistant" >> "$GITHUB_OUTPUT"
+          gateway=$(node -p "require('./cdk-outputs.json')['Prod-Assistant']?.GatewayUrl ?? ''")
+          echo "assistant-gateway-url=$gateway" >> "$GITHUB_OUTPUT"
           echo "### Live: $url" >> "$GITHUB_STEP_SUMMARY"
 
       # Without --with-deps: the runner image already has Chromium's system libraries, and the
@@ -127,6 +129,7 @@ jobs:
           SMOKE_USER_EMAIL: ${{ steps.deploy.outputs.smoke-user-email }}
           SMOKE_USER_PASSWORD: ${{ secrets.SMOKE_USER_PASSWORD }}
           SMOKE_ASSISTANT_ARN: ${{ steps.deploy.outputs.assistant-runtime-arn }}
+          SMOKE_ASSISTANT_GATEWAY_URL: ${{ steps.deploy.outputs.assistant-gateway-url }}
 
       - uses: actions/upload-artifact@v7
         if: failure()

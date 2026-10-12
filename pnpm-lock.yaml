@@ -176,6 +176,9 @@ importers:
         specifier: ^10.8.1
         version: 10.8.1
     devDependencies:
+      '@hochbeet/assistant-tools':
+        specifier: workspace:*
+        version: link:../services/assistant-tools
       '@hochbeet/bed-assistant':
         specifier: workspace:*
         version: link:../agents/bed-assistant
@@ -289,6 +292,28 @@ importers:
         version: 12.2.0
 
   packages/tsconfig: {}
+
+  services/assistant-tools:
+    dependencies:
+      '@hochbeet/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@hochbeet/garden-rules':
+        specifier: workspace:*
+        version: link:../../packages/garden-rules
+      '@hochbeet/service-kit':
+        specifier: workspace:*
+        version: link:../../packages/service-kit
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@hochbeet/catalog-seed':
+        specifier: workspace:*
+        version: link:../../packages/catalog-seed
+      '@types/aws-lambda':
+        specifier: ^8.10.164
+        version: 8.10.164
 
   services/catalog:
     dependencies:

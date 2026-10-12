@@ -1,0 +1,24 @@
+{
+  "name": "@hochbeet/assistant-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hochbeet/contracts": "workspace:*",
+    "@hochbeet/garden-rules": "workspace:*",
+    "@hochbeet/service-kit": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@hochbeet/catalog-seed": "workspace:*",
+    "@types/aws-lambda": "^8.10.164"
+  }
+}
