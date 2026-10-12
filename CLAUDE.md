@@ -55,7 +55,7 @@ pnpm --filter @hochbeet/bed-assistant format   # ruff format für den Agenten (P
 ```
 
 Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `packages/*`,
-`@hochbeet/catalog-service` und `@hochbeet/garden-service` (gemeinsamer Service-Code in `@hochbeet/service-kit`), `@hochbeet/bed-assistant` für den Agenten in `agents/bed-assistant`.
+`@hochbeet/catalog-service` und `@hochbeet/garden-service` (gemeinsamer Service-Code in `@hochbeet/service-kit`), `@hochbeet/bed-assistant` für den Agenten in `agents/bed-assistant`, `@hochbeet/assistant-tools` für die Gateway-Tools in `services/assistant-tools`.
 Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
 Deployment: `deploy.yml` deployt jeden grünen `main`-Commit per OIDC nach `prod` und führt danach die Smoke-Tests aus;
 einmalige Einrichtung und Fehlersuche in `docs/deployment.md`.
@@ -105,7 +105,8 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 - UI-Texte und Fehlermeldungen auf Deutsch; Code, Bezeichner, Kommentare und Commits auf Englisch (Conventional Commits).
 - Region `eu-central-1`, Stage-Konfiguration in `infra/lib/config/stages.ts` (zunächst nur `prod`).
 - Werte zwischen Stacks über SSM-Parameter; Namen nur in `infra/lib/config/ssm.ts` definieren.
-- Beet-Assistent (`agents/bed-assistant`): Python 3.13 mit Strands Agents, ruff, mypy strict, pytest; Requests spiegeln `AssistantRequestSchema` aus `packages/contracts` (Grenzen reicht Infra als Umgebungsvariablen durch). Deployt als Code-Zip (`dist/` aus `scripts/build.sh`, Wheels für Linux ARM64) auf die AgentCore Runtime in `infra/lib/assistant/`; die Runtime-Rolle bekommt nur `bedrock:InvokeModel*` auf das konfigurierte Modell, nie Marketplace-Rechte. Kostengrenzen (Tageskontingent, `maxTokens`, Gruppen, Budget) nie lockern, ohne den User zu fragen.
+- Beet-Assistent (`agents/bed-assistant`): Python 3.13 mit Strands Agents, ruff, mypy strict, pytest; Requests spiegeln `AssistantRequestSchema` aus `packages/contracts` (Grenzen reicht Infra als Umgebungsvariablen durch). Deployt als Code-Zip (`dist/` aus `scripts/build.sh`, Wheels für Linux ARM64) auf die AgentCore Runtime in `infra/lib/assistant/`; die Runtime-Rolle bekommt nur `bedrock:InvokeModel*` auf das konfigurierte Modell, nie Marketplace-Rechte. Kostengrenzen (Tageskontingent, `maxTokens`, `maxToolCalls`, Gruppen, Budget) nie lockern, ohne den User zu fragen.
+- Tools des Assistenten: nur lesend, im AgentCore Gateway als ein Lambda-Target (`services/assistant-tools`, Definitionen in `src/tools.ts`, Ein-/Ausgaben als Zod-Schemas in `packages/contracts/src/api/assistant.ts`). Neue Tools dort ergänzen; sie rufen die Service-APIs nur über `createApiReader()` mit dem User-Token auf, das der Request-Interceptor setzt, nie direkt auf Tabellen und nie mit einer vom Modell gelieferten `userId`.
 - cdk-nag 3: Ausnahmen per `Validations.of(construct).acknowledge({ id, reason })` (nicht `NagSuppressions`) und in `docs/architecture.md` unter „cdk-nag“ eintragen.
 
 ## Was nicht aus Sessions passiert

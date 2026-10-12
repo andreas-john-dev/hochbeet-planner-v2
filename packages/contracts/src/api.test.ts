@@ -3,6 +3,9 @@ import {
   ApprovePublicationRequestSchema,
   AssistantEventSchema,
   AssistantRequestSchema,
+  EvaluateBedToolInputSchema,
+  FindPlantsToolInputSchema,
+  GetBedToolInputSchema,
   BedWithPlantingsResponseSchema,
   ErrorResponseSchema,
   ImportCatalogRequestSchema,
@@ -89,12 +92,23 @@ describe('import contracts', () => {
 });
 
 describe('assistant contracts', () => {
-  it('takes a trimmed question with an optional bed', () => {
+  it('takes a trimmed question with the id of the bed on screen', () => {
     expect(AssistantRequestSchema.parse({ message: '  Was passt zu Tomaten? ' })).toEqual({
       message: 'Was passt zu Tomaten?',
     });
-    const withBed = { message: 'Und hier?', bed: { bed, plantings: [singlePlanting] } };
+    const withBed = { message: 'Und hier?', bedId: bed.id };
     expect(AssistantRequestSchema.parse(withBed)).toEqual(withBed);
+    expect(AssistantRequestSchema.safeParse({ message: 'Hier?', bedId: 'x' }).success).toBe(false);
+  });
+
+  it('describes tool inputs for the model and checks ids and dates', () => {
+    expect(GetBedToolInputSchema.safeParse({ bedId: bed.id }).success).toBe(true);
+    expect(GetBedToolInputSchema.safeParse({ bedId: '../admin' }).success).toBe(false);
+    expect(
+      EvaluateBedToolInputSchema.safeParse({ bedId: bed.id, week: '2026-13-01' }).success,
+    ).toBe(false);
+    expect(FindPlantsToolInputSchema.parse({ query: ' Tomate ' })).toEqual({ query: 'Tomate' });
+    expect(GetBedToolInputSchema.shape.bedId.description).toMatch(/ID des Beets/);
   });
 
   it('refuses empty and too long questions in German', () => {

@@ -32,9 +32,11 @@ class FakeResponder:
         self.chunks = chunks
         self.fail = fail
         self.prompts: list[str] = []
+        self.tokens: list[str] = []
 
-    async def stream(self, prompt: str) -> AsyncIterator[str]:
+    async def stream(self, prompt: str, token: str) -> AsyncIterator[str]:
         self.prompts.append(prompt)
+        self.tokens.append(token)
         for chunk in self.chunks:
             yield chunk
         if self.fail:
@@ -88,6 +90,8 @@ async def test_streams_the_answer_and_the_remaining_quota() -> None:
     ]
     assert quota.users == ["u-1"]
     assert responder.prompts == ["Was passt?"]
+    # The agent calls the gateway with the caller's own token.
+    assert responder.tokens == [headers(["ai-testers"])["Authorization"].removeprefix("Bearer ")]
 
 
 async def test_401_without_token_and_403_without_group() -> None:

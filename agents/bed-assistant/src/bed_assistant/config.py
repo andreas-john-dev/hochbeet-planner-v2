@@ -14,6 +14,10 @@ class Settings:
     max_tokens: int
     max_input_chars: int
     allowed_groups: frozenset[str]
+    #: MCP endpoint of the AgentCore Gateway with the read-only tools; empty means no tools.
+    gateway_url: str = ""
+    #: Tool calls per question; further calls are refused.
+    max_tool_calls: int = 6
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "Settings":
@@ -27,4 +31,6 @@ class Settings:
             allowed_groups=frozenset(
                 g for g in env.get("ALLOWED_GROUPS", "ai-testers,admins").split(",") if g
             ),
+            gateway_url=env.get("GATEWAY_URL", ""),
+            max_tool_calls=int(env.get("MAX_TOOL_CALLS", "6")),
         )

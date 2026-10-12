@@ -4,7 +4,7 @@ import base64
 import binascii
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -12,6 +12,8 @@ class Caller:
     #: Cognito `sub`; the only source of the user id.
     user_id: str
     groups: frozenset[str]
+    #: The verified ID token itself; the agent calls the gateway with it. Never logged.
+    token: str = field(default="", repr=False, compare=False)
 
 
 def _header(headers: Mapping[str, str], name: str) -> str | None:
@@ -44,4 +46,4 @@ def caller_from_headers(headers: Mapping[str, str]) -> Caller | None:
         groups = groups.strip("[]").replace(",", " ").split()
     if not isinstance(groups, list):
         groups = []
-    return Caller(user_id=sub, groups=frozenset(str(g) for g in groups))
+    return Caller(user_id=sub, groups=frozenset(str(g) for g in groups), token=token)
