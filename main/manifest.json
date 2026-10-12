@@ -509,6 +509,12 @@
     "navLabel": "Profil"
   },
   {
+    "id": "profil-assistent",
+    "path": "/profil",
+    "heading": "Profil",
+    "access": "admin"
+  },
+  {
     "id": "admin",
     "path": "/admin",
     "heading": "Administration",
