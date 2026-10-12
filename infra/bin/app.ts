@@ -85,6 +85,10 @@ for (const stage of stages) {
   );
   frontend.addApiBehavior('/api/catalog/*', catalogOrigin);
   frontend.addApiBehavior('/api/garden/*', apiOrigin(names.gardenApiDomain));
+  frontend.addStackDependency(assistant, '/api/assistant/* reads the runtime ARN from SSM');
+  frontend.addAssistantBehavior(
+    ssm.StringParameter.valueForStringParameter(frontend, names.assistantRuntimeArn),
+  );
 }
 
 // cdk-nag runs as a policy validation plugin; violations fail `cdk synth`.

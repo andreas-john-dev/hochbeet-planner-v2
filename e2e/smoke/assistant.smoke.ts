@@ -48,12 +48,23 @@ test.describe('assistant runtime', () => {
     expect([401, 403]).toContain(response.status());
   });
 
-  test('answers the smoke user', async ({ page }) => {
+  test('is reachable on the app domain only for its invocation path', async ({ request }) => {
+    // CloudFront (T-42): other paths and methods end at the rewrite function.
+    expect((await request.get('/api/assistant/invocations')).status()).toBe(404);
+    const unsigned = await request.post('/api/assistant/invocations', {
+      headers: { 'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': sessionId() },
+      data: { message: 'Hallo' },
+    });
+    expect([401, 403]).toContain(unsigned.status());
+  });
+
+  // The way the app asks: same domain, through CloudFront to the runtime.
+  test('answers the smoke user through the app domain', async ({ page }) => {
     test.skip(!email || !password, 'SMOKE_USER_EMAIL and SMOKE_USER_PASSWORD are not set');
     test.setTimeout(90_000);
     const idToken = await signIn(page);
 
-    const response = await page.request.post(invocationUrl(runtimeArn ?? ''), {
+    const response = await page.request.post('/api/assistant/invocations', {
       headers: {
         Authorization: `Bearer ${idToken}`,
         'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': sessionId(),

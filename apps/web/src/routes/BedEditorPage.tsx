@@ -14,10 +14,22 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import { parseISO } from 'date-fns';
-import { ArrowLeft, Maximize, MapPinOff, Minus, Plus, Redo2, Settings2, Undo2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Maximize,
+  MapPinOff,
+  MessageCircle,
+  Minus,
+  Plus,
+  Redo2,
+  Settings2,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { BedFormDialog } from '@/components/beds/BedFormDialog';
+import { AssistantChat } from '@/components/editor/AssistantChat';
 import { BedCanvas } from '@/components/editor/BedCanvas';
 import { FindingsList } from '@/components/editor/FindingsList';
 import { PlantingDetails } from '@/components/editor/PlantingDetails';
@@ -29,6 +41,8 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { ApiError, apiErrorMessage } from '@/lib/api';
 import { activePlantings } from '@/lib/active-plantings';
+import { canUseAssistant } from '@/lib/assistant';
+import { useAuth } from '@/lib/auth/context';
 import type { Change, Step } from '@/lib/editor/history';
 import { bedCentre, isTempId, newPlanting, snapToBed } from '@/lib/editor/placement';
 import { withDraft } from '@/lib/editor/plantings';
@@ -60,6 +74,11 @@ function BedEditor({ bedId }: { bedId: string }) {
   const [today] = useState(() => new Date());
   const [store] = useState(() => createEditorStore(today));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { user, guest } = useAuth();
+  const assistant = canUseAssistant(user, guest);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
+  const assistantId = useId();
   const save = useSavePlanting(bedId);
   const remove = useDeletePlanting(bedId);
   const { history, week } = useStore(store);
@@ -261,6 +280,20 @@ function BedEditor({ bedId }: { bedId: string }) {
               Auf Beet einpassen
             </Button>
           </div>
+          {assistant && (
+            <Button
+              variant={assistantOpen ? 'secondary' : 'outline'}
+              className="h-11"
+              aria-expanded={assistantOpen}
+              aria-controls={isDesktop ? assistantId : undefined}
+              onClick={() => {
+                setAssistantOpen((open) => !open);
+              }}
+            >
+              <MessageCircle aria-hidden />
+              Assistent
+            </Button>
+          )}
         </div>
       </div>
       <WeekSlider
@@ -271,27 +304,65 @@ function BedEditor({ bedId }: { bedId: string }) {
           store.getState().setWeek(next);
         }}
       />
-      {bed && plants.data ? (
-        <Workspace
-          bed={bed}
-          plants={plants.data}
-          plantings={shown}
-          allPlantings={details.data?.plantings ?? []}
-          ghosts={faint}
-          store={store}
-          week={weekDate}
-          onCommit={commit}
-        />
-      ) : (
-        <div
-          className="bg-muted h-[60dvh] min-h-72 animate-pulse rounded-xl border md:h-[65dvh]"
-          aria-busy="true"
-        >
-          <span className="sr-only">Beet wird geladen …</span>
+      <div className="flex flex-col gap-4 md:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {bed && plants.data ? (
+            <Workspace
+              bed={bed}
+              plants={plants.data}
+              plantings={shown}
+              allPlantings={details.data?.plantings ?? []}
+              ghosts={faint}
+              store={store}
+              week={weekDate}
+              onCommit={commit}
+            />
+          ) : (
+            <div
+              className="bg-muted h-[60dvh] min-h-72 animate-pulse rounded-xl border md:h-[65dvh]"
+              aria-busy="true"
+            >
+              <span className="sr-only">Beet wird geladen …</span>
+            </div>
+          )}
         </div>
-      )}
+        {assistant && isDesktop && bed && (
+          // Stays mounted while hidden, so closing the panel keeps the conversation.
+          <aside
+            id={assistantId}
+            hidden={!assistantOpen}
+            aria-labelledby={`${assistantId}-title`}
+            className="bg-card w-80 shrink-0 flex-col gap-2 rounded-xl border p-3 md:h-[65dvh] [&:not([hidden])]:flex"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h2 id={`${assistantId}-title`} className="font-semibold">
+                Beet-Assistent
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Assistent schließen"
+                onClick={() => {
+                  setAssistantOpen(false);
+                }}
+              >
+                <X />
+              </Button>
+            </div>
+            <AssistantChat bedId={bed.id} active={assistantOpen} className="flex-1" />
+          </aside>
+        )}
+      </div>
       {error && <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>}
       {bed && <BedFormDialog bed={bed} open={settingsOpen} onOpenChange={setSettingsOpen} />}
+      {assistant && bed && (
+        <Sheet open={!isDesktop && assistantOpen} onOpenChange={setAssistantOpen}>
+          <SheetContent aria-describedby={undefined} className="h-[85dvh]">
+            <SheetTitle>Beet-Assistent</SheetTitle>
+            <AssistantChat bedId={bed.id} className="flex-1" />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

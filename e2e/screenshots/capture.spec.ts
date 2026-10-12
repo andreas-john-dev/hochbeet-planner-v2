@@ -19,6 +19,7 @@ for (const appPage of appPages) {
     if (appPage.seed) await seedFor(page, appPage.access, appPage.seed);
     await page.emulateMedia({ colorScheme: 'light' });
     await open(page, appPage.path, appPage.heading);
+    await appPage.setup?.(page);
     await page.screenshot({
       path: join(outDir, testInfo.project.name, `${appPage.id}.png`),
       fullPage: true,

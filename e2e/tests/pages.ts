@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test';
+import { askAssistant } from './assistant-helpers';
 import { EXAMPLE_BED_ID, exampleGarden, type Garden, PENDING_ID, pendingRequest } from './garden';
 
 /**
@@ -18,6 +20,8 @@ export interface AppPage {
   navLabel?: string;
   /** Data of the signed-in user or guest, for pages that only show something with data. */
   seed?: Garden;
+  /** Brings the page into the state to check, e.g. an open panel; runs after the heading shows. */
+  setup?: (page: Page) => Promise<void>;
 }
 
 export const appPages: readonly AppPage[] = [
@@ -43,6 +47,15 @@ export const appPages: readonly AppPage[] = [
     heading: 'Hochbeet Süd',
     access: 'user',
     seed: exampleGarden,
+  },
+  {
+    // The editor with the Beet-Assistent open and one streamed answer (admins may use it).
+    id: 'beet-editor-assistent',
+    path: `/beete/${EXAMPLE_BED_ID}`,
+    heading: 'Hochbeet Süd',
+    access: 'admin',
+    seed: exampleGarden,
+    setup: askAssistant,
   },
   {
     id: 'katalog',
@@ -110,5 +123,12 @@ export const appPages: readonly AppPage[] = [
   { id: 'gast-katalog', path: '/katalog', heading: 'Pflanzenkatalog', access: 'guest' },
 ];
 
-/** Pages that need an account; signed out they redirect to the sign-in page. */
-export const protectedPages = appPages.filter((p) => p.access === 'user' || p.access === 'admin');
+/**
+ * Pages that need an account, once per path (states such as the open assistant share their
+ * page's path); signed out they redirect to the sign-in page.
+ */
+export const protectedPages = [
+  ...new Map(
+    appPages.filter((p) => p.access === 'user' || p.access === 'admin').map((p) => [p.path, p]),
+  ).values(),
+];

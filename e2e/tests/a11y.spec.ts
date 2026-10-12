@@ -11,6 +11,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       if (appPage.seed) await seedFor(page, appPage.access, appPage.seed);
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await open(page, appPage.path, appPage.heading);
+      await appPage.setup?.(page);
       const { violations } = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();

@@ -5,6 +5,8 @@ import { emptyGarden, type GardenRepository, type LocalGarden } from '@/lib/loca
 const STORAGE_KEY = 'hochbeet-mock-api';
 const CATALOG_KEY = 'hochbeet-mock-catalog';
 const IMPORTS_KEY = 'hochbeet-mock-imports';
+/** Questions to the mock assistant per user and day; Playwright sets it to test the limit. */
+export const ASSISTANT_QUOTA_KEY = 'hochbeet-mock-assistant';
 
 /**
  * Mock API data per user plus the global catalogue shared by all users (the start catalogue
@@ -55,6 +57,21 @@ export class MockStore {
     const raw = this.storage.getItem(IMPORTS_KEY);
     const all = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     this.storage.setItem(IMPORTS_KEY, JSON.stringify({ ...all, [key]: result }));
+  }
+
+  /**
+   * Counts one question of `userId` on `day`, like the agent's daily quota. Returns the
+   * questions left, or undefined once `limit` is reached.
+   */
+  takeAssistantQuestion(userId: string, day: string, limit: number): number | undefined {
+    const raw = this.storage.getItem(ASSISTANT_QUOTA_KEY);
+    const all = raw ? (JSON.parse(raw) as Record<string, { day: string; count: number }>) : {};
+    const today = all[userId];
+    const used = today?.day === day ? today.count : 0;
+    if (used >= limit) return undefined;
+    all[userId] = { day, count: used + 1 };
+    this.storage.setItem(ASSISTANT_QUOTA_KEY, JSON.stringify(all));
+    return limit - used - 1;
   }
 
   private all(): Record<string, LocalGarden> {
