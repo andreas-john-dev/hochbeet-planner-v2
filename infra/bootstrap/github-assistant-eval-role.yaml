@@ -1,0 +1,100 @@
+# One-time setup, deployed by hand (see docs/deployment.md, "Modellvergleich"):
+# the role the workflow assistant-eval.yml assumes for the model comparison of the
+# Beet-Assistent (T-45). It may invoke exactly the compared models and read the gateway URL,
+# nothing else: no Marketplace rights, no tables, no deploy rights.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Hochbeet-Planer - GitHub Actions role for the assistant model comparison (OIDC)
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Default: andreas-john-dev
+  GitHubRepo:
+    Type: String
+    Default: hochbeet-planner-v2
+  GitHubEnvironment:
+    Type: String
+    Default: prod
+    Description: Only jobs running in this GitHub environment may assume the role.
+  GitHubSubjectPrefix:
+    Type: String
+    Default: ''
+    Description: >-
+      Same value as for the deploy role: prefix of the OIDC sub claim if the repository uses
+      immutable subjects. Empty means repo:<GitHubOwner>/<GitHubRepo>.
+  Stage:
+    Type: String
+    Default: prod
+  InferenceProfiles:
+    Type: CommaDelimitedList
+    Default: eu.anthropic.claude-haiku-4-5-20251001-v1:0,eu.amazon.nova-lite-v1:0
+    Description: EU inference profiles of the compared models (evaluation/models.py).
+  FoundationModels:
+    Type: CommaDelimitedList
+    Default: anthropic.claude-haiku-4-5-20251001-v1:0,amazon.nova-lite-v1:0
+    Description: Models behind the profiles; the profiles route to them in several EU regions.
+
+Conditions:
+  UseSubjectPrefix:
+    Fn::Not:
+      - Fn::Equals: [Ref: GitHubSubjectPrefix, '']
+
+Resources:
+  EvalRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: hochbeet-github-assistant-eval
+      Description: Assumed by the assistant model comparison workflow of the Hochbeet-Planer
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRoleWithWebIdentity
+            Principal:
+              Federated:
+                Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub:
+                  Fn::If:
+                    - UseSubjectPrefix
+                    - Fn::Sub: ${GitHubSubjectPrefix}:environment:${GitHubEnvironment}
+                    - Fn::Sub: repo:${GitHubOwner}/${GitHubRepo}:environment:${GitHubEnvironment}
+      Policies:
+        - PolicyName: invoke-compared-models
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - Fn::Sub:
+                      - arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${Profile}
+                      - Profile:
+                          Fn::Select: [0, Ref: InferenceProfiles]
+                  - Fn::Sub:
+                      - arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${Profile}
+                      - Profile:
+                          Fn::Select: [1, Ref: InferenceProfiles]
+                  - Fn::Sub:
+                      - arn:${AWS::Partition}:bedrock:*::foundation-model/${Model}
+                      - Model:
+                          Fn::Select: [0, Ref: FoundationModels]
+                  - Fn::Sub:
+                      - arn:${AWS::Partition}:bedrock:*::foundation-model/${Model}
+                      - Model:
+                          Fn::Select: [1, Ref: FoundationModels]
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/hochbeet/${Stage}/assistant/gateway-url
+
+Outputs:
+  RoleArn:
+    Description: Value for the GitHub repository variable AWS_ASSISTANT_EVAL_ROLE_ARN
+    Value:
+      Fn::GetAtt: [EvalRole, Arn]

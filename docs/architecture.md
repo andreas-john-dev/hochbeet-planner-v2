@@ -505,6 +505,14 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 - Smoke-Test nach jedem Deploy: Der Smoke-User listet seine Vorlieben und löscht danach alles, was der Assistent über ihn weiß (auch die Smoke-Frage).
 - Kosten: AgentCore Memory rechnet nach Events, gespeicherten Vorlieben und Abrufen ab, jeweils unter 1 USD je Tausend. Bei höchstens 20 Fragen pro User und Tag (einige Events und ein Abruf je Frage) bleibt das bei den wenigen Testern im Bereich von Cent; das Kontingent begrenzt auch diese Kosten.
 
+**Modellvergleich (T-45):**
+
+- Testsatz von 20 Fragen mit erwarteten Eigenschaften in `agents/bed-assistant/evaluation/` (`cases.py`), regelbasiert geprüft: genannte Begriffe, genutzte Tools, keine IDs, Deutsch, Länge, bei Vorschlägen „im Beet“ und „ohne verbleibende Warnungen“. Feste Beet-Daten: Das Skript legt als Smoke-User ein Testbeet mit bekannten Fundstellen an (Daten relativ zum Lauf) und löscht es danach.
+- Der Lauf nutzt den Agenten-Code selbst (`StrandsResponder` mit Gateway-Tools und denselben Grenzen), nur mit wechselnder Modell-ID (`models.py`: Claude Haiku 4.5 und Amazon Nova Lite). Tokens und Tool-Aufrufe liest ein Beobachter (`observe`) aus den Metriken von Strands; daraus folgen Kosten je Frage nach einer Preisliste mit oberen Schätzwerten.
+- Gestartet nur von Hand: Workflow `assistant-eval.yml` (`workflow_dispatch`, Umgebung `prod`) mit der eigenen Rolle `hochbeet-github-assistant-eval` (Bootstrap-Template, nur `bedrock:InvokeModel*` auf die verglichenen Modelle und `ssm:GetParameter` auf die Gateway-URL, die `Prod-Assistant` unter `/hochbeet/<stage>/assistant/gateway-url` ablegt). Der Lauf bricht ab, bevor er 0,90 $ überschreiten könnte.
+- Ergebnisse und Empfehlung in `docs/assistant-evaluation.md`.
+- **Abweichung vom Issue:** eigenes Skript statt AgentCore Evaluations. Evaluations bewertet Traces der Runtime mit einem Bewertungsmodell; das braucht X-Ray Transaction Search (im Konto aus, siehe Runtime) und kostet je Urteil einen Modellaufruf. Ein Vergleich über die Runtime hätte zudem deren Rolle um ein zweites Modell erweitert.
+
 ### Gemeinsamer Service-Code
 
 `packages/service-kit` (`@hochbeet/service-kit`) enthält, was alle Lambdaliths teilen:
@@ -745,6 +753,7 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 | `/hochbeet/<stage>/garden/api-domain` | `Prod-GardenStateless` | Domain der Garden-HTTP-API, Origin für `/api/garden/*` in CloudFront |
 | `/hochbeet/<stage>/assistant/quota-table-name` | `Prod-AssistantStateful` | Tabelle der Tageskontingente, gelesen von `Prod-Assistant` |
 | `/hochbeet/<stage>/assistant/memory-id` | `Prod-AssistantStateful` | ID der AgentCore Memory, gelesen von `Prod-Assistant` |
+| `/hochbeet/<stage>/assistant/gateway-url` | `Prod-Assistant` | MCP-Endpunkt der Tools, gelesen vom Modellvergleich (`assistant-eval.yml`) |
 | `/hochbeet/<stage>/assistant/runtime-arn` | `Prod-Assistant` | ARN der AgentCore Runtime, gelesen von `Prod-Frontend` für `/api/assistant/*` |
 
 ### Cognito-Konfiguration

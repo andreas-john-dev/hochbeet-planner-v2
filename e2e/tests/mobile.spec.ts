@@ -95,7 +95,14 @@ test.describe('editor on the phone', () => {
     await page.touchscreen.tap(at.x, at.y);
     await expect(preview).toHaveAttribute('data-x', '150');
     await expect(preview).toHaveAttribute('data-y', '30');
-    await expect(page).toHaveScreenshot('tap-to-place.png');
+    await expect(page.getByRole('button', { name: 'Hier pflanzen' })).toBeVisible();
+    // The scroll position after the tap varies (then the fixed header covers part of the page):
+    // centre the bed again and compare only the bed.
+    const canvas = page.getByTestId('bed-canvas');
+    await canvas.evaluate((el) => {
+      el.scrollIntoView({ block: 'center' });
+    });
+    await expect(canvas).toHaveScreenshot('tap-to-place.png');
     // A tap only moves the preview; nothing is planted before the confirmation.
     await expect(page.locator(`[data-plant-id="${TOMATO}"]`)).toHaveCount(1);
 

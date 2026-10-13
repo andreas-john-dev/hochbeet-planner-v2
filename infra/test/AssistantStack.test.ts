@@ -182,6 +182,13 @@ describe('AssistantStack', () => {
     });
   });
 
+  it('publishes the gateway URL for the model comparison', () => {
+    template.hasResourceProperties('AWS::SSM::Parameter', {
+      Name: '/hochbeet/prod/assistant/gateway-url',
+      Value: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Gateway'), 'GatewayUrl'] },
+    });
+  });
+
   it('publishes the runtime ARN for the frontend and the smoke test', () => {
     template.hasResourceProperties('AWS::SSM::Parameter', {
       Name: '/hochbeet/prod/assistant/runtime-arn',

@@ -1,0 +1,81 @@
+name: Assistant evaluation
+
+# Model comparison of the Beet-Assistent (T-45) against prod: the test set of
+# agents/bed-assistant/evaluation with each model, scored by rule-based checks. Started by hand
+# only, never on push, because every run calls the models (below 1 € per run, enforced by the
+# script). One-time setup in docs/deployment.md ("Modellvergleich").
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Models to compare (keys from evaluation/models.py, comma-separated)
+        default: haiku,nova-lite
+        required: true
+      cases:
+        description: Only these cases (ids, comma-separated); empty runs all
+        default: ''
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assistant-eval
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Compare models
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The prod environment: main only, with the smoke user's password.
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check setup
+        env:
+          ROLE_ARN: ${{ vars.AWS_ASSISTANT_EVAL_ROLE_ARN }}
+        run: |
+          if [ -z "$ROLE_ARN" ]; then
+            echo "::error title=Evaluation not set up::Repository variable AWS_ASSISTANT_EVAL_ROLE_ARN is not set. See docs/deployment.md."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: agents/*/uv.lock
+
+      - name: Install the agent
+        working-directory: agents/bed-assistant
+        run: uv sync --frozen
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ASSISTANT_EVAL_ROLE_ARN }}
+          role-session-name: hochbeet-assistant-eval-${{ github.run_id }}
+          aws-region: eu-central-1
+
+      - name: Run the test set
+        working-directory: agents/bed-assistant
+        env:
+          SMOKE_USER_EMAIL: smoke-test@hochbeet.andi-john-dev.de
+          SMOKE_USER_PASSWORD: ${{ secrets.SMOKE_USER_PASSWORD }}
+          MODELS: ${{ inputs.models }}
+          CASES: ${{ inputs.cases }}
+        run: |
+          PYTHONPATH=src uv run --frozen python -m evaluation --models "$MODELS" --cases "$CASES" --out eval-out
+          cat eval-out/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: assistant-evaluation
+          path: agents/bed-assistant/eval-out/
+          retention-days: 90
+          if-no-files-found: ignore

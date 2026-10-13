@@ -11,6 +11,8 @@ test-results/
 .DS_Store
 screenshots-out/
 lighthouse-out/
+# Results of the assistant model comparison (agents/bed-assistant/evaluation)
+eval-out/
 # Login state of the Playwright setup project
 e2e/.auth/
 
