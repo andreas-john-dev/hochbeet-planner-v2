@@ -100,6 +100,9 @@ async def run_model(
             "ok" if result.ok else result.failed,
             result.cost_usd,
         )
+        if not result.ok:
+            # Artifacts are not always at hand; the job log shows why a case failed.
+            logger.info("  %s", result.error or result.answer[:300].replace("\n", " "))
         results.append(result)
     return results
 

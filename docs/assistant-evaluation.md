@@ -1,12 +1,54 @@
 # Modellvergleich des Beet-Assistenten
 
-Stand: 13. Oktober 2026 (T-45, Issue #95)
+Stand: 13. Oktober 2026 (T-45, Issue #95), erster Lauf am selben Tag
 
 Wie gut und wie teuer beantwortet der Beet-Assistent typische Fragen mit verschiedenen Modellen? Dieses Dokument beschreibt den Testsatz, den Lauf und die Ergebnisse.
 
 ## Ergebnisse
 
-> Noch kein Lauf. Den ersten Lauf startet der Workflow `Assistant evaluation`, sobald die Rolle eingerichtet ist (siehe „Lauf starten“). Danach stehen hier die Tabelle aus dem Job-Summary, die Kosten des Laufs und die Empfehlung.
+Erster Lauf am 13. Oktober 2026 ([Workflow-Lauf #2](https://github.com/andreas-john-dev/hochbeet-planner-v2/actions/runs/38359702814), alle 20 Fragen, beide Modelle). Geschätzte Kosten des Laufs (obere Grenze): **0,25 $**.
+
+| Modell           | Fragen bestanden | einfache Aufgaben | Prüfungen bestanden | Tool-Aufrufe/Frage | Tokens ein/aus je Frage | Kosten/Frage | Latenz Median (max) | Fehler |
+| ---------------- | ---------------- | ----------------- | ------------------- | ------------------ | ----------------------- | ------------ | ------------------- | ------ |
+| Claude Haiku 4.5 | 16/20 (80 %)     | 9/10 (90 %)       | 74/85 (87 %)        | 1,9                | 8.783 / 450             | 0,0121 $     | 7,6 s (276,6 s)     | 1      |
+| Amazon Nova Lite | 9/20 (45 %)      | 5/10 (50 %)       | 72/85 (85 %)        | 1,9                | 6.124 / 350             | 0,0006 $     | 3,0 s (16,4 s)      | 0      |
+
+| Frage                | Claude Haiku 4.5                                    | Amazon Nova Lite                                    |
+| -------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| `warnungen`          | ✓                                                   | ✗ keine IDs                                         |
+| `fruchtfolge`        | ✓                                                   | ✗ keine IDs                                         |
+| `nachbarn-lauch`     | ✓                                                   | ✗ keine IDs                                         |
+| `starkzehrer`        | ✓                                                   | ✓                                                   |
+| `spinat`             | ✓                                                   | ✗ keine IDs                                         |
+| `gute-nachbarn`      | ✓                                                   | ✗ keine IDs                                         |
+| `inhalt`             | ✓                                                   | ✗ keine IDs                                         |
+| `fenchel`            | ✓                                                   | ✓                                                   |
+| `beet-id`            | ✓                                                   | ✗ keine IDs                                         |
+| `abstand-tomate`     | ✓                                                   | ✓                                                   |
+| `nachbarn-salat`     | ✓                                                   | ✓                                                   |
+| `kartoffel`          | ✓                                                   | ✓                                                   |
+| `familie-mangold`    | ✓                                                   | ✓                                                   |
+| `beete`              | ✓                                                   | ✓                                                   |
+| `englisch`           | ✗ auf Deutsch                                       | ✗ auf Deutsch                                       |
+| `mathe`              | ✓                                                   | ✓                                                   |
+| `gedicht`            | ✓                                                   | ✓                                                   |
+| `vorschlag`          | Fehler (MCP-Verbindung nach 4,5 min geschlossen)    | ✗ Warnungen bleiben                                 |
+| `vorschlag-salat`    | ✗ kein Vorschlag                                    | ✗ Warnungen bleiben                                 |
+| `vorschlag-kraeuter` | ✗ kein Vorschlag                                    | ✗ kein Vorschlag                                    |
+
+### Was auffällt
+
+- **Erklären und Nachschlagen kann Haiku zuverlässig:** alle 17 Textfragen außer der englischen bestanden, mit knapp 2 Tool-Aufrufen je Frage.
+- **Nova Lite nennt IDs:** In 8 der 9 Fragen zum Testbeet stehen ULIDs von Beet oder Pflanzungen in der Antwort, obwohl der Systemprompt das verbietet. Fachlich lagen die Antworten meist richtig (85 % der Prüfungen bestanden), für Nutzer wirken sie aber technisch und unfertig.
+- **Englische Fragen bekommen englische Antworten,** bei beiden Modellen, obwohl der Prompt „Antworte immer auf Deutsch“ verlangt. Ob das gewollt ist, ist eine fachliche Entscheidung (siehe unten).
+- **Pflanzvorschläge bestehen bei keinem Modell.** Nova Lite liefert Vorschläge, aber mit verbleibenden Warnungen der Regel-Engine; bei Kräutern gar keinen. Haiku brach beim ersten Vorschlag nach 4,5 Minuten ab („Connection to the MCP server was closed“) und lieferte danach keine Vorschläge, bei bis zu 0,08 $ je Anfrage. Das deutet auf ein Problem im Vorschlagsmodus selbst (T-43) und nicht nur auf das Modell; es betrifft vermutlich auch prod. Die Ursache klärt T-48 (#111); der Bericht schreibt dafür ab jetzt bei Fehlschlägen Antwort bzw. Fehler ins Job-Log.
+- **Kosten:** Nova Lite kostet je Frage etwa 1/20 von Haiku (0,0006 $ statt 0,0121 $) und antwortet im Median doppelt so schnell. Bei 20 Fragen pro Tag und Tester sind das mit Haiku höchstens etwa 0,25 $ pro Tester und Tag.
+
+### Empfehlung
+
+- **Bei Claude Haiku 4.5 bleiben, auch für einfache Aufgaben.** Die Ersparnis mit Nova Lite ist absolut gering (Cent-Beträge pro Tag), dafür verletzt Nova Lite die Regel „keine IDs“ in fast jeder Antwort zum Beet und besteht nur 50 % der einfachen Aufgaben. Ein Wechsel lohnt sich erst, wenn ein neuer Lauf zeigt, dass Nova die Prompt-Regeln einhält (z. B. nach einem Prompt-Fix, der IDs in Tool-Ergebnissen verbirgt).
+- **Vorschlagsmodus untersuchen** (T-48, #111), bevor er weiter genutzt oder verglichen wird.
+- **Sprache klären:** Soll der Assistent auf englische Fragen deutsch antworten (wie im Prompt) oder in der Sprache der Frage? Danach Prompt oder Testfall anpassen.
 
 ## Was verglichen wird
 
