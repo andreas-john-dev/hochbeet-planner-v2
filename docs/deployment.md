@@ -93,13 +93,17 @@ Actions → *Deploy* → *Run workflow* auf `main`. Der erste Lauf dauert wegen 
 
 Der Workflow *Assistant evaluation* (`.github/workflows/assistant-eval.yml`) vergleicht Modelle für den Beet-Assistenten gegen prod (siehe `docs/assistant-evaluation.md`). Er braucht eine eigene, schmale Rolle, die nur die verglichenen Modelle aufrufen und die Gateway-URL aus SSM lesen darf:
 
-1. **Rolle anlegen** (als Admin, wie die Deploy-Rolle; dieselben `GitHubSubjectPrefix`-Angaben wie in Schritt 2):
+1. **Rolle anlegen** (als Admin, wie die Deploy-Rolle). Nutzt das Repo unveränderliche OIDC-Subjects, braucht die Rolle denselben `GitHubSubjectPrefix` wie die Deploy-Rolle; ohne ihn scheitert der Workflow mit `Not authorized to perform sts:AssumeRoleWithWebIdentity`. Den Wert der Deploy-Rolle liest der erste Befehl:
 
    ```bash
+   prefix=$(aws cloudformation describe-stacks --region eu-central-1 --profile admin \
+     --stack-name hochbeet-github-deploy-role \
+     --query "Stacks[0].Parameters[?ParameterKey=='GitHubSubjectPrefix'].ParameterValue" --output text)
    aws cloudformation deploy --region eu-central-1 --profile admin \
      --template-file infra/bootstrap/github-assistant-eval-role.yaml \
      --stack-name hochbeet-github-assistant-eval-role \
-     --capabilities CAPABILITY_NAMED_IAM
+     --capabilities CAPABILITY_NAMED_IAM \
+     --parameter-overrides "GitHubSubjectPrefix=$prefix"
    aws cloudformation describe-stacks --region eu-central-1 --profile admin \
      --stack-name hochbeet-github-assistant-eval-role \
      --query "Stacks[0].Outputs[?OutputKey=='RoleArn'].OutputValue" --output text
