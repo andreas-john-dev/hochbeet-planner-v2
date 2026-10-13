@@ -290,3 +290,16 @@ async def test_suggestions_work_when_recalling_fails(agents: list[FakeAgent]) ->
     result = await responder.suggest("Was passt noch?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
     assert result.summary == "Eine Tomate."
     assert "Vorlieben" not in agents[0].kwargs["prompts"][0]
+
+
+async def test_an_observer_sees_each_agent_before_it_is_closed(agents: list[FakeAgent]) -> None:
+    seen: list[tuple[str, bool]] = []
+    responder = StrandsResponder(
+        settings(GATEWAY_URL="https://gw.example/mcp"),
+        FakeGateway,
+        observe=lambda agent: seen.append(("seen", agent.cleaned_up)),  # type: ignore[attr-defined]
+    )
+    await collect(responder.stream("Hallo", USER, None))
+    await responder.suggest("Was passt?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
+    assert seen == [("seen", False), ("seen", False)]
+    assert all(agent.cleaned_up for agent in agents)

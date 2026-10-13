@@ -263,6 +263,11 @@ export class AssistantStack extends Stack {
       parameterName: names.assistantRuntimeArn,
       stringValue: this.runtime.agentRuntimeArn,
     });
+    // Read by the model comparison (workflow assistant-eval.yml, T-45).
+    new ssm.StringParameter(this, 'GatewayUrlParameter', {
+      parameterName: names.assistantGatewayUrl,
+      stringValue: gatewayUrl,
+    });
     // Read by the deploy workflow for the smoke test.
     new CfnOutput(this, 'RuntimeArn', {
       key: 'RuntimeArn',

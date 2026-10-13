@@ -110,11 +110,14 @@ class StrandsResponder:
         *,
         memory: MemoryStore | None = None,
         session_factory: Callable[[Settings, str, str], Any] = memory_session,
+        observe: Callable[[Agent], None] | None = None,
     ) -> None:
         self._settings = settings
         self._client_factory = client_factory
         self._memory = memory
         self._session_factory = session_factory
+        #: Sees each agent after its answer, e.g. its token usage (model comparison, T-45).
+        self._observe = observe
         self._model = BedrockModel(
             model_id=settings.model_id,
             region_name=settings.region,
@@ -163,8 +166,7 @@ class StrandsResponder:
                     emitted = True
                     yield text
         finally:
-            # Closes the MCP session to the gateway.
-            agent.cleanup()
+            self._done(agent)
 
     async def suggest(self, question: str, caller: Caller, bed_id: str) -> SuggestionResult:
         """
@@ -194,6 +196,14 @@ class StrandsResponder:
                 preferences=preferences,
             )
         finally:
+            self._done(agent)
+
+    def _done(self, agent: Agent) -> None:
+        try:
+            if self._observe is not None:
+                self._observe(agent)
+        finally:
+            # Closes the MCP session to the gateway.
             agent.cleanup()
 
     async def recall(self, caller: Caller, query: str) -> list[str]:

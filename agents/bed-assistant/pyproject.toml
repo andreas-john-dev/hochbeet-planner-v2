@@ -17,6 +17,8 @@ dev = [
   "pytest>=8.4",
   "pytest-asyncio>=1.2",
   "ruff>=0.14",
+  # Model comparison (evaluation/): signs in the smoke user with SRP like the app.
+  "pycognito>=2024.5",
 ]
 
 [tool.uv]
@@ -24,7 +26,7 @@ package = false
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "."]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S", "PT"]
@@ -37,14 +39,14 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 strict = true
 python_version = "3.13"
 mypy_path = "src"
-files = ["src", "tests", "main.py"]
+files = ["src", "tests", "evaluation", "main.py"]
 
 [[tool.mypy.overrides]]
-module = ["strands.*", "bedrock_agentcore.*", "moto.*"]
+module = ["strands.*", "bedrock_agentcore.*", "moto.*", "pycognito.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 # Third-party: bedrock-agentcore still uses class-based pydantic config.

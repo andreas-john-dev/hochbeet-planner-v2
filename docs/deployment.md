@@ -89,6 +89,28 @@ Die Domain `hochbeet.andi-john-dev.de` und die Hosted Zone stehen in `infra/lib/
 
 Actions → *Deploy* → *Run workflow* auf `main`. Der erste Lauf dauert wegen CloudFront und der Zertifikatsprüfung etwa 10–20 Minuten. Danach ist die App unter https://hochbeet.andi-john-dev.de erreichbar; die URL steht auch in der Zusammenfassung des Laufs und unter *Deployments* → `prod`.
 
+### Modellvergleich einrichten (optional, T-45)
+
+Der Workflow *Assistant evaluation* (`.github/workflows/assistant-eval.yml`) vergleicht Modelle für den Beet-Assistenten gegen prod (siehe `docs/assistant-evaluation.md`). Er braucht eine eigene, schmale Rolle, die nur die verglichenen Modelle aufrufen und die Gateway-URL aus SSM lesen darf:
+
+1. **Rolle anlegen** (als Admin, wie die Deploy-Rolle; dieselben `GitHubSubjectPrefix`-Angaben wie in Schritt 2):
+
+   ```bash
+   aws cloudformation deploy --region eu-central-1 --profile admin \
+     --template-file infra/bootstrap/github-assistant-eval-role.yaml \
+     --stack-name hochbeet-github-assistant-eval-role \
+     --capabilities CAPABILITY_NAMED_IAM
+   aws cloudformation describe-stacks --region eu-central-1 --profile admin \
+     --stack-name hochbeet-github-assistant-eval-role \
+     --query "Stacks[0].Outputs[?OutputKey=='RoleArn'].OutputValue" --output text
+   ```
+
+   Die Rolle setzt den OIDC-Provider aus Schritt 2 voraus.
+2. **Variable:** Settings → Secrets and variables → Actions → *Variables* → `AWS_ASSISTANT_EVAL_ROLE_ARN` mit der `RoleArn`.
+3. **Modelle:** Claude Haiku 4.5 ist durch Schritt 5 schon freigeschaltet. Amazon-Modelle wie Nova Lite brauchen kein Marketplace-Abo; meldet der Lauf trotzdem `AccessDeniedException` für Nova, das Modell einmal in der Bedrock-Konsole (Model catalog → Nova Lite → Playground) aufrufen.
+
+Gestartet wird nur von Hand (Actions → *Assistant evaluation* → *Run workflow*); ein Lauf kostet unter 1 €.
+
 ### Umstellung einer bestehenden Einrichtung auf die eigene Domain
 
 Wer die Einrichtung schon vor der eigenen Domain gemacht hat, braucht einmalig:
