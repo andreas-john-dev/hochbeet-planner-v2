@@ -3,10 +3,17 @@ Planting suggestions: the model proposes plantings (structured output), the code
 the grid and into the bed, the rule engine (`evaluate_bed` with candidates) checks them, and the
 model revises them while warnings remain, for at most `rounds` rounds. Warnings left after the
 last round are passed on openly. Nothing here ever saves a planting.
+
+The model gets the bed with the areas its plantings occupy in the prompt and only looks up
+plants itself; checking is the code's job. The whole request has a deadline below the 60 s
+read timeout of CloudFront: a round that would run past it is dropped, and the last checked
+round is answered instead.
 """
 
+import asyncio
 import json
 import re
+import time
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
@@ -20,6 +27,14 @@ MAX_REASON_CHARS = 300
 
 #: Target name of the tools in the gateway (infra: TOOLS_TARGET_NAME); tools are `garden___<x>`.
 TOOLS_TARGET = "garden"
+
+#: The only gateway tool the model may use for suggestions; get_bed and evaluate_bed run in code.
+SUGGESTION_TOOLS = ("find_plants",)
+
+TIMEOUT_MESSAGE = (
+    "Die Vorschläge haben zu lange gedauert. Bitte versuche es noch einmal, gern mit einem "
+    "genaueren Wunsch."
+)
 
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 
@@ -148,8 +163,27 @@ class McpGardenTools:
         return data
 
 
+def occupied(bed_data: dict[str, Any], today: date) -> list[dict[str, Any]]:
+    """Plantings still in the bed from `today` on: plant, kind, occupied area and end."""
+    current = []
+    for planting in bed_data.get("plantings") or []:
+        until = planting.get("until")
+        if isinstance(until, str) and until < today.isoformat():
+            continue
+        entry = {"plant": planting.get("plant"), "kind": planting.get("kind")}
+        if isinstance(planting.get("area"), dict):
+            entry["area"] = planting["area"]
+        entry["until"] = until
+        current.append(entry)
+    return current
+
+
 def suggestion_prompt(
-    question: str, bed_id: str, today: date, preferences: Sequence[str] = ()
+    question: str,
+    bed: Bed,
+    bed_data: dict[str, Any],
+    today: date,
+    preferences: Sequence[str] = (),
 ) -> str:
     known = (
         "Bekannte Vorlieben des Users (berücksichtigen):\n"
@@ -158,12 +192,24 @@ def suggestion_prompt(
         if preferences
         else ""
     )
+    plantings = json.dumps(occupied(bed_data, today), ensure_ascii=False, separators=(",", ":"))
     return (
-        f"Heute ist {today.isoformat()}. Mache Pflanzvorschläge für das Beet mit der ID {bed_id}"
-        f" (höchstens {MAX_SUGGESTIONS}).\n"
-        "Lies das Beet mit get_bed und suche passende Sorten mit find_plants (für die plantId).\n"
-        "Positionen in cm im Beet auf dem 5-cm-Raster, Abstände der Sorten beachten, "
-        "startDate ist der Montag der Pflanzwoche. Begründe jeden Vorschlag kurz.\n\n"
+        f"Heute ist {today.isoformat()}. Mache Pflanzvorschläge (höchstens {MAX_SUGGESTIONS}) "
+        f"für ein Beet von {bed.width_cm} × {bed.depth_cm} cm (x nach rechts, y nach unten, "
+        f"Hauptreihenrichtung {bed.main_row_direction}).\n"
+        "Belegte Flächen der Pflanzungen, die noch im Beet stehen (area in cm, until = "
+        f"Ende, null = dauerhaft):\n{plantings}\n\n"
+        "So gehst du vor:\n"
+        "- Suche passende Sorten mit find_plants (für plantId und Abstände). Andere Werkzeuge "
+        "hast du hier nicht, das Beet steht oben: Das System prüft deine Vorschläge mit der "
+        "Regel-Engine und meldet dir Warnungen zurück.\n"
+        "- Setze Vorschläge auf freie Flächen: Eine Einzelpflanze belegt einen Kreis mit dem "
+        "halben Abstand in der Reihe als Radius, eine Reihe einen Streifen in Reihenabstand "
+        "Breite. Positionen in cm auf dem 5-cm-Raster.\n"
+        "- Konflikte zwischen vorhandenen Pflanzungen sind nicht deine Aufgabe; schlage trotzdem "
+        "vor. Eine leere Liste nur, wenn wirklich keine freie Fläche da ist, auch nicht nach dem "
+        "Ende einer Pflanzung.\n"
+        "- startDate ist der Montag der Pflanzwoche. Begründe jeden Vorschlag kurz.\n\n"
         f"{known}Wunsch des Users:\n{question}"
     )
 
@@ -188,38 +234,71 @@ async def suggest(
     rounds: int,
     today: date,
     preferences: Sequence[str] = (),
+    seconds: float = 50.0,
+    clock: Callable[[], float] = time.monotonic,
 ) -> SuggestionResult:
     """
     Runs the check loop: `ask` returns the model's structured answer for a prompt (the same
-    conversation across rounds); `evaluate_bed` checks the sanitized suggestions.
+    conversation across rounds); `evaluate_bed` checks the sanitized suggestions. Everything
+    together takes at most `seconds`: a later round that runs out of time is dropped in favour
+    of the last checked one, a first round raises a German `SuggestionError`.
     """
-    bed = Bed.from_tool(await tools.call("get_bed", {"bedId": bed_id}))
-    prompt = suggestion_prompt(question, bed_id, today, preferences)
-    suggestions: list[dict[str, Any]] = []
-    warnings: list[str] = []
-    summary = ""
-    done = 0
+    deadline = clock() + seconds
+
+    async def within_deadline[T](step: Awaitable[T]) -> T:
+        return await asyncio.wait_for(step, timeout=max(0.0, deadline - clock()))
+
+    try:
+        bed_data = await within_deadline(tools.call("get_bed", {"bedId": bed_id}))
+    except TimeoutError as late:
+        raise SuggestionError(TIMEOUT_MESSAGE) from late
+    bed = Bed.from_tool(bed_data)
+    prompt = suggestion_prompt(question, bed, bed_data, today, preferences)
+    result: SuggestionResult | None = None
     for done in range(1, max(1, rounds) + 1):
-        answer = await ask(prompt)
-        summary = str(answer.get("summary") or "").strip()
-        suggestions, dropped = sanitize(answer.get("suggestions") or [], bed)
-        if not suggestions:
-            warnings = []
-            break
-        evaluation = await tools.call(
-            "evaluate_bed", {"bedId": bed_id, "candidates": candidates(suggestions)}
-        )
-        unknown = set(evaluation.get("unknownCandidates") or [])
-        known = [i for i in range(len(suggestions)) if i not in unknown]
-        warnings = list(
-            dict.fromkeys(
-                str(f["message"])
-                for f in evaluation.get("findings") or []
-                if f.get("severity") == "WARNING" and set(f.get("candidates") or []) & set(known)
+        try:
+            result, prompt = await within_deadline(
+                _round(ask, tools, prompt, bed, bed_id, done, rounds)
             )
-        )
-        suggestions = [suggestions[i] for i in known]
-        if not warnings or done >= rounds:
+        except TimeoutError as late:
+            if result is None:
+                raise SuggestionError(TIMEOUT_MESSAGE) from late
             break
-        prompt = revision_prompt(warnings, dropped, len(unknown))
-    return SuggestionResult(suggestions, warnings, summary, done)
+        if not prompt:
+            break
+    if result is None:
+        raise SuggestionError(TIMEOUT_MESSAGE)
+    return result
+
+
+async def _round(
+    ask: Callable[[str], Awaitable[dict[str, Any]]],
+    tools: GardenTools,
+    prompt: str,
+    bed: Bed,
+    bed_id: str,
+    done: int,
+    rounds: int,
+) -> tuple[SuggestionResult, str]:
+    """One round: ask, sanitize, check. Returns the result and the next prompt ("" = finished)."""
+    answer = await ask(prompt)
+    summary = str(answer.get("summary") or "").strip()
+    suggestions, dropped = sanitize(answer.get("suggestions") or [], bed)
+    if not suggestions:
+        return SuggestionResult([], [], summary, done), ""
+    evaluation = await tools.call(
+        "evaluate_bed", {"bedId": bed_id, "candidates": candidates(suggestions)}
+    )
+    unknown = set(evaluation.get("unknownCandidates") or [])
+    known = [i for i in range(len(suggestions)) if i not in unknown]
+    warnings = list(
+        dict.fromkeys(
+            str(f["message"])
+            for f in evaluation.get("findings") or []
+            if f.get("severity") == "WARNING" and set(f.get("candidates") or []) & set(known)
+        )
+    )
+    result = SuggestionResult([suggestions[i] for i in known], warnings, summary, done)
+    if not warnings or done >= rounds:
+        return result, ""
+    return result, revision_prompt(warnings, dropped, len(unknown))

@@ -12,7 +12,7 @@ import {
   type Planting,
   type ToolError,
 } from '@hochbeet/contracts';
-import { candidatePlanting, evaluateBed } from '@hochbeet/garden-rules';
+import { bounds, candidatePlanting, evaluateBed, footprint } from '@hochbeet/garden-rules';
 import { z } from 'zod';
 import { type GardenReader, ToolFailure } from './api';
 
@@ -75,6 +75,14 @@ const plantNames = (plants: readonly CatalogPlant[]) =>
 async function getBed(api: GardenReader, bedId: string): Promise<GetBedToolOutput> {
   const [{ bed, plantings }, { plants }] = await Promise.all([api.getBed(bedId), api.listPlants()]);
   const names = plantNames(plants);
+  const byId = new Map(plants.map((plant) => [plant.id, plant]));
+  const area = (planting: (typeof plantings)[number]) => {
+    const plant = byId.get(planting.plantId);
+    if (!plant) return {};
+    const box = bounds(footprint(planting, plant));
+    const cm = (value: number) => Math.round(value);
+    return { area: { x0: cm(box.x0), y0: cm(box.y0), x1: cm(box.x1), y1: cm(box.y1) } };
+  };
   return {
     bed: {
       id: bed.id,
@@ -94,6 +102,7 @@ async function getBed(api: GardenReader, bedId: string): Promise<GetBedToolOutpu
         ...(p.kind === 'ROW' ? { lengthCm: p.lengthCm, orientation: p.orientation } : {}),
         from: p.startDate,
         until: until(p),
+        ...area(p),
       })),
   };
 }
