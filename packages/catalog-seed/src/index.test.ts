@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   contradictionReport,
   findContradictions,
+  resolveOneSided,
   resolveSeed,
   seedEntries,
   seedPlantByName,
@@ -80,6 +81,8 @@ describe('short forms', () => {
       'Rotkohl',
       'Weißkohl',
       'Wirsing',
+      // Named on the side of Schnittlauch, see "symmetric neighbours".
+      'Schnittlauch',
     ]);
   });
 
@@ -120,13 +123,92 @@ describe('short forms', () => {
   });
 });
 
+describe('symmetric neighbours', () => {
+  it('gives each plant the pairs named by the other side', () => {
+    const [a, b, c] = seedEntries;
+    if (!a || !b || !c) throw new Error('seed too small');
+    const plants = resolveSeed([
+      { ...a, good: [b.name], bad: [] },
+      { ...b, good: [], bad: [c.name] },
+      { ...c, good: [], bad: [] },
+    ]);
+    const [pa, pb, pc] = plants;
+    expect(pb?.goodNeighbors).toEqual([a.id]);
+    expect(pc?.badNeighbors).toEqual([b.id]);
+    expect(pa?.goodNeighbors).toEqual([b.id]);
+  });
+
+  it('applies "Warnung sticht" across both sides', () => {
+    const [a, b] = seedEntries;
+    if (!a || !b) throw new Error('seed too small');
+    const [pa, pb] = resolveSeed([
+      { ...a, good: [b.name], bad: [] },
+      { ...b, good: [], bad: [a.name] },
+    ]);
+    expect(pa?.goodNeighbors).toEqual([]);
+    expect(pa?.badNeighbors).toEqual([b.id]);
+    expect(pb?.goodNeighbors).toEqual([]);
+  });
+
+  it('is symmetric for every seed plant and never lists a pair as good and bad', () => {
+    for (const p of seedPlants) {
+      for (const id of p.goodNeighbors) {
+        expect(seedPlants.find((o) => o.id === id)?.goodNeighbors, p.name).toContain(p.id);
+        expect(p.badNeighbors, p.name).not.toContain(id);
+      }
+      for (const id of p.badNeighbors) {
+        expect(seedPlants.find((o) => o.id === id)?.badNeighbors, p.name).toContain(p.id);
+      }
+    }
+  });
+});
+
+describe('checked catalogue (T-46)', () => {
+  it('gives basil sourced neighbours and a medium feeder', () => {
+    expect(plant('Basilikum').feeder).toBe('MITTEL');
+    expect(names(plant('Basilikum').goodNeighbors)).toEqual(
+      expect.arrayContaining(['Tomate', 'Rosmarin', 'Petersilie', 'Oregano']),
+    );
+    expect(names(plant('Basilikum').badNeighbors)).toEqual(['Pfefferminze']);
+    expect(names(plant('Tomate').goodNeighbors)).toContain('Basilikum');
+  });
+
+  it('leaves no plant without neighbours', () => {
+    for (const p of seedPlants) {
+      expect(p.goodNeighbors.length + p.badNeighbors.length, p.name).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps the pairs the sources name for plants without BUND entry', () => {
+    expect(names(plant('Bohnenkraut').goodNeighbors)).toEqual(
+      expect.arrayContaining(['Buschbohne', 'Stangenbohne']),
+    );
+    expect(names(plant('Aubergine').badNeighbors)).toEqual(
+      expect.arrayContaining(['Tomate', 'Paprika', 'Zucchini', 'Kürbis']),
+    );
+    expect(names(plant('Pastinake').badNeighbors)).toContain('Möhre');
+    expect(names(plant('Rucola').badNeighbors)).toContain('Chinakohl');
+    expect(names(plant('Schnittlauch').goodNeighbors)).toContain('Erdbeere');
+    expect(names(plant('Tomate').badNeighbors)).toContain('Salatgurke');
+    // Decided by the product owner: BUND's good pair stays (Plantura disagrees).
+    expect(names(plant('Tomate').goodNeighbors)).toContain('Rotkohl');
+  });
+
+  it('lets culture times cover the time to first harvest', () => {
+    expect(plant('Rote Bete').lifecycle).toEqual({ type: 'ANNUAL', cultureWeeks: 20 });
+    expect(plant('Zwiebel').lifecycle).toEqual({ type: 'ANNUAL', cultureWeeks: 22 });
+    expect(plant('Kartoffel').lifecycle).toEqual({ type: 'ANNUAL', cultureWeeks: 18 });
+  });
+});
+
 describe('contradictions', () => {
-  const contradictions = findContradictions(seedPlants);
+  // Compares both sides as the sources name them; seedPlants are already symmetric.
+  const contradictions = findContradictions(resolveOneSided(seedEntries));
 
   it('finds pairs listed as good on one side and bad on the other', () => {
     const [a, b, c] = seedEntries;
     if (!a || !b || !c) throw new Error('seed too small');
-    const plants = resolveSeed([
+    const plants = resolveOneSided([
       { ...a, good: [b.name, c.name], bad: [] },
       { ...b, good: [], bad: [a.name] },
       { ...c, good: [a.name], bad: [] },
@@ -139,7 +221,7 @@ describe('contradictions', () => {
   it('finds a pair listed as good and bad by the same plant', () => {
     const [a, b] = seedEntries;
     if (!a || !b) throw new Error('seed too small');
-    const plants = resolveSeed([
+    const plants = resolveOneSided([
       { ...a, good: [b.name], bad: [b.name] },
       { ...b, good: [], bad: [] },
     ]);

@@ -3,7 +3,7 @@ import { seedEntries } from './data';
 import { resolveSeed } from './resolve';
 
 export { contradictionReport, findContradictions, type Contradiction } from './contradictions';
-export { resolveSeed, UnknownNeighborError } from './resolve';
+export { resolveOneSided, resolveSeed, UnknownNeighborError } from './resolve';
 export type { NeighborRefs, SeedEntry } from './types';
 export { seedEntries };
 

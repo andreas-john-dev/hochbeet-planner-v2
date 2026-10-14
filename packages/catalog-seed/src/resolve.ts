@@ -61,8 +61,41 @@ export function resolveNames(
   return [...new Set(names)].filter((name) => name !== entry.name);
 }
 
-/** Turns seed entries into plants with neighbour IDs. Throws on unknown references. */
-export function resolveSeed(entries: readonly SeedEntry[]): Plant[] {
+/** Neighbour names of every entry as written on its own side, after expanding short forms. */
+function ownLists(entries: readonly SeedEntry[], byName: ReadonlyMap<string, SeedEntry>) {
+  return new Map(
+    entries.map((entry) => [
+      entry.name,
+      {
+        good: resolveNames(entry, 'good', byName),
+        bad: resolveNames(entry, 'bad', byName),
+      },
+    ]),
+  );
+}
+
+type Lists = ReadonlyMap<string, { good: readonly string[]; bad: readonly string[] }>;
+
+/**
+ * Makes the lists symmetric: a plant also gets every plant that lists it, in catalogue order
+ * after its own entries. "Warnung sticht": a pair that is bad on either side is never good.
+ */
+function symmetric(entries: readonly SeedEntry[], own: Lists): Lists {
+  const listing = (name: string, list: 'good' | 'bad') =>
+    entries.filter((other) => own.get(other.name)?.[list].includes(name)).map((e) => e.name);
+  return new Map(
+    entries.map((entry) => {
+      const lists = own.get(entry.name) ?? { good: [], bad: [] };
+      const bad = [...new Set([...lists.bad, ...listing(entry.name, 'bad')])];
+      const good = [...new Set([...lists.good, ...listing(entry.name, 'good')])].filter(
+        (name) => !bad.includes(name),
+      );
+      return [entry.name, { good, bad }];
+    }),
+  );
+}
+
+function toPlants(entries: readonly SeedEntry[], lists: Lists): Plant[] {
   const byName = new Map(entries.map((entry) => [entry.name, entry]));
   const idOf = (name: string) => {
     const entry = byName.get(name);
@@ -71,10 +104,26 @@ export function resolveSeed(entries: readonly SeedEntry[]): Plant[] {
   };
   return entries.map((entry) => {
     const { good: _good, bad: _bad, ...fields } = entry;
-    return {
-      ...fields,
-      goodNeighbors: resolveNames(entry, 'good', byName).map(idOf),
-      badNeighbors: resolveNames(entry, 'bad', byName).map(idOf),
-    };
+    const { good, bad } = lists.get(entry.name) ?? { good: [], bad: [] };
+    return { ...fields, goodNeighbors: good.map(idOf), badNeighbors: bad.map(idOf) };
   });
+}
+
+/**
+ * Plants with only the neighbours each entry names itself (no symmetry, no "Warnung sticht").
+ * Basis of the contradiction report, which compares both sides of a pair.
+ */
+export function resolveOneSided(entries: readonly SeedEntry[]): Plant[] {
+  const byName = new Map(entries.map((entry) => [entry.name, entry]));
+  return toPlants(entries, ownLists(entries, byName));
+}
+
+/**
+ * Turns seed entries into plants with neighbour IDs. Neighbourhood is symmetric, so every plant
+ * carries the pairs named on either side (catalogue, assistant and rules agree). Throws on
+ * unknown references.
+ */
+export function resolveSeed(entries: readonly SeedEntry[]): Plant[] {
+  const byName = new Map(entries.map((entry) => [entry.name, entry]));
+  return toPlants(entries, symmetric(entries, ownLists(entries, byName)));
 }
