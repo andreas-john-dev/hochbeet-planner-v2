@@ -37,3 +37,9 @@ def test_names_the_bed_on_screen_before_the_question() -> None:
 def test_refuses_a_bed_id_that_is_no_ulid() -> None:
     with pytest.raises(InvalidRequestError):
         parse_request({"message": "Hi", "bedId": "../admin"}, 100)
+
+
+def test_the_assistant_answers_in_the_language_of_the_question() -> None:
+    from bed_assistant.prompt import SYSTEM_PROMPT
+
+    assert "in der Sprache der Frage" in SYSTEM_PROMPT

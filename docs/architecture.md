@@ -435,6 +435,7 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 
 **Agent (`agents/bed-assistant`, Python 3.13, T-40):**
 
+- Antwortsprache: die Sprache der Frage (meist Deutsch); Fehlermeldungen und UI bleiben deutsch.
 - Strands Agents mit `BedrockModel` (Claude Haiku 4.5 über das EU-Inference-Profil, `temperature` 0,3, höchstens 1024 Ausgabe-Tokens). Die Modell-ID steht in der Stage-Konfiguration und lässt sich für Vergleiche (T-45) austauschen.
 - Einstieg `main.py` → `bed_assistant.app`: `BedrockAgentCoreApp` mit einem Entrypoint. Er prüft der Reihe nach Aufrufer (401), Gruppe (403, zweite Verteidigungslinie nach dem Authorizer), Eingabe (400) und Tageskontingent (429) und streamt erst dann die Antwort.
 - Request wie `AssistantRequestSchema` in `packages/contracts/src/api/assistant.ts`: `message` (höchstens 2000 Zeichen, Infra reicht die Konstante als `MAX_INPUT_CHARS` an den Agenten) und optional `bedId` (das Beet, das der User gerade sieht; der Agent liest es selbst über die Tools). Python spiegelt das Schema mit pydantic.
