@@ -142,3 +142,5 @@ Strittige Werte und Entscheidungen des Product Owners:
 - **Tomate–Rotkohl:** BUND nennt Kohlgewächse als gute Nachbarn der Tomate, Plantura nennt Rotkohl schlecht, „die meisten Kohlarten“ aber gut. Entscheidung: bleibt gut.
 - **Standzeiten** von Rote Bete, Zwiebel und Kartoffel lagen unter der Kulturdauer bis Erntebeginn. Entscheidung: anheben.
 - **Chinakohl** hat nur einen schlechten Nachbarn (Rucola), keine Quelle nennt gute.
+
+Offen: **Abstände** sind nicht neu gegen die BZfE-Tabelle geprüft, weil sie bei der Prüfung weder auf bzfe.de noch auf landwirtschaft.de abrufbar war. Eine Stichprobe gegen meine ernte zeigt Abweichungen bei 22 von 32 vergleichbaren Sorten, meist um 5 bis 20 cm. Dazu gehören die in T-46 genannten Ausreißer: Stangenbohne 80 × 80 cm (meine ernte 60 × 120), Kürbis 150 × 150 cm (65 × 150) und Radieschen 5 × 10 cm (3 × 15). Rhabarber führt meine ernte nicht. Die Werte bleiben, bis die BZfE-Tabelle wieder geprüft werden kann.
