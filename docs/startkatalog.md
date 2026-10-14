@@ -83,7 +83,7 @@ Bei der Stangenbohne bezeichnen 80 × 80 cm den Abstand der Stangen; an jeder St
 
 ## Quellen
 
-- BZfE: Tabelle Aussaat und Pflanzzeiten – Abstände, Erntezeiträume. Unter der alten Adresse auf bzfe.de nicht mehr abrufbar (404, Stand 14. Oktober 2026); dieselbe Tabelle liegt jetzt bei [landwirtschaft.de](https://www.landwirtschaft.de/fileadmin/SITE_MASTER/content/Downloads/Tabelle_Aussaat_und_Pflanzzeiten.pdf).
+- [BZfE: Tabelle Aussaat und Pflanzzeiten](https://www.landwirtschaft.de/fileadmin/SITE_MASTER/content/Downloads/Tabelle_Aussaat_und_Pflanzzeiten.pdf) (aid-Heft 1559 „Von Apfel bis Zucchini – Das Jahr im Garten“) – Abstände, Erntezeiträume. Liegt seit 2026 bei landwirtschaft.de; die alte Adresse auf bzfe.de liefert 404.
 - [BUND: Mischkultur – gute und schlechte Nachbarn](https://www.bund.net/fileadmin/user_upload_bund/publikationen/naturnahes-gaertnern/Mischkultur-Gemuese-BUND.pdf) – Nachbarschaften
 - [meine ernte: Aussaat- und Pflanzkalender](https://www.meine-ernte.de/fileadmin/fieldupload/Aussaat-_und_Pflanzkalender.pdf) – Pflanzenfamilien, Kulturdauer, Abstände für Zucchini, Gurke und Rucola
 - [Plantura: Starkzehrer, Mittelzehrer & Schwachzehrer](https://www.plantura.garden/gemuese/gemuese-anbauen/starkzehrer-mittelzehrer-und-schwachzehrer) – Nährstoffbedarf
@@ -143,4 +143,4 @@ Strittige Werte und Entscheidungen des Product Owners:
 - **Standzeiten** von Rote Bete, Zwiebel und Kartoffel lagen unter der Kulturdauer bis Erntebeginn. Entscheidung: anheben.
 - **Chinakohl** hat nur einen schlechten Nachbarn (Rucola), keine Quelle nennt gute.
 
-Offen: **Abstände** sind nicht neu gegen die BZfE-Tabelle geprüft, weil sie bei der Prüfung weder auf bzfe.de noch auf landwirtschaft.de abrufbar war. Eine Stichprobe gegen meine ernte zeigt Abweichungen bei 22 von 32 vergleichbaren Sorten, meist um 5 bis 20 cm. Dazu gehören die in T-46 genannten Ausreißer: Stangenbohne 80 × 80 cm (meine ernte 60 × 120), Kürbis 150 × 150 cm (65 × 150) und Radieschen 5 × 10 cm (3 × 15). Rhabarber führt meine ernte nicht. Die Werte bleiben, bis die BZfE-Tabelle wieder geprüft werden kann.
+**Abstände** sind gegen die BZfE-Tabelle geprüft (aid-Heft 1559 „Von Apfel bis Zucchini“, Angabe Reihenabstand × Abstand in der Reihe) und stimmen bei allen Sorten. Das gilt auch für die in T-46 vermuteten Ausreißer: Stangenbohne 80 × 80 cm (6–8 Pflanzen je Stange), Kürbis 150 × 150 cm, Rhabarber 120 × 120 cm, Dill 30 × 30 cm und Radieschen 10 × 5 cm. Mehrere Sätze (früh, Sommer, Herbst) gibt die Tabelle u. a. für Kohl, Porree und Endivie an; der Katalog nutzt jeweils einen dieser Sätze, etwa Blumenkohl Sommer 60 × 60 cm und Rot-/Weißkohl Herbst 60 × 50 cm. Bewusst nach meine ernte statt BZfE bleiben Salatgurke (BZfE 150 × 40 cm, Katalog 100 × 40 cm), Zucchini (BZfE 2 m² je Pflanze, Katalog 100 × 100 cm) und Rucola (BZfE 15 × 0,5 cm, Katalog 20 × 3 cm).
