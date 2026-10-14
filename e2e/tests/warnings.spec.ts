@@ -4,7 +4,7 @@ import { bed, planting, seedGarden } from './garden';
 
 const BED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0S1A';
 const TOMATO = '01M49THV00QS1SEJEM64991JH5'; // Tomate, 22 weeks
-const POTATO = '01M49THV00ZXD963BV15Z5DW76'; // Kartoffel, 16 weeks
+const POTATO = '01M49THV00ZXD963BV15Z5DW76'; // Kartoffel, 18 weeks
 const LETTUCE = '01M49THV00RK9E9PC83NEE87CJ'; // Kopfsalat, 8 weeks
 const TOMATO_ID = '01J9ZQ3W8D6V2K5M7N8P9R0T01';
 const POTATO_ID = '01J9ZQ3W8D6V2K5M7N8P9R0T02';
@@ -104,7 +104,7 @@ test.describe('findings list', () => {
     await expect(label).toContainText('KW 41');
     const list = page.getByRole('list', { name: 'Hinweise' });
     const bad = list.getByRole('button', { name: /Kartoffel und Tomate sind schlechte Nachbarn/ });
-    await expect(bad).toContainText('KW 19 – KW 34 2026');
+    await expect(bad).toContainText('KW 19 – KW 36 2026');
 
     await bad.click();
     await expect(label).toContainText('KW 19');
