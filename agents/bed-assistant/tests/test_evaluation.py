@@ -14,6 +14,7 @@ from evaluation.cases import (
     Case,
     Outcome,
     checks_for,
+    in_english,
     in_german,
     mentions,
     no_ids,
@@ -82,6 +83,7 @@ def test_checks_read_the_answer() -> None:
     assert not no_ids().passes(outcome("Beet 01J9ZQ3W8D6V2K5M7N8P9R0S1A"))
     assert in_german().passes(outcome("Das ist nicht gut und du solltest"))
     assert not in_german().passes(outcome("Tomatoes need 60 cm between plants."))
+    assert in_english().passes(outcome("You should keep 60 cm between the plants."))
     assert uses("get_bed").passes(outcome("", tools=["list_beds", "get_bed"]))
 
 
@@ -103,6 +105,11 @@ def test_the_test_set() -> None:
     # Plain answers are always checked for ids, language and length.
     plain = next(c for c in CASES if not c.suggest)
     assert {"keine IDs", "auf Deutsch"} <= {check.label for check in checks_for(plain)}
+    # Questions in English get answers in English.
+    english = next(c for c in CASES if c.id == "englisch")
+    labels = {check.label for check in checks_for(english)}
+    assert "auf Englisch" in labels
+    assert "auf Deutsch" not in labels
 
 
 class FakeAgent:

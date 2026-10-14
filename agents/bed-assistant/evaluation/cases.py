@@ -73,8 +73,15 @@ def no_ids() -> Check:
     return Check("keine IDs", lambda o: not _ULID.search(o.text))
 
 
+_ENGLISH = re.compile(r"\b(the|and|is|you|your|with|between|should)\b", re.IGNORECASE)
+
+
 def in_german() -> Check:
     return Check("auf Deutsch", lambda o: len(_GERMAN.findall(o.text)) >= 3)
+
+
+def in_english() -> Check:
+    return Check("auf Englisch", lambda o: len(_ENGLISH.findall(o.text)) >= 3)
 
 
 def at_most_words(limit: int) -> Check:
@@ -123,10 +130,12 @@ class Case:
     suggest: bool = False
     #: Simple task in the sense of the recommendation (e.g. explain a warning).
     simple: bool = False
+    #: Language of the question; the assistant answers in it.
+    language: str = "de"
 
 
-#: Applied to every plain answer on top of the case's own checks.
-COMMON_CHECKS: Sequence[Check] = (no_ids(), in_german(), at_most_words(220))
+#: Applied to every plain answer on top of the case's own checks (plus its language).
+COMMON_CHECKS: Sequence[Check] = (no_ids(), at_most_words(220))
 
 CASES: Sequence[Case] = (
     # Warnings of the test bed: does it find and explain them?
@@ -224,6 +233,7 @@ CASES: Sequence[Case] = (
         "How far apart should I plant tomatoes?",
         (mentions("60"),),
         simple=True,
+        language="en",
     ),
     # Off topic: refuse kindly, without tools.
     Case("mathe", "Was ist 5+5?", (uses_no_tools(), avoids("= 10", "ist 10", "lautet 10"))),
@@ -258,4 +268,7 @@ CASES: Sequence[Case] = (
 
 
 def checks_for(case: Case) -> Sequence[Check]:
-    return (*case.checks, *(() if case.suggest else COMMON_CHECKS))
+    if case.suggest:
+        return tuple(case.checks)
+    language = in_english() if case.language == "en" else in_german()
+    return (*case.checks, *COMMON_CHECKS, language)
