@@ -89,7 +89,7 @@ describe('tools through the gateway path', () => {
     expect(GetBedToolOutputSchema.parse(own.result).bed.name).toBe('Geheimbeet');
   });
 
-  it('reads a bed with plant names and periods', async () => {
+  it('reads a bed with plant names, periods and the occupied areas', async () => {
     const { result } = await callAsUser('user-a', 'get_bed', { bedId: BED_A });
     expect(GetBedToolOutputSchema.parse(result)).toEqual({
       bed: { id: BED_A, name: 'Hochbeet Süd', widthCm: 120, depthCm: 80, mainRowDirection: 'H' },
@@ -102,6 +102,8 @@ describe('tools through the gateway path', () => {
           y: 40,
           from: '2026-05-04',
           until: '2026-08-31',
+          // A tomato occupies a circle of 30 cm radius (half its 60 cm spacing in the row).
+          area: { x0: 0, y0: 10, x1: 60, y1: 70 },
         },
         expect.objectContaining({ id: '01J9ZQ3W8D6V2K5M7N8P9R0T02', x: 45 }),
       ],

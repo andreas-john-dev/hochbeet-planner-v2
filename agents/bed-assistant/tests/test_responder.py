@@ -35,12 +35,18 @@ class FakeGateway:
 
     url: str
     token: str
+    #: Gateway tools the model may see; None means all.
+    tools: tuple[str, ...] | None = None
     calls: list[str] = field(default_factory=list)
 
     async def call_tool_async(self, _id: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
         self.calls.append(name)
         if name == "garden___get_bed":
-            text = '{"bed": {"widthCm": 200, "depthCm": 100, "mainRowDirection": "H"}}'
+            text = (
+                '{"bed": {"widthCm": 200, "depthCm": 100, "mainRowDirection": "H"}, "plantings": '
+                '[{"plant": "Tomate", "kind": "SINGLE", "x": 100, "y": 50, "from": "2026-05-04", '
+                '"until": null, "area": {"x0": 70, "y0": 20, "x1": 130, "y1": 80}}]}'
+            )
         else:
             text = '{"findings": [], "unknownCandidates": []}'
         return {"status": "success", "content": [{"text": text}]}
@@ -188,7 +194,10 @@ async def test_suggestions_use_structured_output_and_check_with_the_gateway(
     [agent] = agents
     gateway = agent.kwargs["tools"][0]
     assert gateway.token == USER_TOKEN
+    # The model only looks up plants; the bed is in the prompt, the check runs in code.
+    assert gateway.tools == ("find_plants",)
     assert gateway.calls == ["garden___get_bed", "garden___evaluate_bed"]
+    assert '"area":{"x0":70,"y0":20,"x1":130,"y1":80}' in agent.kwargs["prompts"][0]
     assert agent.cleaned_up
 
 
@@ -206,8 +215,16 @@ def test_the_gateway_client_sends_the_token_as_bearer(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(module, "MCPClient", fake_client)
     gateway_client("https://gw.example/mcp", USER_TOKEN)
+    gateway_client("https://gw.example/mcp", USER_TOKEN, ("find_plants",))
+    headers = {"Authorization": f"Bearer {USER_TOKEN}"}
     assert built == [
-        {"url": "https://gw.example/mcp", "headers": {"Authorization": f"Bearer {USER_TOKEN}"}}
+        {"url": "https://gw.example/mcp", "headers": headers, "tool_filters": None},
+        # Suggestions: the model only sees find_plants.
+        {
+            "url": "https://gw.example/mcp",
+            "headers": headers,
+            "tool_filters": {"allowed": ["garden___find_plants"]},
+        },
     ]
 
 

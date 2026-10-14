@@ -172,6 +172,11 @@ const ToolPlantingSchema = z.object({
   from: IsoDateSchema,
   /** Removal, else the planned end; null for perennials. */
   until: IsoDateSchema.nullable(),
+  /**
+   * Bounding box of the area the planting occupies (Standfläche, as the spacing rule sees it),
+   * so the model can place suggestions on free ground. Missing for unknown plants.
+   */
+  area: z.object({ x0: z.number(), y0: z.number(), x1: z.number(), y1: z.number() }).optional(),
 });
 
 export const GetBedToolOutputSchema = z.object({

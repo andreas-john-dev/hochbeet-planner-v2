@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import date
 from typing import Any, Protocol
 
@@ -24,7 +24,14 @@ from .config import Settings
 from .memory import PREFERENCE_NAMESPACE, MemoryStore, memory_session_id
 from .prompt import SYSTEM_PROMPT
 from .schema_model import suggestion_list_model
-from .suggest import McpGardenTools, SuggestionError, SuggestionResult, suggest
+from .suggest import (
+    SUGGESTION_TOOLS,
+    TOOLS_TARGET,
+    McpGardenTools,
+    SuggestionError,
+    SuggestionResult,
+    suggest,
+)
 
 logger = logging.getLogger("bed_assistant")
 
@@ -67,9 +74,18 @@ class ToolCallLimit(HookProvider):
             event.cancel_tool = TOOL_LIMIT_MESSAGE
 
 
-def gateway_client(url: str, token: str) -> MCPClient:
-    """MCP client for the gateway, authenticated with the caller's own ID token."""
-    return MCPClient(url=url, headers={"Authorization": f"Bearer {token}"})
+def gateway_client(url: str, token: str, tools: Sequence[str] | None = None) -> MCPClient:
+    """
+    MCP client for the gateway, authenticated with the caller's own ID token. With `tools`,
+    the model only sees these gateway tools; the code can still call all of them directly.
+    """
+    return MCPClient(
+        url=url,
+        headers={"Authorization": f"Bearer {token}"},
+        tool_filters=(
+            {"allowed": [f"{TOOLS_TARGET}___{tool}" for tool in tools]} if tools else None
+        ),
+    )
 
 
 def memory_session(settings: Settings, user_id: str, session_id: str) -> Any:
@@ -106,7 +122,7 @@ class StrandsResponder:
     def __init__(
         self,
         settings: Settings,
-        client_factory: Callable[[str, str], Any] = gateway_client,
+        client_factory: Callable[..., Any] = gateway_client,
         *,
         memory: MemoryStore | None = None,
         session_factory: Callable[[Settings, str, str], Any] = memory_session,
@@ -170,12 +186,14 @@ class StrandsResponder:
 
     async def suggest(self, question: str, caller: Caller, bed_id: str) -> SuggestionResult:
         """
-        Checked planting suggestions; one agent and gateway session for all rounds. The rounds
-        are not stored as conversation, but the caller's fitting preferences go into the prompt.
+        Checked planting suggestions; one agent and gateway session for all rounds. The model
+        only looks up plants (`SUGGESTION_TOOLS`); the bed and the checks come from the code.
+        The rounds are not stored as conversation, but the caller's fitting preferences go into
+        the prompt. The whole request ends after `suggestion_seconds`.
         """
         if not self._settings.gateway_url:
             raise SuggestionError("Pflanzvorschläge sind gerade nicht verfügbar.")
-        client = self._client_factory(self._settings.gateway_url, caller.token)
+        client = self._client_factory(self._settings.gateway_url, caller.token, SUGGESTION_TOOLS)
         agent = self.agent(caller, client)
         model = suggestion_list_model()
         preferences = await self.recall(caller, question)
@@ -194,6 +212,7 @@ class StrandsResponder:
                 rounds=self._settings.suggestion_rounds,
                 today=date.today(),
                 preferences=preferences,
+                seconds=self._settings.suggestion_seconds,
             )
         finally:
             self._done(agent)

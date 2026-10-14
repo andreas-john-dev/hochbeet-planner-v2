@@ -1,13 +1,16 @@
+import asyncio
 from datetime import date
 from typing import Any
 
 import pytest
 
 from bed_assistant.suggest import (
+    TIMEOUT_MESSAGE,
     Bed,
     McpGardenTools,
     SuggestionError,
     monday_of,
+    occupied,
     sanitize,
     snap,
     suggest,
@@ -67,6 +70,27 @@ def test_keeps_at_most_six_and_fills_missing_reasons() -> None:
     assert kept[0]["reason"] == "Vorschlag des Assistenten."
 
 
+#: An onion harvested in April and a perennial chive plant still in the bed.
+BED_DATA: dict[str, Any] = {
+    "plantings": [
+        {
+            "plant": "Zwiebel",
+            "kind": "ROW",
+            "from": "2025-10-06",
+            "until": "2026-04-27",
+            "area": {"x0": 0, "y0": 0, "x1": 100, "y1": 25},
+        },
+        {
+            "plant": "Schnittlauch",
+            "kind": "SINGLE",
+            "from": "2024-04-01",
+            "until": None,
+            "area": {"x0": 20, "y0": 60, "x1": 40, "y1": 80},
+        },
+    ]
+}
+
+
 class FakeTools:
     """Gateway tools: the bed, and the rule engine warning about tomatoes at x < 100."""
 
@@ -76,7 +100,7 @@ class FakeTools:
     async def call(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self.calls.append((tool, arguments))
         if tool == "get_bed":
-            return {"bed": {"widthCm": 200, "depthCm": 100, "mainRowDirection": "H"}}
+            return {"bed": {"widthCm": 200, "depthCm": 100, "mainRowDirection": "H"}, **BED_DATA}
         findings = [
             {"severity": "WARNING", "message": "Tomate steht zu dicht.", "candidates": [i]}
             for i, c in enumerate(arguments["candidates"])
@@ -99,7 +123,20 @@ class FakeModel:
         return self.answers.pop(0)
 
 
-async def run(model: FakeModel, tools: FakeTools, rounds: int = 3) -> Any:
+class SlowModel(FakeModel):
+    """Like FakeModel, but the rounds listed in `slow` take longer than any test deadline."""
+
+    def __init__(self, *answers: dict[str, Any], slow: set[int]) -> None:
+        super().__init__(*answers)
+        self.slow = slow
+
+    async def __call__(self, prompt: str) -> dict[str, Any]:
+        if len(self.prompts) + 1 in self.slow:
+            await asyncio.sleep(5)
+        return await super().__call__(prompt)
+
+
+async def run(model: FakeModel, tools: FakeTools, rounds: int = 3, seconds: float = 50) -> Any:
     return await suggest(
         model,
         tools,
@@ -107,7 +144,53 @@ async def run(model: FakeModel, tools: FakeTools, rounds: int = 3) -> Any:
         question="Was passt noch?",
         rounds=rounds,
         today=date(2026, 5, 1),
+        seconds=seconds,
     )
+
+
+def test_the_prompt_lists_only_the_areas_still_taken() -> None:
+    assert occupied(BED_DATA, date(2026, 5, 1)) == [
+        {
+            "plant": "Schnittlauch",
+            "kind": "SINGLE",
+            "area": {"x0": 20, "y0": 60, "x1": 40, "y1": 80},
+            "until": None,
+        }
+    ]
+
+
+async def test_the_model_gets_the_bed_and_leaves_the_checks_to_the_code() -> None:
+    # T-48: Haiku tested positions with evaluate_bed itself and gave up over conflicts the bed
+    # already had. Now the bed is in the prompt, and only the code checks.
+    model = FakeModel({"suggestions": [item(x=150)], "summary": "Tomate rechts."})
+    await run(model, FakeTools())
+    prompt = model.prompts[0]
+    assert "200 × 100 cm" in prompt
+    assert '"plant":"Schnittlauch"' in prompt
+    assert "Zwiebel" not in prompt
+    assert "find_plants" in prompt
+    assert "get_bed" not in prompt
+    assert "evaluate_bed" not in prompt
+    assert "Konflikte zwischen vorhandenen Pflanzungen sind nicht deine Aufgabe" in prompt
+
+
+async def test_a_first_round_past_the_deadline_ends_with_a_german_message() -> None:
+    model = SlowModel({"suggestions": [item(x=150)], "summary": "Zu spät."}, slow={1})
+    with pytest.raises(SuggestionError) as failed:
+        await run(model, FakeTools(), seconds=0.2)
+    assert str(failed.value) == TIMEOUT_MESSAGE
+
+
+async def test_a_later_round_past_the_deadline_keeps_the_last_checked_round() -> None:
+    model = SlowModel(
+        {"suggestions": [item(x=40)], "summary": "Erster Versuch."},
+        {"suggestions": [item(x=150)], "summary": "Zu spät."},
+        slow={2},
+    )
+    result = await run(model, FakeTools(), seconds=0.5)
+    assert (result.rounds, result.summary) == (1, "Erster Versuch.")
+    assert result.suggestions == [item(x=40)]
+    assert result.warnings == ["Tomate steht zu dicht."]
 
 
 async def test_revises_until_the_rule_engine_has_no_warnings() -> None:
