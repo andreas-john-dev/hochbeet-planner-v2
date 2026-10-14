@@ -17,6 +17,7 @@ from strands import Agent
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.hooks import BeforeToolCallEvent, HookProvider, HookRegistry
 from strands.models.bedrock import BedrockModel
+from strands.tools.executors import SequentialToolExecutor
 from strands.tools.mcp import MCPClient
 
 from .auth import Caller
@@ -151,6 +152,8 @@ class StrandsResponder:
             system_prompt=SYSTEM_PROMPT,
             tools=tools,
             hooks=[ToolCallLimit(self._settings.max_tool_calls)],
+            # One gateway call at a time: parallel calls closed the MCP session (T-48 evaluation).
+            tool_executor=SequentialToolExecutor(),
             callback_handler=None,
             conversation_manager=SlidingWindowConversationManager(
                 window_size=self._settings.history_messages
@@ -222,8 +225,12 @@ class StrandsResponder:
             if self._observe is not None:
                 self._observe(agent)
         finally:
-            # Closes the MCP session to the gateway.
-            agent.cleanup()
+            # Closes the MCP session to the gateway. A session that broke during the answer fails
+            # here again; logged with its cause instead of hiding the answer or the first error.
+            try:
+                agent.cleanup()
+            except Exception:
+                logger.warning("closing the gateway session failed", exc_info=True)
 
     async def recall(self, caller: Caller, query: str) -> list[str]:
         """The caller's preferences that fit `query`; none if memory is off or unavailable."""

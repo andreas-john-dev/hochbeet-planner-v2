@@ -24,7 +24,7 @@ from evaluation.cases import (
 )
 from evaluation.models import BUDGET_USD, MODELS, EvalModel
 from evaluation.report import markdown, summarize
-from evaluation.runner import MAX_CASE_USD, run_model
+from evaluation.runner import MAX_CASE_USD, describe, run_model
 
 TODAY = date(2026, 10, 12)
 HAIKU = MODELS["haiku"]
@@ -190,6 +190,19 @@ async def test_errors_fail_all_checks() -> None:
     assert result.error == "RuntimeError: Bedrock down"
     assert result.passed == []
     assert not result.ok
+
+
+def test_errors_name_their_causes() -> None:
+    try:
+        try:
+            raise ConnectionError("peer closed")
+        except ConnectionError as closed:
+            raise RuntimeError("Connection to the MCP server was closed") from closed
+    except RuntimeError as failure:
+        described = describe(failure)
+    assert described == (
+        "RuntimeError: Connection to the MCP server was closed ← ConnectionError: peer closed"
+    )
 
 
 async def test_stops_before_the_budget_is_exceeded() -> None:

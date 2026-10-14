@@ -113,6 +113,18 @@ def skipped(model: EvalModel, case: Case) -> CaseResult:
     )
 
 
+def describe(failure: BaseException) -> str:
+    """The error with its causes, innermost last (an MCP session hides why it closed)."""
+    parts: list[str] = []
+    seen: set[int] = set()
+    current: BaseException | None = failure
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        parts.append(f"{type(current).__name__}: {current}")
+        current = current.__cause__ or current.__context__
+    return " ← ".join(parts)
+
+
 async def run_case(
     model: EvalModel,
     case: Case,
@@ -144,7 +156,8 @@ async def run_case(
                     first_text = time.perf_counter() - started
                 outcome.text += chunk
     except Exception as failure:
-        error = f"{type(failure).__name__}: {failure}"[:300]
+        logger.warning("%s %s failed", model.key, case.id, exc_info=True)
+        error = describe(failure)[:300]
     seconds = time.perf_counter() - started
     outcome.tools = usage.tools
     checks = checks_for(case)

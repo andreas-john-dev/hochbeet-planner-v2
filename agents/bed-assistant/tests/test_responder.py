@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from strands.tools.executors import SequentialToolExecutor
 
 from bed_assistant import responder as module
 from bed_assistant.auth import Caller
@@ -59,6 +60,7 @@ class FakeAgent:
     kwargs: dict[str, Any]
     chunks: list[Any] = field(default_factory=lambda: ["Im Beet ", "stehen Tomaten."])
     cleaned_up: bool = False
+    cleanup_fails: bool = False
 
     async def stream_async(self, prompt: str) -> AsyncIterator[dict[str, Any]]:
         self.kwargs["prompt"] = prompt
@@ -87,6 +89,8 @@ class FakeAgent:
 
     def cleanup(self) -> None:
         self.cleaned_up = True
+        if self.cleanup_fails:
+            raise RuntimeError("Connection to the MCP server was closed")
 
 
 @pytest.fixture
@@ -118,6 +122,8 @@ async def test_uses_the_gateway_tools_with_the_callers_token(agents: list[FakeAg
     assert isinstance(limit, ToolCallLimit)
     assert limit.limit == 4
     assert agent.kwargs["prompt"] == "Was steht im Beet?"
+    # One gateway call at a time: parallel calls closed the gateway session.
+    assert isinstance(agent.kwargs["tool_executor"], SequentialToolExecutor)
     # The MCP session to the gateway is closed after every answer.
     assert agent.cleaned_up
 
@@ -320,3 +326,13 @@ async def test_an_observer_sees_each_agent_before_it_is_closed(agents: list[Fake
     await responder.suggest("Was passt?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
     assert seen == [("seen", False), ("seen", False)]
     assert all(agent.cleaned_up for agent in agents)
+
+
+async def test_a_broken_gateway_session_does_not_hide_the_suggestions(
+    agents: list[FakeAgent], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(FakeAgent, "cleanup_fails", True)
+    responder = StrandsResponder(settings(GATEWAY_URL="https://gw.example/mcp"), FakeGateway)
+    result = await responder.suggest("Was passt noch?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A")
+    assert len(result.suggestions) == 1
+    assert agents[0].cleaned_up
