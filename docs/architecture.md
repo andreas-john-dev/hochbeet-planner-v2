@@ -207,9 +207,11 @@ Umsetzung in `packages/catalog-seed`:
 
 - `src/data.ts` enthält die Sorten wie in der Tabelle, inklusive der Kurzformen in den Nachbarlisten. Jede Sorte hat eine feste ULID; sie wird nie geändert, weil Pflanzungen und Anpassungen darauf verweisen.
 - `resolveSeed()` löst die Kurzformen auf: Kohl, andere Kohlarten (ohne die Sorte selbst), Sellerie, Bohnen und „wie X“. Bei „wie X“ übernimmt die Sorte die rohen Listen von X; „andere Kohlarten“ wird danach für die übernehmende Sorte aufgelöst. Unbekannte Namen werfen einen Fehler. Eine Sorte steht nie in ihrer eigenen Liste.
+- Danach macht `resolveSeed()` die Listen symmetrisch: Jede Sorte bekommt auch die Sorten, die sie selbst nennen (nach den eigenen Einträgen, in Katalogreihenfolge). „Warnung sticht“: Ein Paar, das eine Seite als schlecht führt, steht bei keiner Seite unter den guten. So zeigen Katalog, Beet-Assistent und Regeln dieselben Nachbarn, auch wenn die Quelle das Paar nur bei einer Sorte nennt (z. B. Basilikum bei Tomate). `data.ts` trägt ein Paar deshalb nur auf der Seite ein, deren Quelle es nennt.
 - Exportiert werden `seedPlants` (fertige `Plant`-Objekte) und `seedPlantByName`.
 - Icon-Schlüssel sind der Sortenname in Kleinbuchstaben mit Bindestrichen, Umlaute ausgeschrieben, z. B. `rote-bete`, `fruehlingszwiebel`. `packages/plant-icons` liefert die passenden SVGs.
-- Tests prüfen das Zod-Schema, die Nachbar-Referenzen und die Kurzformen. Widersprüche (gut auf einer, schlecht auf der anderen Seite) listet der Testreport `packages/catalog-seed/report/contradictions.md`. Die Tabelle wendet „Warnung sticht“ bereits an und enthält aktuell keine.
+- Tests prüfen das Zod-Schema, die Nachbar-Referenzen und die Kurzformen. Widersprüche (gut auf einer, schlecht auf der anderen Seite) listet der Testreport `packages/catalog-seed/report/contradictions.md`; er vergleicht die einseitigen Listen aus `resolveOneSided()`. Die Tabelle wendet „Warnung sticht“ bereits an und enthält aktuell keine.
+- Ändert sich der Seed einer Sorte, schreibt `Custom::CatalogSeed` sie beim Deploy neu (`seedHash`); Admin-Korrekturen an genau dieser Sorte werden dabei überschrieben. Anpassungen der User (Overlay) bleiben erhalten und überdecken weiterhin die globalen Werte.
 
 ### Pflanzen-Icons
 
