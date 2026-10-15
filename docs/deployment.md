@@ -140,7 +140,7 @@ Wer die Einrichtung schon vor der eigenen Domain gemacht hat, braucht einmalig:
 - **Smoke-Tests lokal gegen prod:** `SMOKE_BASE_URL=https://hochbeet.andi-john-dev.de pnpm --filter e2e smoke`
 - **Fehlgeschlagener Smoke-Test:** Die Ergebnisse inklusive Traces hängen als Artefakt `smoke-test-results` am Lauf.
 - **Kosten:** Im Leerlauf fallen praktisch nur Cent-Beträge an (S3, CloudFront, SSM, Route-53-Abfragen; Cognito Lite ist bis 10.000 aktive Nutzer kostenlos). Das ACM-Zertifikat ist kostenlos.
-- **Traces des Assistenten:** CloudWatch → *GenAI Observability* → *Bedrock AgentCore* → Agent `prod_bed_assistant` → *Traces*; Spans zeigen Modell- und Tool-Schritte, Dauer und Tokens, aber keine Fragen oder Antworten (siehe `docs/architecture.md`, Runtime).
+- **Traces des Assistenten:** CloudWatch → *GenAI Observability* → *Bedrock AgentCore* → Agent `prod_bed_assistant` → *Traces*; Spans zeigen Modell- und Tool-Schritte, Dauer und Tokens, aber keine Fragen oder Antworten (siehe `docs/architecture/assistant.md`, Runtime).
 - **Abbauen:** `Prod-SharedStateful` hat Termination Protection und der User Pool Löschschutz; beides muss vor dem Löschen in der AWS-Konsole bewusst abgeschaltet werden. Der User Pool bleibt wegen `RETAIN` danach trotzdem bestehen.
 
 ## Fehlersuche

@@ -287,7 +287,7 @@ export class AssistantStack extends Stack {
     this.acknowledgeNagFindings();
   }
 
-  /** Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag"). */
+  /** Accepted cdk-nag findings, documented in docs/architecture/infrastructure.md (section "cdk-nag"). */
   private acknowledgeNagFindings() {
     // cdk-nag names resources as they resolve: placeholders for tokens, literals otherwise.
     const account = Token.isUnresolved(this.account) ? '<AWS::AccountId>' : this.account;

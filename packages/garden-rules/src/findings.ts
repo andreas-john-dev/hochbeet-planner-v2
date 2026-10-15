@@ -1,6 +1,6 @@
 import type { Interval } from './time';
 
-/** Rules of the engine (docs/architecture.md, "Regel-Engine"). */
+/** Rules of the engine (docs/architecture/rules.md). */
 export type RuleId =
   'SPACING' | 'BAD_NEIGHBOR' | 'GOOD_NEIGHBOR' | 'HEAVY_FEEDER' | 'CROP_ROTATION' | 'BED_EDGE';
 

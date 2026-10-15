@@ -99,7 +99,7 @@ export class CatalogStatefulStack extends Stack {
     this.acknowledgeNagFindings(seedFunction, provider);
   }
 
-  /** Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag"). */
+  /** Accepted cdk-nag findings, documented in docs/architecture/infrastructure.md (section "cdk-nag"). */
   private acknowledgeNagFindings(seedFunction: NodejsFunction, provider: cr.Provider) {
     const basicExecutionRole =
       'AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]';

@@ -126,7 +126,7 @@ export class SharedStatefulStack extends Stack {
       props.budgetAlertEmail,
     );
 
-    // Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag").
+    // Accepted cdk-nag findings, documented in docs/architecture/infrastructure.md (section "cdk-nag").
     Validations.of(this.userPool).acknowledge({
       id: 'AwsSolutions-COG2',
       reason:

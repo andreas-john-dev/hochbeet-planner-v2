@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { CategorySchema, FeederSchema, LifecycleSchema, PositiveGridCmSchema } from '../domain';
 import { DirectionSchema, GridCmSchema, IsoDateSchema, UlidSchema } from '../primitives';
 
-// Beet-Assistent on Bedrock AgentCore (docs/architecture.md, "Beet-Assistent"). The agent is
+// Beet-Assistent on Bedrock AgentCore (docs/architecture/assistant.md). The agent is
 // Python (agents/bed-assistant); its pydantic model mirrors this schema, and infra passes the
 // limit below to it, so both sides check the same length.
 

@@ -168,7 +168,7 @@ export class ServiceApiStack extends Stack {
     }
   }
 
-  /** Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag"). */
+  /** Accepted cdk-nag findings, documented in docs/architecture/infrastructure.md (section "cdk-nag"). */
   private acknowledgeNagFindings(publicRoutes: readonly apigw.HttpRoute[]) {
     for (const route of publicRoutes) {
       Validations.of(route).acknowledge({
