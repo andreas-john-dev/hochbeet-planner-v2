@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { CatalogPlantSchema, PlantFieldsSchema, PlantOverrideSchema, PlantSchema } from '../domain';
 import { IsoDateSchema, UlidSchema } from '../primitives';
 
-// Catalog-Service, routes under /api/catalog (docs/architecture.md, "Catalog-Service").
+// Catalog-Service, routes under /api/catalog (docs/architecture/catalog.md, "Catalog-Service").
 
 /** GET /catalog/plants: the user's effective view (global + adjustments + own). */
 export const ListPlantsResponseSchema = z.object({ plants: z.array(CatalogPlantSchema) });

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BedFieldsSchema, BedSchema, PlantingFieldsSchema, PlantingSchema } from '../domain';
 import { UlidSchema } from '../primitives';
 
-// Garden-Service, routes under /api/garden (docs/architecture.md, "Garden-Service").
+// Garden-Service, routes under /api/garden (docs/architecture/garden.md).
 
 /** POST /garden/beds, PUT /garden/beds/{bedId} */
 export const SaveBedRequestSchema = BedFieldsSchema;

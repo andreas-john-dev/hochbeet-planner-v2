@@ -1,5 +1,5 @@
 /**
- * Key design of the garden table (docs/architecture.md, "Garden-Service"). The user is part
+ * Key design of the garden table (docs/architecture/garden.md). The user is part
  * of every key, so a query can never reach another user's beds.
  */
 export const gardenTable = { partitionKey: 'PK', sortKey: 'SK' } as const;

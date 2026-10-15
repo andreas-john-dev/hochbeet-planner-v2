@@ -26,7 +26,7 @@ export type Footprint = CircleFootprint | StripFootprint;
 type PlantSpacing = Pick<Plant, 'spacingInRowCm' | 'rowSpacingCm'>;
 
 /**
- * Area a planting occupies (docs/architecture.md, "Standfläche"):
+ * Area a planting occupies (docs/architecture/domain.md, "Standfläche"):
  * - single plant: circle with radius spacingInRowCm / 2,
  * - row: strip of width rowSpacingCm along the row, overhanging spacingInRowCm / 2 at both ends.
  */

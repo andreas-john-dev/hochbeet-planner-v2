@@ -5,7 +5,8 @@ TypeScript-Monorepo: React-Frontend, serverless AWS-Backend, CDK; dazu ein Pytho
 
 ## Referenzen
 
-- `docs/architecture.md` – Architektur, Domänenmodell, Regeln, API, Stacks. **Verbindlich.**
+- `docs/architecture.md` – Überblick über Architektur, Bausteine und Grundregeln; Details je Thema in `docs/architecture/` (`domain.md`, `rules.md`, `catalog.md`, `garden.md`, `backend.md`, `assistant.md`, `frontend.md`, `infrastructure.md`, `testing.md`). **Verbindlich.**
+- `README.md` – Einstieg ins Repo: Funktionen, Stack, Loslegen, wichtigste Befehle.
 - `docs/startkatalog.md` – 56 Sorten mit Abständen, Familie, Bedarf, Standzeit und Nachbarn; Quelle für `packages/catalog-seed`.
 - GitHub-Issues – alle Aufgaben. Label `task` = umsetzbarer Task (T-01 …), Label `epic` = User Story mit Task-Liste.
 
@@ -18,7 +19,7 @@ TypeScript-Monorepo: React-Frontend, serverless AWS-Backend, CDK; dazu ein Pytho
 3. Plane kurz, implementiere dann mit Tests.
 4. Branch: `t-<nr>-<kurzname>`, z. B. `t-12-starkzehrer`.
    PR-Titel: `T-12: Regel Starkzehrer`. PR-Beschreibung enthält `Closes #<issue>` und die abgehakten Akzeptanzkriterien.
-5. Weicht die Umsetzung von `docs/architecture.md` ab, aktualisiere das Dokument im selben PR und begründe es in der PR-Beschreibung.
+5. Weicht die Umsetzung von der Architektur ab, aktualisiere das passende Dokument (`docs/architecture.md` oder `docs/architecture/*.md`) im selben PR und begründe es in der PR-Beschreibung.
 6. Ist etwas fachlich unklar, frag nach, statt zu raten.
 
 ## Definition of Done
@@ -115,7 +116,7 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 - Modellvergleich (`agents/bed-assistant/evaluation/`, Ergebnisse in `docs/assistant-evaluation.md`): Testfälle in `cases.py` mit regelbasierten Prüfungen, Modelle und Preise in `models.py`; der Lauf nutzt den Agenten-Code selbst und bleibt unter 1 € (Grenze im Skript, nie anheben, ohne den User zu fragen). Nie automatisch starten.
 - Strukturierte Ausgaben des Agents (z. B. Pflanzvorschläge) als Zod-Schema in `packages/contracts`, als JSON Schema nach `agents/bed-assistant/src/bed_assistant/schemas/` exportiert (`agentSchemas` in `src/json-schemas.ts`); der Agent baut daraus sein Modell (`schema_model.py`), nie von Hand gespiegelt.
 - Tools des Assistenten: nur lesend, im AgentCore Gateway als ein Lambda-Target (`services/assistant-tools`, Definitionen in `src/tools.ts`, Ein-/Ausgaben als Zod-Schemas in `packages/contracts/src/api/assistant.ts`). Neue Tools dort ergänzen; sie rufen die Service-APIs nur über `createApiReader()` mit dem User-Token auf, das der Request-Interceptor setzt, nie direkt auf Tabellen und nie mit einer vom Modell gelieferten `userId`.
-- cdk-nag 3: Ausnahmen per `Validations.of(construct).acknowledge({ id, reason })` (nicht `NagSuppressions`) und in `docs/architecture.md` unter „cdk-nag“ eintragen.
+- cdk-nag 3: Ausnahmen per `Validations.of(construct).acknowledge({ id, reason })` (nicht `NagSuppressions`) und in `docs/architecture/infrastructure.md` unter „cdk-nag“ eintragen.
 
 ## Was nicht aus Sessions passiert
 
@@ -126,7 +127,7 @@ Vor Änderungen an `turbo.json` oder Turborepo-Befehlen die zur installierten Ve
 ## Prompt-Vorlage
 
 ```text
-Setze Issue #<N> um. Halte dich an CLAUDE.md und docs/architecture.md.
+Setze Issue #<N> um. Halte dich an CLAUDE.md und docs/architecture.md (mit docs/architecture/).
 Plane zuerst, implementiere mit Tests, führe lint, typecheck und test aus
 und öffne einen PR mit "Closes #<N>".
 ```

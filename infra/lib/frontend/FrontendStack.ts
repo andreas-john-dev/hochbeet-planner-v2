@@ -238,7 +238,7 @@ export class FrontendStack extends Stack {
     });
   }
 
-  /** Accepted cdk-nag findings, documented in docs/architecture.md (section "cdk-nag"). */
+  /** Accepted cdk-nag findings, documented in docs/architecture/infrastructure.md (section "cdk-nag"). */
   private acknowledgeNagFindings() {
     const ack = (scope: Construct, id: string, reason: string) => {
       Validations.of(scope).acknowledge({ id, reason });

@@ -1,5 +1,5 @@
 /**
- * Key design of the catalog table (docs/architecture.md, "Catalog-Service").
+ * Key design of the catalog table (docs/architecture/catalog.md, "Catalog-Service").
  * Infra creates the table from these names; the service builds keys with the helpers.
  */
 export const catalogTable = {
