@@ -1,6 +1,6 @@
 # Modellvergleich des Beet-Assistenten
 
-Stand: 13. Oktober 2026 (T-45, Issue #95), erster Lauf am selben Tag
+Stand: 15. Oktober 2026 (T-45, Issue #95; Nachläufe der Pflanzvorschläge nach T-48, Issue #111)
 
 Wie gut und wie teuer beantwortet der Beet-Assistent typische Fragen mit verschiedenen Modellen? Dieses Dokument beschreibt den Testsatz, den Lauf und die Ergebnisse.
 
@@ -36,18 +36,38 @@ Erster Lauf am 13. Oktober 2026 ([Workflow-Lauf #2](https://github.com/andreas-j
 | `vorschlag-salat`    | ✗ kein Vorschlag                                    | ✗ Warnungen bleiben                                 |
 | `vorschlag-kraeuter` | ✗ kein Vorschlag                                    | ✗ kein Vorschlag                                    |
 
+### Nachläufe Pflanzvorschläge (T-48)
+
+Nur Claude Haiku 4.5 und die drei Vorschlagsfälle, jeweils gegen prod:
+
+| Lauf | Stand | Fragen bestanden | Prüfungen bestanden | Fehler | Latenz Median (max) | Kosten des Laufs |
+| --- | --- | --- | --- | --- | --- | --- |
+| [14.10., vor T-48](https://github.com/andreas-john-dev/hochbeet-planner-v2/actions/runs/38555533624) | Modell prüft selbst mit `evaluate_bed` | – | – | – | Ø 38 s | 0,24 $ |
+| [14.10., nach T-48](https://github.com/andreas-john-dev/hochbeet-planner-v2/actions/runs/38581452542) | Beet im Prompt, nur `find_plants`, 50-s-Grenze (#116) | 1/3 | 4/10 | 2 | 13,2 s (16,0 s) | 0,062 $ |
+| [14.10., Tools nacheinander](https://github.com/andreas-john-dev/hochbeet-planner-v2/actions/runs/38625364142) | Gateway-Tools nacheinander (#117) | 0/3 | 7/10 | 0 | 14,4 s (19,9 s) | 0,074 $ |
+
+| Frage | vor T-48 | nach T-48 | Tools nacheinander |
+| --- | --- | --- | --- |
+| `vorschlag` | ✗ kein Vorschlag         | Fehler (MCP-Verbindung geschlossen) | ✗ Warnungen bleiben (4 Vorschläge) |
+| `vorschlag-salat` | ✗ kein Vorschlag | ✓ | ✗ Warnungen bleiben (Feldsalat, Kopfsalat) |
+| `vorschlag-kraeuter` | ✗ Warnungen bleiben | Fehler (MCP-Verbindung geschlossen) | ✗ Warnungen bleiben (Oregano, Salbei, Basilikum) |
+
+- **Vor T-48** rief Haiku `evaluate_bed` immer wieder selbst auf, sah Konflikte zwischen den vorhandenen Pflanzungen und gab dann keine Vorschläge ab. Der Abbruch nach 4,5 Minuten im ersten Lauf kam vermutlich aus derselben Schleife, zusammen mit parallelen Tool-Aufrufen (siehe unten).
+- **Nach T-48** bekommt das Modell das Beet mit den belegten Flächen im Prompt und schlägt nur noch Sorten nach; geprüft wird im Code. Zwei Fälle scheiterten aber, sobald Haiku `find_plants` mehrfach gleichzeitig aufrief: Das Gateway schloss dann die MCP-Session.
+- **Mit Tools nacheinander** liefern alle drei Fälle Vorschläge im Beet, ohne Fehler und unter 20 s (Akzeptanzkriterium von T-48 erfüllt). Nach den zwei Runden (`suggestionRounds`) überlappen sie aber noch um 13–30 cm mit vorhandenen Pflanzungen, z. B. Kopfsalat mit Roter Bete oder Salbei mit Lauch; die App zeigt diese Warnungen offen an. Haiku behauptet in der Zusammenfassung trotzdem, alle Abstände seien eingehalten.
+
 ### Was auffällt
 
 - **Erklären und Nachschlagen kann Haiku zuverlässig:** alle 17 Textfragen außer der englischen bestanden, mit knapp 2 Tool-Aufrufen je Frage.
 - **Nova Lite nennt IDs:** In 8 der 9 Fragen zum Testbeet stehen ULIDs von Beet oder Pflanzungen in der Antwort, obwohl der Systemprompt das verbietet. Fachlich lagen die Antworten meist richtig (85 % der Prüfungen bestanden), für Nutzer wirken sie aber technisch und unfertig.
 - **Englische Fragen bekommen englische Antworten,** bei beiden Modellen, obwohl der Prompt damals „Antworte immer auf Deutsch“ verlangte. Entschieden (14. Oktober 2026): Der Assistent antwortet in der Sprache der Frage; Prompt und Testfall sind angepasst.
-- **Pflanzvorschläge bestehen bei keinem Modell.** Nova Lite liefert Vorschläge, aber mit verbleibenden Warnungen der Regel-Engine; bei Kräutern gar keinen. Haiku brach beim ersten Vorschlag nach 4,5 Minuten ab („Connection to the MCP server was closed“) und lieferte danach keine Vorschläge, bei bis zu 0,08 $ je Anfrage. Das deutet auf ein Problem im Vorschlagsmodus selbst (T-43) und nicht nur auf das Modell; es betrifft vermutlich auch prod. Die Ursache klärt T-48 (#111); der Bericht schreibt dafür ab jetzt bei Fehlschlägen Antwort bzw. Fehler ins Job-Log.
+- **Pflanzvorschläge bestanden im ersten Lauf bei keinem Modell.** Nova Lite lieferte Vorschläge mit verbleibenden Warnungen, bei Kräutern gar keine; Haiku brach beim ersten Vorschlag nach 4,5 Minuten ab und lieferte danach keine Vorschläge. Die Ursache lag im Vorschlagsmodus selbst; nach T-48 und den Nachläufen oben liefert Haiku jetzt in allen Fällen Vorschläge, nur noch mit Überlappungen.
 - **Kosten:** Nova Lite kostet je Frage etwa 1/20 von Haiku (0,0006 $ statt 0,0121 $) und antwortet im Median doppelt so schnell. Bei 20 Fragen pro Tag und Tester sind das mit Haiku höchstens etwa 0,25 $ pro Tester und Tag.
 
 ### Empfehlung
 
 - **Bei Claude Haiku 4.5 bleiben, auch für einfache Aufgaben.** Die Ersparnis mit Nova Lite ist absolut gering (Cent-Beträge pro Tag), dafür verletzt Nova Lite die Regel „keine IDs“ in fast jeder Antwort zum Beet und besteht nur 50 % der einfachen Aufgaben. Ein Wechsel lohnt sich erst, wenn ein neuer Lauf zeigt, dass Nova die Prompt-Regeln einhält (z. B. nach einem Prompt-Fix, der IDs in Tool-Ergebnissen verbirgt).
-- **Vorschlagsmodus untersuchen** (T-48, #111), bevor er weiter genutzt oder verglichen wird.
+- **Vorschlagsmodus:** läuft mit Haiku stabil und schnell genug (T-48). Offen sind die Überlappungen nach zwei Runden; Ideen: freie Flächen im Code berechnen und dem Modell als Kandidaten geben, oder kleine Überlappungen im Code auf den nächsten freien Rasterpunkt schieben. Mehr Runden nur nach Rücksprache (Kostengrenze `suggestionRounds`).
 - **Sprache:** entschieden, der Assistent antwortet in der Sprache der Frage (Prompt und Testfall `englisch` angepasst).
 
 ## Was verglichen wird
