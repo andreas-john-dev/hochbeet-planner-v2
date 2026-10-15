@@ -205,9 +205,13 @@ export class AssistantStack extends Stack {
         SUGGESTION_ROUNDS: String(assistant.suggestionRounds),
         MEMORY_ID: memoryId,
         HISTORY_MESSAGES: String(assistant.historyMessages),
+        // ADOT in the agent (bed_assistant.telemetry); spans without conversation content.
+        TRACING: 'true',
+        SERVICE_NAME: `${props.stage.name}_bed_assistant`,
       },
-      // X-Ray tracing needs Transaction Search enabled in the account (see docs/architecture.md).
-      tracingEnabled: false,
+      // Spans to X-Ray, stored in CloudWatch (aws/spans): needs X-Ray Transaction Search in the
+      // account, enabled once by hand (docs/deployment.md), else the deploy fails.
+      tracingEnabled: true,
       loggingConfigs: [
         {
           logType: agentcore.LogType.USAGE_LOGS,

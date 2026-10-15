@@ -85,6 +85,19 @@ Die Domain `hochbeet.andi-john-dev.de` und die Hosted Zone stehen in `infra/lib/
 
    Fragt die Konsole nach Use-Case-Angaben für Anthropic, diese einmal ausfüllen. Das Abo erscheint unter AWS Marketplace → *Manage subscriptions*.
 
+6. **X-Ray Transaction Search einschalten** (einmal pro AWS-Konto und Region, T-47): Die Runtime des Beet-Assistenten liefert Traces an X-Ray (`tracingEnabled`). Das klappt nur, wenn X-Ray Trace-Segmente in CloudWatch Logs schreibt, sonst schlägt der Deploy von `Prod-Assistant` fehl. Als Admin in `eu-central-1`:
+   - Konsole: CloudWatch → *Application Signals* → *Transaction Search* → *Enable Transaction Search*, 1 % indexierte Spans (kostenlos) reichen.
+   - oder per CLI:
+
+     ```bash
+     aws logs put-resource-policy --region eu-central-1 --policy-name TransactionSearchXRayAccess \
+       --policy-document '{"Version":"2012-10-17","Statement":[{"Sid":"TransactionSearchXRayAccess","Effect":"Allow","Principal":{"Service":"xray.amazonaws.com"},"Action":"logs:PutLogEvents","Resource":["arn:aws:logs:eu-central-1:<konto>:log-group:aws/spans:*","arn:aws:logs:eu-central-1:<konto>:log-group:/aws/application-signals/data:*"],"Condition":{"ArnLike":{"aws:SourceArn":"arn:aws:xray:eu-central-1:<konto>:*"},"StringEquals":{"aws:SourceAccount":"<konto>"}}}]}'
+     aws xray update-trace-segment-destination --region eu-central-1 --destination CloudWatchLogs
+     aws xray get-trace-segment-destination --region eu-central-1   # Status ACTIVE
+     ```
+
+   Danach legt X-Ray die Log-Gruppe `aws/spans` an. Ihre Aufbewahrung am besten gleich begrenzen (z. B. `aws logs put-retention-policy --log-group-name aws/spans --retention-in-days 30`), sonst bleiben Spans unbegrenzt liegen.
+
 ### 4. Erster Deploy
 
 Actions → *Deploy* → *Run workflow* auf `main`. Der erste Lauf dauert wegen CloudFront und der Zertifikatsprüfung etwa 10–20 Minuten. Danach ist die App unter https://hochbeet.andi-john-dev.de erreichbar; die URL steht auch in der Zusammenfassung des Laufs und unter *Deployments* → `prod`.
@@ -127,6 +140,7 @@ Wer die Einrichtung schon vor der eigenen Domain gemacht hat, braucht einmalig:
 - **Smoke-Tests lokal gegen prod:** `SMOKE_BASE_URL=https://hochbeet.andi-john-dev.de pnpm --filter e2e smoke`
 - **Fehlgeschlagener Smoke-Test:** Die Ergebnisse inklusive Traces hängen als Artefakt `smoke-test-results` am Lauf.
 - **Kosten:** Im Leerlauf fallen praktisch nur Cent-Beträge an (S3, CloudFront, SSM, Route-53-Abfragen; Cognito Lite ist bis 10.000 aktive Nutzer kostenlos). Das ACM-Zertifikat ist kostenlos.
+- **Traces des Assistenten:** CloudWatch → *GenAI Observability* → *Bedrock AgentCore* → Agent `prod_bed_assistant` → *Traces*; Spans zeigen Modell- und Tool-Schritte, Dauer und Tokens, aber keine Fragen oder Antworten (siehe `docs/architecture.md`, Runtime).
 - **Abbauen:** `Prod-SharedStateful` hat Termination Protection und der User Pool Löschschutz; beides muss vor dem Löschen in der AWS-Konsole bewusst abgeschaltet werden. Der User Pool bleibt wegen `RETAIN` danach trotzdem bestehen.
 
 ## Fehlersuche
@@ -140,6 +154,7 @@ Wer die Einrichtung schon vor der eigenen Domain gemacht hat, braucht einmalig:
 | `This stack uses assets, so the toolkit stack must be deployed` | Schritt 1 fehlt. |
 | `Unable to fetch parameters [/hochbeet/prod/shared/…]` | `Prod-SharedStateful` ist nicht deployt; `cdk deploy --all` deployt ihn eigentlich vor `Prod-Frontend`. |
 | `Model access is denied … AWS Marketplace actions (aws-marketplace:ViewSubscriptions, aws-marketplace:Subscribe)` | Das Marketplace-Abo für das Claude-Modell fehlt (Schritt 5). Kommt die Meldung auch beim Aufruf als Admin mit „subscription … cannot be completed at this time“, ist meist die Zahlungsmethode ungültig (Billing → *Payment methods*), das Konto noch in der Verifizierung oder eine SCP der Organization verbietet Marketplace-Aktionen. |
+| Deploy von `Prod-Assistant` scheitert an `AWS::Logs::Delivery` bzw. der Trace-Delivery (`TracesDelivery`) | X-Ray Transaction Search ist im Konto nicht eingeschaltet (Schritt 6). |
 | Smoke-Test „answers the smoke user“ mit 429 | Das Tageskontingent des Smoke-Users ist aufgebraucht (mehr als 20 Deploys bzw. Wiederholungen an einem Tag); am nächsten Tag geht es wieder. |
 | `… is in UPDATE_ROLLBACK_FAILED state and can not be updated` | Ein vorheriger Deploy ist gescheitert und auch sein Rollback. Der Stack muss einmal manuell weiterrollen, bevor die Pipeline wieder deployen kann (siehe unten). |
 | `Unable to find Route by key … within the provided RouteSettings` | Die Stage wurde vor der Route aktualisiert, die ihre `RouteSettings` nennen. `ServiceApiStack` setzt dafür eine explizite Abhängigkeit der Stage auf die öffentlichen Routen (seit dem Fix nach T-37). |
