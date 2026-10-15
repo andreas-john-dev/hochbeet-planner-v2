@@ -50,6 +50,8 @@ describe('AssistantStack', () => {
         SUGGESTION_ROUNDS: '2',
         MEMORY_ID: ssmParam('hochbeet/prod/assistant/memory-id'),
         HISTORY_MESSAGES: '20',
+        TRACING: 'true',
+        SERVICE_NAME: 'prod_bed_assistant',
       },
     });
   });
@@ -172,14 +174,22 @@ describe('AssistantStack', () => {
     expect(actions.some((a) => a.startsWith('aws-marketplace:'))).toBe(false);
   });
 
-  it('writes usage logs without X-Ray tracing', () => {
-    // Trace delivery fails unless X-Ray Transaction Search is enabled in the account.
-    template.resourceCountIs('AWS::Logs::Delivery', 1);
-    template.resourceCountIs('AWS::XRay::ResourcePolicy', 0);
+  it('writes usage logs and delivers traces to X-Ray', () => {
     template.hasResourceProperties('AWS::Logs::LogGroup', {
       LogGroupName: '/aws/vendedlogs/bedrock-agentcore/prod-bed-assistant-usage',
       RetentionInDays: 30,
     });
+    template.hasResourceProperties('AWS::Logs::DeliverySource', { LogType: 'USAGE_LOGS' });
+    template.hasResourceProperties('AWS::Logs::DeliverySource', { LogType: 'TRACES' });
+    template.hasResourceProperties('AWS::Logs::DeliveryDestination', {
+      DeliveryDestinationType: 'XRAY',
+    });
+    template.resourceCountIs('AWS::Logs::Delivery', 2);
+    // Only the log delivery service may write segments, only for this runtime.
+    const document = JSON.stringify(template.findResources('AWS::XRay::ResourcePolicy'));
+    expect(document).toContain('xray:PutTraceSegments');
+    expect(document).toContain('delivery.logs.amazonaws.com');
+    expect(document).toMatch(/logs:LogGeneratingResourceArns.*Runtime[0-9A-F]+.*AgentRuntimeArn/);
   });
 
   it('publishes the gateway URL for the model comparison', () => {
