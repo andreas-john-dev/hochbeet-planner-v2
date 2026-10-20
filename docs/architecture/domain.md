@@ -50,12 +50,33 @@ Die Stückzahl einer Reihe wird nicht gespeichert, sondern berechnet: `floor(len
 | `badNeighbors` | plantId[] | Schlechte Nachbarn (symmetrisch ausgewertet) |
 | `color` | string | Farbe der Standfläche im Beet-Editor |
 | `icon` | string | Schlüssel eines SVG-Icons aus `packages/plant-icons`; eigene Sorten wählen ein vorhandenes Icon oder bekommen das Kategorie-Icon |
+| `frostSensitive` | boolean, optional | Frostempfindlich: kommt erst nach dem letzten Frost ins Freie; fehlt = `false` |
+| `sowing` | Objekt, optional | Aussaat und Anzucht, siehe unten; fehlt bei Sorten ohne Angaben |
 
 Der Lebenszyklus hat drei Varianten:
 
 - `ANNUAL` mit `cultureWeeks`: Ende = Pflanzdatum + Kulturdauer.
 - `MULTI_YEAR` mit `years`: Ende = Pflanzdatum + Jahre, z. B. Erdbeere mit 3 Jahren.
 - `PERENNIAL`: kein Ende, z. B. Rosmarin; nur manuelles Entfernen.
+
+Die Standzeit zählt ab dem Tag, an dem die Pflanze ins Beet kommt, also ab dem Auspflanzen oder der Direktsaat (Epic #120).
+
+### Aussaat und Anzucht (`sowing`)
+
+Angaben wie auf der Rückseite einer Samentüte. Zeitfenster sind wiederkehrende ISO-Kalenderwochen von–bis (`WeekWindow`, beide Enden eingeschlossen); `from > to` geht über den Jahreswechsel, z. B. KW 40 bis 8. `isWeekInWindow()` in `packages/contracts` prüft, ob eine Woche im Fenster liegt.
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `method` | `DIRECT` \| `PRESOW` \| `BOTH` | Direktsaat ins Beet, Vorkultur als Jungpflanze oder beides |
+| `presowWeeks` | WeekWindow | Wann vorgezogen werden kann; Pflicht bei `PRESOW` und `BOTH` |
+| `propagationWeeks` | `{ min, max }` Wochen | Von der Aussaat bis zum Auspflanzen; Pflicht bei `PRESOW` und `BOTH` |
+| `prickOutWeeks` | Wochen, optional | Pikieren nach so vielen Wochen; nur mit Vorkultur |
+| `directSowWeeks` | WeekWindow | Wann direkt ins Beet gesät werden kann; Pflicht bei `DIRECT` und `BOTH` |
+| `directSowExtraWeeks` | Wochen, optional | Kommt bei Direktsaat zur Standzeit dazu (Keimen, erste Wochen); fehlt = 0; nur mit Direktsaat |
+| `germinationDays` | `{ min, max }` Tage, optional | Keimdauer |
+| `germinationTempC` | `{ min, max }` °C, optional | Keimtemperatur |
+
+Angaben, die nicht zur Methode passen (z. B. `prickOutWeeks` bei reiner Direktsaat), lehnt das Schema ab; Bereiche brauchen `min ≤ max`. Eine persönliche Anpassung ersetzt den Block `sowing` als Ganzes; Angaben einer globalen Sorte lassen sich anpassen, aber nicht per Anpassung entfernen.
 
 ### Standfläche
 

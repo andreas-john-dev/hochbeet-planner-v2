@@ -37,3 +37,24 @@ export const MondaySchema = IsoDateSchema.refine(
 /** `H` = parallel to the bed width (x axis), `V` = parallel to the bed depth (y axis). */
 export const DirectionSchema = z.enum(['H', 'V']);
 export type Direction = z.infer<typeof DirectionSchema>;
+
+/** ISO-8601 calendar week number. */
+export const IsoWeekSchema = z
+  .number()
+  .int('Kalenderwoche als ganze Zahl angeben.')
+  .min(1, 'Kalenderwoche 1 bis 53 angeben.')
+  .max(53, 'Kalenderwoche 1 bis 53 angeben.');
+
+/**
+ * Recurring window of ISO weeks, both ends included, e.g. sowing from week 10 to 14.
+ * `from > to` wraps around the turn of the year (week 40 to 8).
+ */
+export const WeekWindowSchema = z.object({ from: IsoWeekSchema, to: IsoWeekSchema });
+export type WeekWindow = z.infer<typeof WeekWindowSchema>;
+
+/** Whether an ISO week number lies in the window, also across the turn of the year. */
+export function isWeekInWindow(week: number, window: WeekWindow): boolean {
+  return window.from <= window.to
+    ? week >= window.from && week <= window.to
+    : week >= window.from || week <= window.to;
+}

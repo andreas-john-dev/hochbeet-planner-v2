@@ -119,7 +119,7 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
   - Eigene Sorte: `SK = PLANT#<id>` mit den Sortenfeldern sowie `publicationStatus` (Standard `PRIVATE`), optional `rejectionComment` und `archived`.
 - **Eigene Sorten** (`POST /catalog/plants`, `PUT` und `DELETE /catalog/plants/{id}`):
   - Neue Sorten bekommen eine ULID und den Status `PRIVATE`.
-  - `PUT` ersetzt die Felder und lässt den Publikationsstatus unverändert.
+  - `PUT` ersetzt die Felder und lässt den Publikationsstatus unverändert. Weggelassene optionale Felder (z. B. `sowing`) werden dabei entfernt, nicht mit den alten Werten gemischt.
   - `DELETE` archiviert immer (`archived`, `archivedAt`), statt hart zu löschen: Der Catalog-Service weiß nicht, ob Pflanzungen die Sorte nutzen, weil die Services sich nie gegenseitig aufrufen. Archivierte Sorten verschwinden aus der Liste und lassen sich nicht mehr ändern; erneutes Archivieren ist erlaubt.
   - Fremde und unbekannte IDs liefern 404.
 - **Anpassungen** (`PUT` und `DELETE /catalog/plants/{id}/override`): nur für globale Sorten. `PUT` speichert die geänderten Felder vollständig neu, `DELETE` setzt die Sorte zurück.

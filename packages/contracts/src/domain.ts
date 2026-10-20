@@ -5,6 +5,7 @@ import {
   IsoDateSchema,
   MondaySchema,
   UlidSchema,
+  WeekWindowSchema,
 } from './primitives';
 
 const NameSchema = z.string().trim().min(1, 'Bitte einen Namen angeben.').max(60);
@@ -118,6 +119,74 @@ export type Lifecycle = z.infer<typeof LifecycleSchema>;
 /** Spacing in cm. Not bound to the grid: sources give values like 7 cm. */
 const SpacingCmSchema = z.number().int().min(1).max(300);
 
+/** `DIRECT` = sown into the bed, `PRESOW` = raised as seedlings first, `BOTH` = either way. */
+export const SowingMethodSchema = z.enum(['DIRECT', 'PRESOW', 'BOTH']);
+export type SowingMethod = z.infer<typeof SowingMethodSchema>;
+
+/** Whole number from `min` to `max` with a German message. */
+const intBetween = (min: number, max: number, unit: string) =>
+  z
+    .number()
+    .int(`Ganze ${unit} angeben.`)
+    .min(min, `${String(min)} bis ${String(max)} ${unit} angeben.`)
+    .max(max, `${String(min)} bis ${String(max)} ${unit} angeben.`);
+
+/** Range with `min <= max`, e.g. 6–8 weeks. */
+const rangeOf = (value: z.ZodNumber) =>
+  z.object({ min: value, max: value }).refine((range) => range.min <= range.max, {
+    path: ['max'],
+    message: 'Bis-Wert muss mindestens so groß sein wie der Von-Wert.',
+  });
+
+const PRESOW_ONLY = ['presowWeeks', 'propagationWeeks', 'prickOutWeeks'] as const;
+const DIRECT_ONLY = ['directSowWeeks', 'directSowExtraWeeks'] as const;
+
+/**
+ * How a plant is sown or raised. Windows are ISO weeks like on the back of a seed packet;
+ * the lifecycle counts from the day the plant goes into the bed, so direct sowing may add
+ * `directSowExtraWeeks` for germination and the first weeks.
+ */
+export const SowingSchema = z
+  .object({
+    method: SowingMethodSchema,
+    /** When seedlings can be started indoors; required for PRESOW and BOTH. */
+    presowWeeks: WeekWindowSchema.optional(),
+    /** Weeks from sowing to planting out; required for PRESOW and BOTH. */
+    propagationWeeks: rangeOf(intBetween(1, 26, 'Wochen')).optional(),
+    /** Pricking out after this many weeks. */
+    prickOutWeeks: intBetween(1, 12, 'Wochen').optional(),
+    /** When it can be sown into the bed; required for DIRECT and BOTH. */
+    directSowWeeks: WeekWindowSchema.optional(),
+    /** Added to the lifecycle of direct sown plantings; missing means 0. */
+    directSowExtraWeeks: intBetween(0, 26, 'Wochen').optional(),
+    germinationDays: rangeOf(intBetween(1, 60, 'Tage')).optional(),
+    germinationTempC: rangeOf(intBetween(0, 40, '°C')).optional(),
+  })
+  .superRefine((sowing, ctx) => {
+    const presow = sowing.method !== 'DIRECT';
+    const direct = sowing.method !== 'PRESOW';
+    const required = (key: keyof typeof sowing, message: string) => {
+      if (sowing[key] === undefined) ctx.addIssue({ code: 'custom', path: [key], message });
+    };
+    const forbidden = (keys: readonly (keyof typeof sowing)[], message: string) => {
+      for (const key of keys) {
+        if (sowing[key] !== undefined) ctx.addIssue({ code: 'custom', path: [key], message });
+      }
+    };
+    if (presow) {
+      required('presowWeeks', 'Bitte die Wochen für die Vorkultur angeben.');
+      required('propagationWeeks', 'Bitte die Dauer der Vorkultur angeben.');
+    } else {
+      forbidden(PRESOW_ONLY, 'Nur bei Vorkultur möglich.');
+    }
+    if (direct) {
+      required('directSowWeeks', 'Bitte die Wochen für die Direktsaat angeben.');
+    } else {
+      forbidden(DIRECT_ONLY, 'Nur bei Direktsaat möglich.');
+    }
+  });
+export type Sowing = z.infer<typeof SowingSchema>;
+
 export const PlantFieldsSchema = z.object({
   name: NameSchema,
   category: CategorySchema,
@@ -133,6 +202,10 @@ export const PlantFieldsSchema = z.object({
   color: z.string().regex(/^#[0-9a-f]{6}$/i, 'Farbe als #rrggbb erwartet.'),
   /** Key of an icon in packages/plant-icons. */
   icon: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Unbekanntes Icon.'),
+  /** Does not stand frost: goes outside only after the last frost. Missing means false. */
+  frostSensitive: z.boolean().optional(),
+  /** Sowing and raising; missing for plants without these details. */
+  sowing: SowingSchema.optional(),
 });
 
 export const PlantSchema = PlantFieldsSchema.extend({ id: UlidSchema });

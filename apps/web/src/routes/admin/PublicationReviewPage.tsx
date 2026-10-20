@@ -16,6 +16,7 @@ import { apiErrorMessage } from '@/lib/api';
 import { CATEGORY_LABEL, FEEDER_LABEL, lifecycleText } from '@/lib/catalog';
 import { useDecidePublication, usePlants, usePublicationQueue } from '@/lib/garden';
 import { plantForm } from '@/lib/plant-form';
+import { sowingLines } from '@/lib/sowing';
 
 /** Route component for /admin/anfragen/$plantId: compare, correct, approve or reject. */
 export function PublicationReviewPage() {
@@ -133,6 +134,11 @@ const ROWS: { label: string; value: (plant: Plant, nameOf: (id: string) => strin
   { label: 'Abstand in der Reihe', value: (p) => `${String(p.spacingInRowCm)} cm` },
   { label: 'Reihenabstand', value: (p) => `${String(p.rowSpacingCm)} cm` },
   { label: 'Standzeit', value: (p) => lifecycleText(p.lifecycle) },
+  { label: 'Frostempfindlich', value: (p) => (p.frostSensitive ? 'Ja' : 'Nein') },
+  {
+    label: 'Aussaat & Anzucht',
+    value: (p) => (p.sowing ? sowingLines(p.sowing).join(', ') : '–'),
+  },
   {
     label: 'Gute Nachbarn',
     value: (p, nameOf) => p.goodNeighbors.map(nameOf).join(', ') || '–',

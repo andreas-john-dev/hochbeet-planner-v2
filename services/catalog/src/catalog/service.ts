@@ -71,7 +71,16 @@ export class CatalogService {
     if (existing.publicationStatus === 'PUBLISHED') return this.saveAsOverride(userId, id, fields);
     await this.checkOwnNeighbors(userId, id, fields);
     // Publication state is not part of the fields; it changes only through the workflow.
-    const item: OwnPlantItem = { ...existing, ...fields, id };
+    // The fields replace the old ones, so optional fields left out are removed.
+    const { publicationStatus, rejectionComment, requestedAt, archived } = existing;
+    const item: OwnPlantItem = {
+      ...fields,
+      id,
+      publicationStatus,
+      archived,
+      ...(rejectionComment === undefined ? {} : { rejectionComment }),
+      ...(requestedAt === undefined ? {} : { requestedAt }),
+    };
     if (!(await this.store.replaceOwnPlant(userId, item))) throw new NotFoundError(PLANT_NOT_FOUND);
     return toCatalogPlant(item);
   }

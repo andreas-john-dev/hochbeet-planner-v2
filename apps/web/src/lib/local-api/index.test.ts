@@ -177,6 +177,28 @@ describe('createLocalFetch', () => {
     expect((await plants()).filter((p) => p.source === 'OWN')).toEqual([]);
   });
 
+  it('keeps sowing details of own plants and adjustments, and drops left out ones', async () => {
+    const sowing = { method: 'DIRECT', directSowWeeks: { from: 12, to: 20 } };
+    const created = (await (
+      await send('/api/catalog/plants', 'POST', { ...ownFields, frostSensitive: true, sowing })
+    ).json()) as CatalogPlant;
+    expect((await plants()).find((p) => p.id === created.id)).toMatchObject({
+      frostSensitive: true,
+      sowing,
+    });
+    await send(`/api/catalog/plants/${created.id}`, 'PUT', ownFields);
+    const updated = (await plants()).find((p) => p.id === created.id);
+    expect(updated?.sowing).toBeUndefined();
+    expect(updated?.frostSensitive).toBeUndefined();
+    expect(updated?.publication).toEqual({ status: 'PRIVATE' });
+
+    await send(`/api/catalog/plants/${lettuce}/override`, 'PUT', { sowing });
+    expect((await plants()).find((p) => p.id === lettuce)).toMatchObject({
+      sowing,
+      overridden: true,
+    });
+  });
+
   it('answers 507 when the browser storage is full', async () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('full', 'QuotaExceededError');

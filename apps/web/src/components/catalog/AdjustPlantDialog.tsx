@@ -1,5 +1,6 @@
 import type { CatalogPlant, Feeder, Lifecycle } from '@hochbeet/contracts';
 import { useId, useState } from 'react';
+import { SowingFields } from '@/components/catalog/SowingFields';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +22,7 @@ import {
   parseAdjustForm,
 } from '@/lib/catalog';
 import { useAdjustPlant } from '@/lib/garden';
+import { remainingErrors, type SowingForm } from '@/lib/sowing-form';
 
 const LIFECYCLE_LABEL: Record<Lifecycle['type'], string> = {
   ANNUAL: 'Wochen',
@@ -75,6 +77,13 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
       Object.fromEntries(Object.entries(current).filter(([key]) => !(key in change))),
     );
   };
+
+  const updateSowing = (change: Partial<SowingForm>) => {
+    setForm((current) => ({ ...current, sowing: { ...current.sowing, ...change } }));
+    setErrors((current) => ({ ...current, sowing: remainingErrors(current.sowing, change) }));
+  };
+  // Details of the global plant can be changed but not removed: an adjustment only adds values.
+  const allowNone = (plant.global ?? plant).sowing === undefined;
 
   const onSubmit = async () => {
     const parsed = parseAdjustForm(form);
@@ -183,6 +192,12 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
           />
         )}
       </div>
+      <SowingFields
+        value={form.sowing}
+        errors={errors.sowing ?? {}}
+        allowNone={allowNone}
+        onChange={updateSowing}
+      />
       <DialogFooter>
         <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onDone}>
           Abbrechen
