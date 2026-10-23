@@ -1,6 +1,7 @@
 import type { CatalogPlant, Category, Lifecycle, PlantFields } from '@hochbeet/contracts';
 import { CATEGORY_ICONS, hasIcon } from '@hochbeet/plant-icons';
 import { type AdjustErrors, type AdjustForm, adjustForm, parseAdjustForm } from './catalog';
+import { EMPTY_SOWING_FORM } from './sowing-form';
 
 /** Form values of an own plant; `icon: null` means the category icon. */
 export interface PlantForm extends AdjustForm {
@@ -49,6 +50,7 @@ export const EMPTY_PLANT_FORM: PlantForm = {
   rowSpacingCm: '',
   lifecycleType: 'ANNUAL',
   lifecycleValue: '',
+  sowing: EMPTY_SOWING_FORM,
   goodNeighbors: [],
   badNeighbors: [],
   color: DEFAULT_COLOR.GEMUESE,
@@ -82,7 +84,8 @@ export function parsePlantForm(
       },
     };
   }
-  const { family, feeder, spacingInRowCm, rowSpacingCm, lifecycle } = rest.fields;
+  const { family, feeder, spacingInRowCm, rowSpacingCm, lifecycle, frostSensitive, sowing } =
+    rest.fields;
   if (!family || !feeder || !spacingInRowCm || !rowSpacingCm || !lifecycle) {
     throw new Error('incomplete adjust form');
   }
@@ -99,6 +102,9 @@ export function parsePlantForm(
       badNeighbors: form.badNeighbors,
       color: form.color,
       icon: form.icon ?? CATEGORY_ICONS[form.category],
+      // Missing means false, so only a frost sensitive plant stores the flag.
+      ...(frostSensitive ? { frostSensitive } : {}),
+      ...(sowing ? { sowing } : {}),
     },
   };
 }

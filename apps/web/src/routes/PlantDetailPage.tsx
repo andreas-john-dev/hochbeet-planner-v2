@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
 import { CATEGORY_LABEL, changedFields, FEEDER_LABEL, lifecycleText } from '@/lib/catalog';
 import { useAdjustPlant, usePlants } from '@/lib/garden';
+import { sowingLines } from '@/lib/sowing';
 import { cn } from '@/lib/utils';
 
 /** Route component for /katalog/$plantId. */
@@ -199,6 +200,26 @@ function PlantDetails({
             'Standzeit',
             lifecycleText(plant.lifecycle),
             global && lifecycleText(global.lifecycle),
+          )}
+          {row(
+            'frostSensitive',
+            'Frostempfindlich',
+            plant.frostSensitive ? 'Ja' : 'Nein',
+            global && (global.frostSensitive ? 'Ja' : 'Nein'),
+          )}
+          {row(
+            'sowing',
+            'Aussaat & Anzucht',
+            plant.sowing ? (
+              <ul className="flex flex-col gap-0.5">
+                {sowingLines(plant.sowing).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : (
+              'Keine Angaben'
+            ),
+            global && (global.sowing ? sowingLines(global.sowing).join(', ') : 'keine Angaben'),
           )}
           {row(
             'color',

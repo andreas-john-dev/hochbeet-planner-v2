@@ -115,6 +115,44 @@ describe('own plants and overrides against DynamoDB Local', () => {
       });
     });
 
+    it('stores sowing details and frost sensitivity of own plants', async () => {
+      const sowing = {
+        method: 'BOTH',
+        presowWeeks: { from: 10, to: 14 },
+        propagationWeeks: { min: 4, max: 6 },
+        directSowWeeks: { from: 14, to: 30 },
+        directSowExtraWeeks: 2,
+      } as const;
+      const plant = await create(
+        USER_A,
+        fields('Pflücksalat rot', { frostSensitive: true, sowing }),
+      );
+      expect(plant).toMatchObject({ frostSensitive: true, sowing });
+      expect((await list(USER_A)).find((p) => p.id === plant.id)).toMatchObject({ sowing });
+
+      const changed = await call(USER_A, 'PUT', `/plants/${plant.id}`, {
+        ...fields('Pflücksalat rot'),
+        sowing: { method: 'DIRECT', directSowWeeks: { from: 14, to: 30 } },
+      });
+      expect(changed.status).toBe(200);
+      const after = (await list(USER_A)).find((p) => p.id === plant.id);
+      expect(after?.sowing).toEqual({ method: 'DIRECT', directSowWeeks: { from: 14, to: 30 } });
+      expect(after?.frostSensitive).toBeUndefined();
+    });
+
+    it('rejects sowing details that do not fit the method', async () => {
+      const response = await call(USER_A, 'POST', '/plants', {
+        ...fields('Ohne Fenster'),
+        sowing: { method: 'PRESOW', directSowExtraWeeks: 1 },
+      });
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as ErrorResponse).issues).toEqual([
+        { path: 'sowing.presowWeeks', message: 'Bitte die Wochen für die Vorkultur angeben.' },
+        { path: 'sowing.propagationWeeks', message: 'Bitte die Dauer der Vorkultur angeben.' },
+        { path: 'sowing.directSowExtraWeeks', message: 'Nur bei Direktsaat möglich.' },
+      ]);
+    });
+
     it('changes an own plant and keeps its publication status', async () => {
       const plant = await create(USER_A, fields('Monatserdbeere'));
       const response = await call(USER_A, 'PUT', `/plants/${plant.id}`, {
@@ -204,6 +242,28 @@ describe('own plants and overrides against DynamoDB Local', () => {
         rowSpacingCm: tomato.rowSpacingCm,
         overridden: false,
       });
+    });
+
+    it('adjusts sowing details of a global plant and resets them', async () => {
+      const sowing = {
+        method: 'PRESOW',
+        presowWeeks: { from: 8, to: 12 },
+        propagationWeeks: { min: 8, max: 10 },
+      } as const;
+      const response = await call(USER_A, 'PUT', `/plants/${tomato.id}/override`, {
+        frostSensitive: true,
+        sowing,
+      });
+      expect(response.status).toBe(200);
+      const adjusted = (await list(USER_A)).find((p) => p.id === tomato.id);
+      expect(adjusted).toMatchObject({ frostSensitive: true, sowing, overridden: true });
+      expect(adjusted?.global?.sowing).toEqual(tomato.sowing);
+      expect((await list(USER_B)).find((p) => p.id === tomato.id)?.sowing).toEqual(tomato.sowing);
+
+      expect((await call(USER_A, 'DELETE', `/plants/${tomato.id}/override`)).status).toBe(204);
+      const reset = (await list(USER_A)).find((p) => p.id === tomato.id);
+      expect(reset).toMatchObject({ overridden: false });
+      expect(reset?.sowing).toEqual(tomato.sowing);
     });
 
     it('lets overrides of global plants only name global plants', async () => {

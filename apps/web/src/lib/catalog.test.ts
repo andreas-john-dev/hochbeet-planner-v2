@@ -88,6 +88,58 @@ describe('adjustments', () => {
   });
 });
 
+describe('adjustments of sowing and frost', () => {
+  const sowing = {
+    method: 'PRESOW' as const,
+    presowWeeks: { from: 10, to: 14 },
+    propagationWeeks: { min: 6, max: 8 },
+  };
+  const withoutDetails = (name: string): CatalogPlant => {
+    const { sowing: _sowing, frostSensitive: _frost, ...rest } = plant(name);
+    return rest;
+  };
+
+  it('treats a missing frost flag like false', () => {
+    const lettuce = withoutDetails('Kopfsalat');
+    expect(overrideFor(lettuce, { frostSensitive: false })).toBeNull();
+    const frosty = { ...lettuce, frostSensitive: true };
+    expect(overrideFor(frosty, { frostSensitive: false })).toEqual({ frostSensitive: false });
+    expect(
+      changedFields({
+        ...lettuce,
+        frostSensitive: false,
+        overridden: true,
+        global: plantFields(lettuce),
+      }),
+    ).toEqual(new Set());
+  });
+
+  it('adds sowing details as adjustment and marks them', () => {
+    const lettuce = withoutDetails('Kopfsalat');
+    expect(overrideFor(lettuce, { sowing })).toEqual({ sowing });
+    const withSowing: CatalogPlant = {
+      ...lettuce,
+      sowing,
+      overridden: true,
+      global: plantFields(lettuce),
+    };
+    expect(changedFields(withSowing)).toEqual(new Set(['sowing']));
+  });
+
+  it('falls back to the global plant when added details are removed again', () => {
+    const lettuce = withoutDetails('Kopfsalat');
+    const withSowing: CatalogPlant = {
+      ...lettuce,
+      sowing,
+      spacingInRowCm: 40,
+      overridden: true,
+      global: plantFields(lettuce),
+    };
+    expect(overrideFor(withSowing, { sowing: undefined })).toEqual({ spacingInRowCm: 40 });
+    expect(overrideFor({ ...withSowing, spacingInRowCm: 25 }, { sowing: undefined })).toBeNull();
+  });
+});
+
 describe('adjust form', () => {
   it('round-trips the plant values', () => {
     const salat = plant('Kopfsalat');
@@ -99,9 +151,28 @@ describe('adjust form', () => {
         spacingInRowCm: 25,
         rowSpacingCm: 30,
         lifecycle: { type: 'ANNUAL', cultureWeeks: 8 },
+        frostSensitive: salat.frostSensitive ?? false,
+        sowing: salat.sowing,
       },
     });
     expect('fields' in parsed && overrideFor(salat, parsed.fields)).toBeNull();
+  });
+
+  it('round-trips sowing details and reports their errors separately', () => {
+    const sowing = {
+      method: 'DIRECT' as const,
+      directSowWeeks: { from: 12, to: 30 },
+      directSowExtraWeeks: 2,
+    };
+    const lettuce = adjusted('Kopfsalat', { frostSensitive: true, sowing });
+    const parsed = parseAdjustForm(adjustForm(lettuce));
+    expect('fields' in parsed && parsed.fields).toMatchObject({ frostSensitive: true, sowing });
+
+    const form = adjustForm(lettuce);
+    const invalid = { ...form, sowing: { ...form.sowing, directTo: '' } };
+    expect(parseAdjustForm(invalid)).toEqual({
+      errors: { sowing: { directTo: 'Bitte beide Werte angeben.' } },
+    });
   });
 
   it('reports invalid values per field', () => {

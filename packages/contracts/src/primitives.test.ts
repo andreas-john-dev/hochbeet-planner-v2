@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { GridCmSchema, IsoDateSchema, MondaySchema, UlidSchema } from './primitives';
+import {
+  GridCmSchema,
+  IsoDateSchema,
+  isWeekInWindow,
+  MondaySchema,
+  UlidSchema,
+  WeekWindowSchema,
+} from './primitives';
 
 const ok = (schema: { safeParse: (v: unknown) => { success: boolean } }, value: unknown) =>
   schema.safeParse(value).success;
@@ -31,5 +38,36 @@ describe('primitives', () => {
     expect(MondaySchema.safeParse('2026-10-07').error?.issues[0]?.message).toBe(
       'Muss ein Montag sein.',
     );
+  });
+
+  it('accepts week windows with ISO weeks 1 to 53', () => {
+    expect(ok(WeekWindowSchema, { from: 10, to: 14 })).toBe(true);
+    expect(ok(WeekWindowSchema, { from: 40, to: 8 })).toBe(true);
+    expect(ok(WeekWindowSchema, { from: 53, to: 53 })).toBe(true);
+    expect(ok(WeekWindowSchema, { from: 0, to: 8 })).toBe(false);
+    expect(ok(WeekWindowSchema, { from: 10, to: 10.5 })).toBe(false);
+  });
+
+  it('finds weeks in a window, both ends included', () => {
+    const spring = { from: 10, to: 14 };
+    expect([9, 10, 12, 14, 15].map((week) => isWeekInWindow(week, spring))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it('finds weeks in a window across the turn of the year', () => {
+    const winter = { from: 40, to: 8 };
+    expect([39, 40, 53, 1, 8, 9].map((week) => isWeekInWindow(week, winter))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
   });
 });

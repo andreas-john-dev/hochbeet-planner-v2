@@ -128,3 +128,52 @@ test('shows a rejection with comment and blocks own neighbours', async ({ page }
   await expect(page.getByRole('button', { name: 'Für alle vorschlagen' })).toBeDisabled();
   await expect(page.getByText(/Entferne dafür zuerst Haferwurzel aus den Nachbarn/)).toBeVisible();
 });
+
+test('keeps sowing details of an own plant and changes them', async ({ page }) => {
+  await signInAs(page, 'user');
+  await seedGarden(page, { beds: [], plantings: [] });
+  await open(page, '/katalog/neu', 'Eigene Sorte anlegen');
+  await page.getByLabel('Name').fill('Ochsenherz');
+  await page.getByLabel('Familie').fill('Nachtschattengewächse');
+  await page.getByLabel('Abstand in der Reihe (cm)').fill('60');
+  await page.getByLabel('Reihenabstand (cm)').fill('60');
+  await page.getByLabel('Kulturdauer (Wochen)').fill('18');
+
+  // The section starts collapsed for a new plant.
+  await page.getByText('Aussaat & Anzucht').click();
+  await page.getByRole('checkbox', { name: /Frostempfindlich/ }).check();
+  await page.getByRole('radio', { name: /^Vorkultur Wird vorgezogen/ }).check();
+  const presow = page.getByRole('group', { name: 'Vorkultur' });
+  await presow.getByLabel('Aussaat ab KW').fill('10');
+  await expect(presow.getByText('Anfang März')).toBeVisible();
+  await presow.getByLabel('Aussaat bis KW').fill('14');
+  await expect(presow.getByText('Anfang April')).toBeVisible();
+  // Missing details are explained on the field.
+  await page.getByRole('button', { name: 'Sorte anlegen' }).click();
+  await expect(presow.getByText('Bitte die Dauer der Vorkultur angeben.')).toBeVisible();
+  await presow.getByLabel('Vorkultur von (Wochen)').fill('6');
+  await presow.getByLabel('Vorkultur bis (Wochen)').fill('8');
+  await page.getByRole('button', { name: 'Sorte anlegen' }).click();
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Ochsenherz' })).toBeVisible();
+  const values = page.getByRole('region', { name: 'Werte' });
+  await expect(values).toContainText('FrostempfindlichJa');
+  await expect(values).toContainText('Vorkultur KW 10–14 (Anfang März bis Anfang April)');
+  await expect(values).toContainText('6–8 Wochen bis zum Auspflanzen');
+
+  // Editing starts with the stored details, open.
+  await page.getByRole('link', { name: 'Bearbeiten' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Sorte bearbeiten' })).toBeVisible();
+  await expect(presow.getByLabel('Aussaat ab KW')).toHaveValue('10');
+  await page.getByRole('radio', { name: /^Vorkultur oder Direktsaat/ }).check();
+  const direct = page.getByRole('group', { name: 'Direktsaat' });
+  await direct.getByLabel('Aussaat ab KW').fill('18');
+  await direct.getByLabel('Aussaat bis KW').fill('22');
+  await page.getByRole('button', { name: 'Speichern' }).click();
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Ochsenherz' })).toBeVisible();
+  await expect(values).toContainText('Vorkultur oder Direktsaat');
+  await expect(values).toContainText('Direktsaat KW 18–22 (Ende April bis Ende Mai)');
+  await page.reload();
+  await expect(values).toContainText('Direktsaat KW 18–22');
+});

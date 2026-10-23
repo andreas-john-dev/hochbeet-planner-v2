@@ -6,6 +6,7 @@ import {
   PlantingSchema,
   PlantOverrideSchema,
   PlantSchema,
+  SowingSchema,
 } from './domain';
 import { bed, rowPlanting, singlePlanting, tomato } from './fixtures.test-utils';
 
@@ -87,6 +88,85 @@ describe('PlantSchema', () => {
   it('validates colour and icon key', () => {
     expect(PlantSchema.safeParse({ ...tomato, color: 'red' }).success).toBe(false);
     expect(PlantSchema.safeParse({ ...tomato, icon: 'Tomate' }).success).toBe(false);
+  });
+});
+
+describe('SowingSchema', () => {
+  const presow = {
+    method: 'PRESOW',
+    presowWeeks: { from: 10, to: 14 },
+    propagationWeeks: { min: 6, max: 8 },
+    prickOutWeeks: 3,
+    germinationDays: { min: 8, max: 14 },
+    germinationTempC: { min: 20, max: 25 },
+  } as const;
+  const direct = {
+    method: 'DIRECT',
+    directSowWeeks: { from: 12, to: 28 },
+    directSowExtraWeeks: 2,
+  } as const;
+  const issues = (value: unknown) =>
+    SowingSchema.safeParse(value).error?.issues.map((i) => [i.path.join('.'), i.message]);
+
+  it('accepts presowing, direct sowing and both', () => {
+    expect(SowingSchema.parse(presow)).toEqual(presow);
+    expect(SowingSchema.parse(direct)).toEqual(direct);
+    const both = { ...presow, ...direct, method: 'BOTH' };
+    expect(SowingSchema.parse(both)).toEqual(both);
+  });
+
+  it('allows windows across the turn of the year', () => {
+    expect(SowingSchema.safeParse({ ...direct, directSowWeeks: { from: 40, to: 8 } }).success).toBe(
+      true,
+    );
+  });
+
+  it('requires the windows of the chosen method', () => {
+    expect(issues({ method: 'PRESOW' })).toEqual([
+      ['presowWeeks', 'Bitte die Wochen für die Vorkultur angeben.'],
+      ['propagationWeeks', 'Bitte die Dauer der Vorkultur angeben.'],
+    ]);
+    expect(issues({ method: 'DIRECT' })).toEqual([
+      ['directSowWeeks', 'Bitte die Wochen für die Direktsaat angeben.'],
+    ]);
+    expect(issues({ ...presow, method: 'BOTH' })).toEqual([
+      ['directSowWeeks', 'Bitte die Wochen für die Direktsaat angeben.'],
+    ]);
+  });
+
+  it('rejects details of the other method', () => {
+    expect(issues({ ...direct, prickOutWeeks: 3 })).toEqual([
+      ['prickOutWeeks', 'Nur bei Vorkultur möglich.'],
+    ]);
+    expect(issues({ ...presow, directSowExtraWeeks: 1 })).toEqual([
+      ['directSowExtraWeeks', 'Nur bei Direktsaat möglich.'],
+    ]);
+  });
+
+  it('checks weeks and ranges', () => {
+    expect(issues({ ...presow, presowWeeks: { from: 0, to: 54 } })).toEqual([
+      ['presowWeeks.from', 'Kalenderwoche 1 bis 53 angeben.'],
+      ['presowWeeks.to', 'Kalenderwoche 1 bis 53 angeben.'],
+    ]);
+    expect(issues({ ...presow, propagationWeeks: { min: 8, max: 6 } })).toEqual([
+      ['propagationWeeks.max', 'Bis-Wert muss mindestens so groß sein wie der Von-Wert.'],
+    ]);
+    expect(issues({ ...presow, germinationTempC: { min: 20, max: 45 } })).toEqual([
+      ['germinationTempC.max', '0 bis 40 °C angeben.'],
+    ]);
+  });
+
+  it('is optional on plants, as is frost sensitivity', () => {
+    expect(PlantSchema.safeParse(tomato).success).toBe(true);
+    const withSowing = { ...tomato, frostSensitive: true, sowing: presow };
+    expect(PlantSchema.parse(withSowing)).toEqual(withSowing);
+    expect(PlantSchema.safeParse({ ...tomato, sowing: { method: 'PRESOW' } }).success).toBe(false);
+  });
+
+  it('can be adjusted as a whole', () => {
+    expect(PlantOverrideSchema.safeParse({ sowing: direct, frostSensitive: false }).success).toBe(
+      true,
+    );
   });
 });
 

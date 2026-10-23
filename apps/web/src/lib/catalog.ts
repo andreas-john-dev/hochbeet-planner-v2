@@ -6,6 +6,7 @@ import type {
   PlantFields,
   PlantOverride,
 } from '@hochbeet/contracts';
+import { parseSowingForm, type SowingErrors, type SowingForm, sowingForm } from './sowing-form';
 
 export const CATEGORY_LABEL: Record<Category, string> = {
   GEMUESE: 'Gemüse',
@@ -73,25 +74,34 @@ const FIELDS = [
   'badNeighbors',
   'color',
   'icon',
+  'frostSensitive',
+  'sowing',
 ] as const satisfies readonly (keyof PlantFields)[];
+
+/** What a missing optional field means, so that e.g. `false` and missing count as equal. */
+const FIELD_DEFAULTS: Partial<PlantFields> = { frostSensitive: false };
 
 /** The plant fields without id and catalogue metadata. */
 export function plantFields(plant: CatalogPlant): PlantFields {
-  return Object.fromEntries(FIELDS.map((key) => [key, plant[key]])) as PlantFields;
+  return Object.fromEntries(
+    FIELDS.flatMap((key) => (plant[key] === undefined ? [] : [[key, plant[key]]])),
+  ) as PlantFields;
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const same = (key: keyof PlantFields, a: unknown, b: unknown) =>
+  JSON.stringify(a ?? FIELD_DEFAULTS[key]) === JSON.stringify(b ?? FIELD_DEFAULTS[key]);
 
 /** Fields where the user's adjustment differs from the global plant. */
 export function changedFields(plant: CatalogPlant): Set<keyof PlantFields> {
   const { global } = plant;
   if (!global) return new Set();
-  return new Set(FIELDS.filter((key) => !same(plant[key], global[key])));
+  return new Set(FIELDS.filter((key) => !same(key, plant[key], global[key])));
 }
 
 /**
  * The override to store after editing: every field that differs from the global plant.
- * Null means nothing differs any more, so the adjustment can be reset.
+ * Null means nothing differs any more, so the adjustment can be reset. A field that is
+ * missing after editing cannot be stored as override and falls back to the global value.
  */
 export function overrideFor(
   plant: CatalogPlant,
@@ -100,7 +110,9 @@ export function overrideFor(
   const base = plant.global ?? plantFields(plant);
   const next = { ...plantFields(plant), ...edited };
   const override = Object.fromEntries(
-    FIELDS.filter((key) => !same(next[key], base[key])).map((key) => [key, next[key]]),
+    FIELDS.filter((key) => next[key] !== undefined && !same(key, next[key], base[key])).map(
+      (key) => [key, next[key]],
+    ),
   ) as PlantOverride;
   return Object.keys(override).length > 0 ? override : null;
 }
@@ -114,6 +126,7 @@ export interface AdjustForm {
   lifecycleType: Lifecycle['type'];
   /** Weeks for annual plants, years for multi-year ones. */
   lifecycleValue: string;
+  sowing: SowingForm;
 }
 
 export function adjustForm(plant: CatalogPlant): AdjustForm {
@@ -130,10 +143,13 @@ export function adjustForm(plant: CatalogPlant): AdjustForm {
         : lifecycle.type === 'MULTI_YEAR'
           ? String(lifecycle.years)
           : '',
+    sowing: sowingForm(plant),
   };
 }
 
-export type AdjustErrors = Partial<Record<keyof AdjustForm, string>>;
+export type AdjustErrors = Partial<Record<Exclude<keyof AdjustForm, 'sowing'>, string>> & {
+  sowing?: SowingErrors;
+};
 
 const wholeNumber = (text: string, min: number, max: number) => {
   const value = Number(text.trim());
@@ -163,11 +179,26 @@ export function parseAdjustForm(
     lifecycle = years === null ? null : { type: 'MULTI_YEAR', years };
     if (!lifecycle) errors.lifecycleValue = 'Bitte 1 bis 20 Jahre angeben.';
   }
-  if (spacingInRowCm === null || rowSpacingCm === null || lifecycle === null || family === '') {
+  const sowing = parseSowingForm(form.sowing);
+  if ('errors' in sowing) errors.sowing = sowing.errors;
+  if (
+    spacingInRowCm === null ||
+    rowSpacingCm === null ||
+    lifecycle === null ||
+    family === '' ||
+    'errors' in sowing
+  ) {
     return { errors };
   }
   return {
-    fields: { family, feeder: form.feeder, spacingInRowCm, rowSpacingCm, lifecycle },
+    fields: {
+      family,
+      feeder: form.feeder,
+      spacingInRowCm,
+      rowSpacingCm,
+      lifecycle,
+      ...sowing.fields,
+    },
   };
 }
 

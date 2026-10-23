@@ -2,6 +2,7 @@ import type { CatalogPlant, Category, Feeder, PlantFields } from '@hochbeet/cont
 import { useId, useState } from 'react';
 import { IconPicker } from '@/components/catalog/IconPicker';
 import { NeighborPicker } from '@/components/catalog/NeighborPicker';
+import { SowingFields } from '@/components/catalog/SowingFields';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,7 @@ import {
   type PlantFormErrors,
   parsePlantForm,
 } from '@/lib/plant-form';
+import { remainingErrors, type SowingForm } from '@/lib/sowing-form';
 import { cn } from '@/lib/utils';
 
 const selectClass =
@@ -60,6 +62,10 @@ export function PlantFormFields({
     setErrors((current) =>
       Object.fromEntries(Object.entries(current).filter(([key]) => !(key in change))),
     );
+  };
+  const updateSowing = (change: Partial<SowingForm>) => {
+    setForm((current) => ({ ...current, sowing: { ...current.sowing, ...change } }));
+    setErrors((current) => ({ ...current, sowing: remainingErrors(current.sowing, change) }));
   };
   const others = neighborCandidates;
 
@@ -223,6 +229,13 @@ export function PlantFormFields({
           </div>
         )}
       </fieldset>
+
+      <SowingFields
+        value={form.sowing}
+        errors={errors.sowing ?? {}}
+        allowNone
+        onChange={updateSowing}
+      />
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-3">

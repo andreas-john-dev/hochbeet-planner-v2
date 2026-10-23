@@ -129,7 +129,17 @@ export function localRoutes({ repo, globals, newId = () => ulid() }: LocalApiOpt
       );
       if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
       // Publication state is not part of the fields; it changes only through the workflow.
-      const plant: OwnPlant = { ...existing, ...parsed.data, id: existing.id };
+      // The fields replace the old ones, so optional fields left out are removed.
+      const { source, overridden, publication, archived, requestedAt } = existing;
+      const plant: OwnPlant = {
+        ...parsed.data,
+        id: existing.id,
+        source,
+        overridden,
+        ...(publication === undefined ? {} : { publication }),
+        ...(archived === undefined ? {} : { archived }),
+        ...(requestedAt === undefined ? {} : { requestedAt }),
+      };
       saveOwn(garden, plant);
       return json<CatalogPlant>(listed(plant));
     }),
