@@ -201,6 +201,97 @@ describe('checked catalogue (T-46)', () => {
   });
 });
 
+describe('sowing details (T-50)', () => {
+  const withoutSowing = ['Erdbeere', 'Pfefferminze', 'Rhabarber', 'Rosmarin'];
+
+  it('gives every plant sowing details except those planted as young plants', () => {
+    expect(
+      seedPlants
+        .filter((p) => !p.sowing)
+        .map((p) => p.name)
+        .sort((a, b) => a.localeCompare(b, 'de')),
+    ).toEqual(withoutSowing);
+    for (const p of seedPlants.filter((p) => p.lifecycle.type === 'ANNUAL')) {
+      expect(p.sowing, p.name).toBeDefined();
+    }
+  });
+
+  // Chili sown from mid January needs the longest: 17 weeks to mid May.
+  it('keeps propagation between 2 and 18 weeks', () => {
+    for (const p of seedPlants) {
+      const weeks = p.sowing?.propagationWeeks;
+      if (!weeks) continue;
+      expect(weeks.min, p.name).toBeGreaterThanOrEqual(2);
+      expect(weeks.max, p.name).toBeLessThanOrEqual(18);
+    }
+  });
+
+  it('starts presowing of frost sensitive plants before the last frost', () => {
+    for (const p of seedPlants.filter((p) => p.frostSensitive && p.sowing?.presowWeeks)) {
+      expect(p.sowing?.presowWeeks?.from, p.name).toBeLessThan(20);
+    }
+  });
+
+  it('adds the shortest propagation to direct sown annuals that can be raised either way', () => {
+    for (const p of seedPlants.filter((p) => p.sowing?.method === 'BOTH')) {
+      const expected = p.lifecycle.type === 'ANNUAL' ? p.sowing?.propagationWeeks?.min : undefined;
+      expect(p.sowing?.directSowExtraWeeks, p.name).toBe(expected);
+    }
+  });
+
+  it('marks the plants that go outside only after the last frost', () => {
+    expect(
+      seedPlants
+        .filter((p) => p.frostSensitive)
+        .map((p) => p.name)
+        .sort((a, b) => a.localeCompare(b, 'de')),
+    ).toEqual([
+      'Aubergine',
+      'Basilikum',
+      'Bohnenkraut',
+      'Buschbohne',
+      'Chili',
+      'Kapuzinerkresse',
+      'Knollensellerie',
+      'Kürbis',
+      'Oregano',
+      'Paprika',
+      'Radicchio',
+      'Rosmarin',
+      'Salatgurke',
+      'Salbei',
+      'Stangenbohne',
+      'Staudensellerie',
+      'Thymian',
+      'Tomate',
+      'Zucchini',
+      'Zuckermais',
+    ]);
+  });
+
+  it('takes the windows from the BZfE table', () => {
+    expect(plant('Tomate').sowing).toEqual({
+      method: 'PRESOW',
+      presowWeeks: { from: 11, to: 16 },
+      propagationWeeks: { min: 7, max: 13 },
+      prickOutWeeks: 2,
+      germinationDays: { min: 3, max: 10 },
+      germinationTempC: { min: 20, max: 22 },
+    });
+    expect(plant('Kopfsalat').sowing).toMatchObject({
+      method: 'BOTH',
+      presowWeeks: { from: 10, to: 30 },
+      directSowWeeks: { from: 13, to: 30 },
+      directSowExtraWeeks: 3,
+    });
+    // Planted in autumn, as the 38 weeks in the bed need (decided by the product owner).
+    expect(plant('Knoblauch').sowing).toEqual({
+      method: 'DIRECT',
+      directSowWeeks: { from: 40, to: 46 },
+    });
+  });
+});
+
 describe('contradictions', () => {
   // Compares both sides as the sources name them; seedPlants are already symmetric.
   const contradictions = findContradictions(resolveOneSided(seedEntries));
