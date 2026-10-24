@@ -19,6 +19,7 @@ export const singlePlanting = {
   id: ID.planting,
   bedId: ID.bed,
   plantId: ID.tomato,
+  origin: 'TRANSPLANT',
   kind: 'SINGLE',
   x: 30,
   y: 45,

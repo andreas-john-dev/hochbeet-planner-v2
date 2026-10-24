@@ -1,4 +1,4 @@
-import type { Bed, IsoDate, Lifecycle, Plant, Planting } from '@hochbeet/contracts';
+import type { Bed, IsoDate, Lifecycle, Plant, Planting, PlantingOrigin } from '@hochbeet/contracts';
 import {
   addWeeks,
   addYears,
@@ -28,11 +28,14 @@ export interface Interval {
   end: IsoDate | null;
 }
 
-/** End derived from the lifecycle alone: start + culture weeks / years, none for perennials. */
-export function lifecycleEnd(start: IsoDate, lifecycle: Lifecycle): IsoDate | null {
+/**
+ * End derived from the lifecycle alone: start + culture weeks (plus `extraWeeks`, e.g. for
+ * direct sowing) / years, none for perennials.
+ */
+export function lifecycleEnd(start: IsoDate, lifecycle: Lifecycle, extraWeeks = 0): IsoDate | null {
   switch (lifecycle.type) {
     case 'ANNUAL':
-      return toIso(addWeeks(toDate(start), lifecycle.cultureWeeks));
+      return toIso(addWeeks(toDate(start), lifecycle.cultureWeeks + extraWeeks));
     case 'MULTI_YEAR':
       return toIso(addYears(toDate(start), lifecycle.years));
     case 'PERENNIAL':
@@ -40,25 +43,37 @@ export function lifecycleEnd(start: IsoDate, lifecycle: Lifecycle): IsoDate | nu
   }
 }
 
-type DatedPlanting = Pick<Planting, 'startDate' | 'endDate' | 'removedDate'>;
+/** How a new planting of `plant` gets into the bed: direct sowing only for direct sown plants. */
+export function defaultOrigin(plant: Pick<Plant, 'sowing'>): PlantingOrigin {
+  return plant.sowing?.method === 'DIRECT' ? 'DIRECT_SOW' : 'TRANSPLANT';
+}
+
+type TimedPlant = Pick<Plant, 'lifecycle' | 'sowing'>;
+
+/**
+ * End from the lifecycle for a planting: culture weeks count from planting out, so direct
+ * sown plantings stay `directSowExtraWeeks` longer for germination and the first weeks.
+ */
+export function plannedEnd(
+  planting: Pick<Planting, 'startDate' | 'origin'>,
+  plant: TimedPlant,
+): IsoDate | null {
+  const extraWeeks =
+    planting.origin === 'DIRECT_SOW' ? (plant.sowing?.directSowExtraWeeks ?? 0) : 0;
+  return lifecycleEnd(planting.startDate, plant.lifecycle, extraWeeks);
+}
+
+type DatedPlanting = Pick<Planting, 'startDate' | 'endDate' | 'removedDate' | 'origin'>;
 
 /**
  * Effective end of a planting: `removedDate` beats `endDate`, which beats the lifecycle.
  * Perennials without removal never end.
  */
-export function effectiveEnd(
-  planting: DatedPlanting,
-  plant: Pick<Plant, 'lifecycle'>,
-): IsoDate | null {
-  return (
-    planting.removedDate ?? planting.endDate ?? lifecycleEnd(planting.startDate, plant.lifecycle)
-  );
+export function effectiveEnd(planting: DatedPlanting, plant: TimedPlant): IsoDate | null {
+  return planting.removedDate ?? planting.endDate ?? plannedEnd(planting, plant);
 }
 
-export function plantingInterval(
-  planting: DatedPlanting,
-  plant: Pick<Plant, 'lifecycle'>,
-): Interval {
+export function plantingInterval(planting: DatedPlanting, plant: TimedPlant): Interval {
   return { start: planting.startDate, end: effectiveEnd(planting, plant) };
 }
 

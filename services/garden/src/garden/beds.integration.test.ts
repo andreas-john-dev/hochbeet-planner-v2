@@ -55,6 +55,7 @@ describe('/api/garden/beds against DynamoDB Local', () => {
     kind: 'SINGLE',
     x: (n % 20) * 10,
     y: 50,
+    origin: 'TRANSPLANT',
     startDate: '2026-05-04',
     endDate: null,
     removedDate: null,

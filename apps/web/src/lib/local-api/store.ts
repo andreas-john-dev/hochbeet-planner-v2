@@ -38,13 +38,28 @@ export interface GardenRepository {
 export const emptyGarden = (): LocalGarden => ({ beds: [], plantings: [] });
 
 export { GUEST_BACKUP_KEY, GUEST_STORAGE_KEY } from './keys';
-export const GUEST_STORAGE_VERSION = 1;
+export const GUEST_STORAGE_VERSION = 2;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 /**
- * Steps from an older version to the next one, keyed by the old version. Empty while there
- * is only version 1; a change of the stored shape adds a step and bumps the version.
+ * Steps from an older version to the next one, keyed by the old version. A change of the
+ * stored shape adds a step and bumps the version. Steps only touch what they know; the
+ * garden is checked entry by entry afterwards.
  */
-const migrations: Record<number, (garden: unknown) => unknown> = {};
+const migrations: Record<number, (garden: unknown) => unknown> = {
+  // 1 → 2: plantings know whether they were sown directly; all older ones were planted out.
+  1: (garden) =>
+    isRecord(garden) && Array.isArray(garden.plantings)
+      ? {
+          ...garden,
+          plantings: garden.plantings.map((planting: unknown) =>
+            isRecord(planting) ? { origin: 'TRANSPLANT', ...planting } : planting,
+          ),
+        }
+      : garden,
+};
 
 const validItems = <T>(schema: z.ZodType<T>, items: unknown): T[] =>
   Array.isArray(items) ? items.flatMap((item) => schema.safeParse(item).data ?? []) : [];
@@ -54,7 +69,7 @@ const validItems = <T>(schema: z.ZodType<T>, items: unknown): T[] =>
  * planting does not cost the user all beds. Plantings of missing beds go too.
  */
 export function sanitizeGarden(raw: unknown): LocalGarden {
-  const data = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const data = isRecord(raw) ? raw : {};
   const beds = validItems(BedSchema, data.beds);
   const bedIds = new Set(beds.map((b) => b.id));
   const plantings = validItems(PlantingSchema, data.plantings).filter((p) => bedIds.has(p.bedId));

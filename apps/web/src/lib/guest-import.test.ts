@@ -31,6 +31,7 @@ const planting = (id: string, plantId: string): Planting => ({
   plantId,
   x: 20,
   y: 20,
+  origin: 'TRANSPLANT',
   startDate: '2026-05-04',
   endDate: null,
   removedDate: null,

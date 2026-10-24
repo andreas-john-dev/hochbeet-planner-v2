@@ -33,6 +33,8 @@ const importBody = (importId: string) => ({
     bedId: GUEST_BED,
     kind: 'SINGLE',
     plantId: OWN_PLANT,
+    // The second one as from an app version before `origin` existed.
+    ...(i === 0 ? { origin: 'DIRECT_SOW' } : {}),
     x: 20 + i * 40,
     y: 20,
     startDate: '2026-05-04',
@@ -86,6 +88,10 @@ describe('/api/garden/import against DynamoDB Local', () => {
       expect(p).toMatchObject({ bedId: newBedId, plantId: OWN_PLANT });
       expect(body.plantings.map((g) => g.id)).not.toContain(p.id);
     }
+    expect(details.plantings.map((p) => [p.x, p.origin]).sort()).toEqual([
+      [20, 'DIRECT_SOW'],
+      [60, 'TRANSPLANT'],
+    ]);
 
     // The same import again: same answer, no duplicates.
     const again = await call(USER_A, 'POST', '/import', body);

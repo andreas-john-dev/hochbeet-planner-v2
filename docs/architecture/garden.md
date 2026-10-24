@@ -38,6 +38,7 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
   - `PUT /garden/beds/{bedId}/plantings/{id}` ersetzt eine bestehende Pflanzung, zum Beispiel beim Verschieben oder Entfernen ab einer Woche.
   - `DELETE /garden/beds/{bedId}/plantings/{id}` löscht sie.
   - Die API prüft nur die Struktur über `SavePlantingRequestSchema`: Raster-Vielfache von 5, Reihen mit Orientierung und Länge, Start vor Ende, Start und Entfernen jeweils am Montag.
+  - `origin` (Direktsaat oder gepflanzt) fehlt in Einträgen von vor T-51: Das Schema liest sie als `TRANSPLANT`, eine Datenmigration in DynamoDB gibt es nicht; jedes Speichern schreibt das Feld mit. Requests ohne `origin` bekommen ebenfalls `TRANSPLANT`.
   - Fachliche Befunde wie „Beetrand“ berechnet der Client. Sie blockieren das Speichern nie, auch eine Pflanzung außerhalb des Beets wird gespeichert.
   - Ob die Sorte existiert, prüft der Garden-Service nicht, weil Services sich nie gegenseitig aufrufen.
 - **Import aus dem Gastmodus** (`POST /garden/import`, `src/garden/import.ts`): siehe „Übernahme aus dem Gastmodus“.

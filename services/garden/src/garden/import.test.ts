@@ -18,6 +18,7 @@ const planting = (id: string, bedId: string): Planting => ({
   plantId: '01M49THV00SZ6Q8R32BYJM5P2S',
   x: 20,
   y: 20,
+  origin: 'TRANSPLANT',
   startDate: '2026-05-04',
   endDate: null,
   removedDate: null,

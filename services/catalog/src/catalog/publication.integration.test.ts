@@ -99,6 +99,7 @@ describe('publication and admin endpoints against DynamoDB Local', () => {
       kind: 'SINGLE',
       x,
       y: 50,
+      origin: 'TRANSPLANT',
       startDate: '2026-05-04',
       endDate: '2026-09-28',
       removedDate: null,

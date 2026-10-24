@@ -88,8 +88,9 @@ Umsetzung (Stand T-30):
   - Jede ausgewählte Reihe hat ihren Griff.
   - Nach dem Setzen wird nur eine Reihe ausgewählt (für den Griff); nach einer Einzelpflanze bleibt die Palette sichtbar.
 - **Detailpanel:** Es ersetzt die Palette, solange etwas ausgewählt ist.
-  - Inhalt: Sorte, Position, echte Daten mit KW und Herkunft des Endes (Standzeit, angepasst, entfernt).
-  - „Ende anpassen“: Datumsfeld; leer heißt Ende aus der Standzeit.
+  - Inhalt: Sorte, Position, echte Daten mit KW und Herkunft des Endes (Standzeit, angepasst, entfernt). Ein beim Anlegen vorbelegtes Ende gilt als „aus der Standzeit“.
+  - „Ins Beet gekommen als“: Umschalter Direktsaat / Gepflanzt (`origin`), mit Hinweis auf den Zuschlag der Sorte; `withOrigin()` in `lib/editor/details.ts` passt ein vorbelegtes Ende an, ein von Hand gesetztes bleibt. Läuft wie jede Änderung über die Undo-Historie.
+  - „Ende anpassen“: Datumsfeld; leer heißt Ende aus der Standzeit. Ändert sich das Ende von außen (Umschalten, Undo), übernimmt das Feld den neuen Wert, ohne das Panel neu aufzubauen.
   - „Entfernen ab KW …“ setzt `removedDate` auf den Montag der im Editor gewählten Woche und ist gesperrt, wenn die Pflanzung später beginnt. Eine entfernte Pflanzung lässt sich wieder ins Beet nehmen.
   - „Pflanzung löschen“ löscht ohne Rückfrage, weil es sich rückgängig machen lässt.
 - **Undo/Redo:** Buttons „Rückgängig“/„Wiederholen“ sowie Strg+Z und Strg+Umschalt+Z (oder Strg+Y); in Textfeldern bleibt das native Undo.

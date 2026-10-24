@@ -17,6 +17,7 @@ describe('candidatePlanting', () => {
       id: 'c-0',
       bedId: 'bed',
       plantId: 'tomato',
+      origin: 'TRANSPLANT',
       kind: 'SINGLE',
       x: 40,
       y: 50,
@@ -34,5 +35,20 @@ describe('candidatePlanting', () => {
       'c-1',
     );
     expect(row).toMatchObject({ kind: 'ROW', orientation: 'H', lengthCm: 50, endDate: null });
+  });
+
+  it('sows directly sown plants into the bed, with their extra weeks', () => {
+    const carrot = plant('carrot', {
+      lifecycle: { type: 'ANNUAL', cultureWeeks: 12 },
+      sowing: { method: 'DIRECT', directSowWeeks: { from: 10, to: 26 }, directSowExtraWeeks: 3 },
+    });
+    expect(
+      candidatePlanting(
+        { plantId: 'carrot', kind: 'ROW', x: 0, y: 20, startDate: '2026-05-04' },
+        bed(),
+        carrot,
+        'c-2',
+      ),
+    ).toMatchObject({ origin: 'DIRECT_SOW', endDate: '2026-08-17' });
   });
 });

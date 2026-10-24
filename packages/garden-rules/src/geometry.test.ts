@@ -29,6 +29,7 @@ const base = {
   id: '01J9ZQ3W8D6V2K5M7N8P9R0S1V',
   bedId: '01J9ZQ3W8D6V2K5M7N8P9R0S1T',
   plantId: '01J9ZQ3W8D6V2K5M7N8P9R0S1W',
+  origin: 'TRANSPLANT' as const,
   startDate: '2026-05-11',
   endDate: null,
   removedDate: null,

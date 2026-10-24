@@ -4,6 +4,7 @@ import {
   createGuestRepository,
   GUEST_BACKUP_KEY,
   GUEST_STORAGE_KEY,
+  GUEST_STORAGE_VERSION,
   type LocalGarden,
   loadGarden,
 } from './store';
@@ -23,11 +24,13 @@ const planting: Planting = {
   plantId: '01M49THV00SZ6Q8R32BYJM5P2S',
   x: 20,
   y: 20,
+  origin: 'TRANSPLANT',
   startDate: '2026-05-04',
   endDate: null,
   removedDate: null,
 };
-const envelope = (garden: unknown, version = 1) => JSON.stringify({ version, garden });
+const envelope = (garden: unknown, version = GUEST_STORAGE_VERSION) =>
+  JSON.stringify({ version, garden });
 
 describe('loadGarden', () => {
   it('starts empty without stored data', () => {
@@ -65,7 +68,36 @@ describe('loadGarden', () => {
   it('cannot read broken JSON, other shapes and newer versions', () => {
     expect(loadGarden('{kaputt')).toBeUndefined();
     expect(loadGarden(JSON.stringify({ beds: [] }))).toBeUndefined();
-    expect(loadGarden(envelope({ beds: [] }, 2))).toBeUndefined();
+    expect(loadGarden(envelope({ beds: [] }, GUEST_STORAGE_VERSION + 1))).toBeUndefined();
+  });
+
+  describe('migration from version 1', () => {
+    const { origin: _origin, ...withoutOrigin } = planting;
+
+    it('marks the plantings as planted out', () => {
+      expect(GUEST_STORAGE_VERSION).toBe(2);
+      expect(loadGarden(envelope({ beds: [bed], plantings: [withoutOrigin] }, 1))).toMatchObject({
+        beds: [bed],
+        plantings: [{ ...withoutOrigin, origin: 'TRANSPLANT' }],
+      });
+    });
+
+    it('keeps an origin that is already there and survives odd shapes', () => {
+      const sown = { ...planting, origin: 'DIRECT_SOW' };
+      expect(loadGarden(envelope({ beds: [bed], plantings: [sown, 'kaputt'] }, 1))).toMatchObject({
+        plantings: [sown],
+      });
+      expect(loadGarden(envelope({ beds: [bed] }, 1))).toMatchObject({
+        beds: [bed],
+        plantings: [],
+      });
+      expect(loadGarden(envelope('kaputt', 1))).toEqual({
+        beds: [],
+        plantings: [],
+        overrides: {},
+        ownPlants: [],
+      });
+    });
   });
 });
 
@@ -79,7 +111,7 @@ describe('createGuestRepository', () => {
     const garden: LocalGarden = { beds: [bed], plantings: [planting] };
     repo.write(garden);
     expect(JSON.parse(localStorage.getItem(GUEST_STORAGE_KEY) ?? '')).toEqual({
-      version: 1,
+      version: GUEST_STORAGE_VERSION,
       garden,
     });
     expect(repo.read()).toMatchObject(garden);

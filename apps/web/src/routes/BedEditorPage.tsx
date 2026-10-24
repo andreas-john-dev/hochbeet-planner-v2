@@ -649,8 +649,8 @@ function Workspace({
         {isDesktop &&
           (selected ? (
             <PlantingDetails
-              // Fresh form state for another planting or after undo.
-              key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
+              // Fresh form state for another planting.
+              key={selected.planting.id}
               planting={selected.planting}
               plant={selected.plant}
               week={week}
@@ -747,7 +747,7 @@ function Workspace({
             <>
               <SheetTitle className="sr-only">{`Pflanzung ${selected.plant.name}`}</SheetTitle>
               <PlantingDetails
-                key={`${selected.planting.id}-${selected.planting.endDate ?? ''}`}
+                key={selected.planting.id}
                 planting={selected.planting}
                 plant={selected.plant}
                 week={week}

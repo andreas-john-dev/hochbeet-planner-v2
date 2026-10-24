@@ -1,6 +1,7 @@
-import type { Lifecycle } from '@hochbeet/contracts';
+import type { Lifecycle, Plant, PlantingOrigin } from '@hochbeet/contracts';
 import { describe, expect, it } from 'vitest';
 import {
+  defaultOrigin,
   effectiveEnd,
   formatWeek,
   intersect,
@@ -8,6 +9,7 @@ import {
   isActiveInWeek,
   lifecycleEnd,
   overlaps,
+  plannedEnd,
   plantingInterval,
   soilRenewalsIn,
   weekInterval,
@@ -26,11 +28,19 @@ const planted = (
   startDate: string,
   endDate: string | null = null,
   removedDate: string | null = null,
+  origin: PlantingOrigin = 'TRANSPLANT',
 ) => ({
+  origin,
   startDate,
   endDate,
   removedDate,
 });
+
+/** Carrot-like: direct sown, 3 weeks longer in the bed than its culture weeks. */
+const carrot = {
+  lifecycle: { type: 'ANNUAL', cultureWeeks: 12 },
+  sowing: { method: 'DIRECT', directSowWeeks: { from: 10, to: 26 }, directSowExtraWeeks: 3 },
+} satisfies Pick<Plant, 'lifecycle' | 'sowing'>;
 
 describe('lifecycle end', () => {
   it('adds the culture weeks for annuals', () => {
@@ -63,6 +73,64 @@ describe('lifecycle end', () => {
     expect(effectiveEnd(planted('2026-05-11', '2026-07-06', '2026-08-03'), annual(12))).toBe(
       '2026-08-03',
     );
+  });
+});
+
+describe('direct sowing', () => {
+  const sown = (endDate: string | null = null, removedDate: string | null = null) =>
+    planted('2026-05-11', endDate, removedDate, 'DIRECT_SOW');
+
+  it('adds the extra weeks of the plant to direct sown annuals', () => {
+    expect(plannedEnd(sown(), carrot)).toBe('2026-08-24');
+    expect(effectiveEnd(sown(), carrot)).toBe('2026-08-24');
+    expect(plantingInterval(sown(), carrot)).toEqual({ start: '2026-05-11', end: '2026-08-24' });
+  });
+
+  it('adds nothing when planted out or when the plant has no extra weeks', () => {
+    expect(effectiveEnd(planted('2026-05-11'), carrot)).toBe('2026-08-03');
+    expect(effectiveEnd(sown(), annual(12))).toBe('2026-08-03');
+    expect(
+      effectiveEnd(sown(), {
+        lifecycle: carrot.lifecycle,
+        sowing: { method: 'DIRECT', directSowWeeks: { from: 10, to: 26 } },
+      }),
+    ).toBe('2026-08-03');
+  });
+
+  it('adds nothing to plants with years or without end', () => {
+    expect(
+      effectiveEnd(planted('2026-04-06', null, null, 'DIRECT_SOW'), {
+        ...strawberry,
+        sowing: carrot.sowing,
+      }),
+    ).toBe('2029-04-06');
+    expect(
+      effectiveEnd(planted('2026-04-06', null, null, 'DIRECT_SOW'), {
+        ...rosemary,
+        sowing: carrot.sowing,
+      }),
+    ).toBeNull();
+  });
+
+  it('still lets endDate and removedDate win', () => {
+    expect(effectiveEnd(sown('2026-07-06'), carrot)).toBe('2026-07-06');
+    expect(effectiveEnd(sown('2026-07-06', '2026-06-01'), carrot)).toBe('2026-06-01');
+    expect(effectiveEnd(sown(null, '2026-09-07'), carrot)).toBe('2026-09-07');
+  });
+
+  it('suggests direct sowing only for plants that are sown directly', () => {
+    expect(defaultOrigin(carrot)).toBe('DIRECT_SOW');
+    expect(
+      defaultOrigin({
+        sowing: {
+          method: 'BOTH',
+          presowWeeks: { from: 10, to: 30 },
+          propagationWeeks: { min: 4, max: 6 },
+          directSowWeeks: { from: 13, to: 30 },
+        },
+      }),
+    ).toBe('TRANSPLANT');
+    expect(defaultOrigin({})).toBe('TRANSPLANT');
   });
 });
 

@@ -66,6 +66,7 @@ function plantingsArb(plants: Plant[]): fc.Arbitrary<Planting[]> {
         plantId,
         x,
         y,
+        origin: 'TRANSPLANT' as const,
         startDate,
         endDate: null,
         removedDate,

@@ -9,6 +9,7 @@ const planting = (id: string, x: number): Planting => ({
   kind: 'SINGLE',
   x,
   y: 50,
+  origin: 'TRANSPLANT',
   startDate: '2026-10-05',
   endDate: null,
   removedDate: null,

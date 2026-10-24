@@ -1,5 +1,5 @@
 import type { Bed, Direction, Plant, Planting } from '@hochbeet/contracts';
-import { lifecycleEnd, weekStart } from '@hochbeet/garden-rules';
+import { defaultOrigin, plannedEnd, weekStart } from '@hochbeet/garden-rules';
 import type { Point } from './viewport';
 
 export type PlantingKind = Planting['kind'];
@@ -52,7 +52,8 @@ export function rowLengthTo(row: { x: number; y: number; orientation: Direction 
 
 /**
  * A new planting at `at` with a temporary id. It starts on the Monday of the week of
- * `today` and ends after the plant's lifecycle; rows follow the bed's main row direction.
+ * `today`, is direct sown for direct sown plants (else planted out) and ends after the
+ * plant's lifecycle; rows follow the bed's main row direction.
  */
 export function newPlanting({
   bed,
@@ -70,14 +71,16 @@ export function newPlanting({
   id?: string;
 }): Planting {
   const startDate = weekStart(today);
+  const origin = defaultOrigin(plant);
   const base = {
     id,
     bedId: bed.id,
     plantId: plant.id,
+    origin,
     x: at.x,
     y: at.y,
     startDate,
-    endDate: lifecycleEnd(startDate, plant.lifecycle),
+    endDate: plannedEnd({ startDate, origin }, plant),
     removedDate: null,
   };
   if (kind === 'SINGLE') return { ...base, kind };

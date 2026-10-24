@@ -5,11 +5,12 @@ import type {
   Planting,
   PlantingFields,
 } from '@hochbeet/contracts';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import { createLogger } from '@hochbeet/service-kit';
 import { authorized, startDynamoDbTable } from '@hochbeet/service-kit/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
-import { gardenTable } from '../table';
+import { gardenTable, plantingSk, userPk } from '../table';
 import { GardenRepository } from './repository';
 
 const USER_A = 'a1b2c3d4-0000-4000-8000-00000000000a';
@@ -97,6 +98,47 @@ describe('/api/garden/beds/{bedId}/plantings against DynamoDB Local', () => {
     expect((await plantingsOf(bed.id)).map((p) => p.id)).toEqual(
       expect.arrayContaining([tomato.id, carrots.id]),
     );
+  });
+
+  it('stores whether a planting was sown directly, planted out by default', async () => {
+    expect(await plant(single())).toMatchObject({ origin: 'TRANSPLANT' });
+    const sown = await plant(row({ origin: 'DIRECT_SOW' }));
+    expect(sown).toMatchObject({ origin: 'DIRECT_SOW' });
+    const switched = await call(USER_A, 'PUT', `/beds/${bed.id}/plantings/${sown.id}`, {
+      ...row(),
+      origin: 'TRANSPLANT',
+    });
+    expect(switched.status).toBe(200);
+    expect((await plantingsOf(bed.id)).find((p) => p.id === sown.id)).toMatchObject({
+      origin: 'TRANSPLANT',
+    });
+    expect(
+      await issues(
+        await call(
+          USER_A,
+          'POST',
+          `/beds/${bed.id}/plantings`,
+          single({
+            origin: 'GESTECKT' as PlantingFields['origin'],
+          }),
+        ),
+      ),
+    ).toEqual([expect.objectContaining({ path: 'origin' })]);
+  });
+
+  it('reads plantings stored before `origin` existed as planted out', async () => {
+    const id = '01J9ZQ3W8D6V2K5M7N8P9R0A1D';
+    await db.client.send(
+      new PutCommand({
+        TableName: db.tableName,
+        // single() has no origin, like every planting written before it existed.
+        Item: { PK: userPk(USER_A), SK: plantingSk(bed.id, id), id, bedId: bed.id, ...single() },
+      }),
+    );
+    expect((await plantingsOf(bed.id)).find((p) => p.id === id)).toMatchObject({
+      id,
+      origin: 'TRANSPLANT',
+    });
   });
 
   it('saves a planting outside the bed: rule warnings never block saving', async () => {
