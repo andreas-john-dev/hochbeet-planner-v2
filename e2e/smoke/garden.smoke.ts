@@ -72,8 +72,11 @@ test.describe('signed in as the smoke user', () => {
       await dialog.getByLabel('Name').fill(bedName);
       await dialog.getByRole('button', { name: 'Beet anlegen' }).click();
       await expect(dialog).toBeHidden();
-      await page.getByRole('link', { name: bedName }).click();
-      await expect(page.getByRole('heading', { level: 1, name: bedName })).toBeVisible();
+      // Exact: the assistant smoke test may create "Assistent-Smoke <run id>" at the same time.
+      await page.getByRole('link', { name: bedName, exact: true }).click();
+      await expect(
+        page.getByRole('heading', { level: 1, name: bedName, exact: true }),
+      ).toBeVisible();
 
       // Pflanzen setzen: tomato and potato in the middle of the bed, by keyboard.
       const palette = page.getByRole('complementary', { name: 'Pflanzen hinzufügen' });
