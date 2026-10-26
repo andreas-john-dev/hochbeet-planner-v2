@@ -3,6 +3,8 @@ import {
   type CatalogPlant,
   CatalogPlantSchema,
   type Bed,
+  type GardenSettings,
+  GardenSettingsSchema,
   type Planting,
   type PlantOverride,
   PlantOverrideSchema,
@@ -27,6 +29,8 @@ export interface LocalGarden {
   overrides?: Record<string, PlantOverride>;
   /** Own plants as the catalogue lists them; archived ones stay for existing plantings. */
   ownPlants?: OwnPlant[];
+  /** Garden settings; missing means the defaults (guests have no profile to set them). */
+  settings?: GardenSettings;
 }
 
 /** Storage of one user's data; the local API reads and writes the whole garden at once. */
@@ -80,7 +84,8 @@ export function sanitizeGarden(raw: unknown): LocalGarden {
     }),
   );
   const ownPlants = validItems(OwnPlantSchema, data.ownPlants);
-  return { beds, plantings, overrides, ownPlants };
+  const settings = GardenSettingsSchema.safeParse(data.settings).data;
+  return { beds, plantings, overrides, ownPlants, ...(settings ? { settings } : {}) };
 }
 
 const EnvelopeSchema = z.object({ version: z.number().int().min(1), garden: z.unknown() });

@@ -12,3 +12,5 @@ export const plantingSk = (bedId: string, plantingId: string) =>
   `${bedSk(bedId)}${PLANTING_INFIX}${plantingId}`;
 /** Record of a guest import: the id mapping first, then `DONE` with the response. */
 export const importSk = (importId: string) => `IMPORT#${importId}`;
+/** The user's garden settings, one item per user. */
+export const SETTINGS_SK = 'SETTINGS';

@@ -6,9 +6,24 @@ import {
   PutCommand,
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { type Bed, BedSchema, type Planting, PlantingSchema } from '@hochbeet/contracts';
+import {
+  type Bed,
+  BedSchema,
+  type GardenSettings,
+  GardenSettingsSchema,
+  type Planting,
+  PlantingSchema,
+} from '@hochbeet/contracts';
 import { z } from 'zod';
-import { BED_PREFIX, bedSk, importSk, PLANTING_INFIX, plantingSk, userPk } from '../table';
+import {
+  BED_PREFIX,
+  bedSk,
+  importSk,
+  PLANTING_INFIX,
+  plantingSk,
+  SETTINGS_SK,
+  userPk,
+} from '../table';
 
 type Item = Record<string, unknown>;
 
@@ -139,6 +154,23 @@ export class GardenRepository {
     }
     await this.delete({ PK: userPk(userId), SK: bedSk(bedId) });
     return true;
+  }
+
+  /** The user's settings, or undefined while they were never saved. */
+  async getSettings(userId: string): Promise<GardenSettings | undefined> {
+    const { Item } = await this.client.send(
+      new GetCommand({ TableName: this.tableName, Key: { PK: userPk(userId), SK: SETTINGS_SK } }),
+    );
+    return Item ? GardenSettingsSchema.parse(Item) : undefined;
+  }
+
+  async putSettings(userId: string, settings: GardenSettings): Promise<void> {
+    await this.client.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: { PK: userPk(userId), SK: SETTINGS_SK, ...settings },
+      }),
+    );
   }
 
   async getImport(userId: string, importId: string): Promise<ImportRecord | undefined> {

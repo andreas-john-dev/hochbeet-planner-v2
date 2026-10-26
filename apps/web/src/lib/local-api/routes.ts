@@ -2,6 +2,9 @@ import {
   type Bed,
   type BedWithPlantingsResponse,
   type CatalogPlant,
+  DEFAULT_GARDEN_SETTINGS,
+  type GardenSettings,
+  GardenSettingsSchema,
   type ListBedsResponse,
   type ListPlantsResponse,
   type Plant,
@@ -169,6 +172,17 @@ export function localRoutes({ repo, globals, newId = () => ulid() }: LocalApiOpt
       const { [plant.id]: _removed, ...overrides } = garden.overrides ?? {};
       repo.write({ ...garden, overrides });
       return noContent();
+    }),
+
+    route('GET', '/api/garden/settings', () =>
+      json<GardenSettings>(repo.read().settings ?? DEFAULT_GARDEN_SETTINGS),
+    ),
+
+    route('PUT', '/api/garden/settings', async ({ request }) => {
+      const parsed = await parseJson(request, GardenSettingsSchema);
+      if (parsed.response) return parsed.response;
+      repo.write({ ...repo.read(), settings: parsed.data });
+      return json<GardenSettings>(parsed.data);
     }),
 
     route('GET', '/api/garden/beds', () =>

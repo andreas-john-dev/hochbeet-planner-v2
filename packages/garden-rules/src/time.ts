@@ -1,10 +1,19 @@
-import type { Bed, IsoDate, Lifecycle, Plant, Planting, PlantingOrigin } from '@hochbeet/contracts';
+import type {
+  Bed,
+  GardenSettings,
+  IsoDate,
+  Lifecycle,
+  Plant,
+  Planting,
+  PlantingOrigin,
+} from '@hochbeet/contracts';
 import {
   addWeeks,
   addYears,
   endOfISOWeek,
   format,
   formatISO,
+  getDaysInMonth,
   getISOWeek,
   isSameMonth,
   isSameYear,
@@ -135,6 +144,17 @@ export function hasSoilRenewalBetween(
     if (soilRenewalsIn(bed, year).some((date) => from <= date && date <= to)) return true;
   }
   return false;
+}
+
+/**
+ * The last frost of `year` as ISO date, from the user's month and day. The settings never
+ * hold 29 February; should one still come, it falls on 28 February in common years.
+ */
+export function lastFrostDate(settings: Pick<GardenSettings, 'lastFrost'>, year: number): IsoDate {
+  const [month = 1, day = 1] = settings.lastFrost.split('-').map(Number);
+  const lastDay = getDaysInMonth(new Date(year, month - 1, 1));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${String(year)}-${pad(month)}-${pad(Math.min(day, lastDay))}`;
 }
 
 export interface WeekLabel {

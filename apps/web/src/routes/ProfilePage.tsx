@@ -1,6 +1,7 @@
 import { SignOutButton } from '@/components/layout/AppShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AssistantMemoryCard } from '@/components/profile/AssistantMemoryCard';
+import { GardenSettingsCard } from '@/components/profile/GardenSettingsCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { canUseAssistant } from '@/lib/assistant';
@@ -58,6 +59,7 @@ export function ProfilePage() {
             </div>
           </CardContent>
         </Card>
+        <GardenSettingsCard />
         {canUseAssistant(user, guest) && <AssistantMemoryCard />}
       </div>
     </>

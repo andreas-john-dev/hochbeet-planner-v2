@@ -7,6 +7,7 @@ import {
   intersect,
   hasSoilRenewalBetween,
   isActiveInWeek,
+  lastFrostDate,
   lifecycleEnd,
   overlaps,
   plannedEnd,
@@ -131,6 +132,18 @@ describe('direct sowing', () => {
       }),
     ).toBe('TRANSPLANT');
     expect(defaultOrigin({})).toBe('TRANSPLANT');
+  });
+});
+
+describe('last frost', () => {
+  it('puts the day of the settings into a year', () => {
+    expect(lastFrostDate({ lastFrost: '05-15' }, 2026)).toBe('2026-05-15');
+    expect(lastFrostDate({ lastFrost: '04-01' }, 2031)).toBe('2031-04-01');
+  });
+
+  it('moves 29 February to the 28th in common years', () => {
+    expect(lastFrostDate({ lastFrost: '02-29' }, 2027)).toBe('2027-02-28');
+    expect(lastFrostDate({ lastFrost: '02-29' }, 2028)).toBe('2028-02-29');
   });
 });
 
