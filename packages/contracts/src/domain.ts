@@ -36,8 +36,17 @@ export type Bed = z.infer<typeof BedSchema>;
 // Planting
 // ---------------------------------------------------------------------------
 
+/** `DIRECT_SOW` = sown into the bed, `TRANSPLANT` = planted out as a seedling. */
+export const PlantingOriginSchema = z.enum(['DIRECT_SOW', 'TRANSPLANT']);
+export type PlantingOrigin = z.infer<typeof PlantingOriginSchema>;
+
 const PlantingBaseSchema = z.object({
   plantId: UlidSchema,
+  /**
+   * How the planting got into the bed; direct sowing may stay longer (`directSowExtraWeeks`).
+   * Missing in data written before it existed, which counts as planted out.
+   */
+  origin: PlantingOriginSchema.default('TRANSPLANT'),
   /** Position in cm on the grid; for rows the start point. */
   x: GridCmSchema,
   y: GridCmSchema,

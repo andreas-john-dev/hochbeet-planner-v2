@@ -24,15 +24,18 @@ Das Modell kennt drei Kernobjekte: das Beet, die Pflanzung und die Sorte. Alle L
 | `id` | ULID | Eindeutige ID |
 | `bedId` | ULID | Zugehöriges Beet |
 | `plantId` | ULID | Verweis auf die Sorte |
+| `origin` | `DIRECT_SOW` \| `TRANSPLANT` | Direkt gesät oder als Jungpflanze gesetzt; neu vorbelegt mit `DIRECT_SOW` für Sorten mit `sowing.method: 'DIRECT'`, sonst `TRANSPLANT`; fehlt in älteren Daten und gilt dann als `TRANSPLANT` |
 | `kind` | `SINGLE` \| `ROW` | Einzelpflanze oder Reihe |
 | `x`, `y` | number | Position in cm, Vielfaches von 5; bei Reihen der Startpunkt |
 | `orientation` | `H` \| `V` | Nur Reihen: parallel zur Breite oder zur Tiefe; vorbelegt mit der Reihenrichtung des Beets |
 | `lengthCm` | number | Nur Reihen: Länge in 5er-Schritten |
-| `startDate` | ISO-Datum | Pflanzdatum, immer der Montag der gewählten Woche |
-| `endDate` | ISO-Datum \| null | Aus dem Lebenszyklus vorbelegt, pro Pflanzung überschreibbar; leer bei Dauerkulturen |
+| `startDate` | ISO-Datum | Pflanz- bzw. Saatdatum, immer der Montag der gewählten Woche |
+| `endDate` | ISO-Datum \| null | Aus dem Lebenszyklus vorbelegt (bei Direktsaat mit Zuschlag), pro Pflanzung überschreibbar; leer bei Dauerkulturen |
 | `removedDate` | ISO-Datum \| null | Manuelles Entfernen „ab KW XY“; sticht `endDate` |
 
 Die Stückzahl einer Reihe wird nicht gespeichert, sondern berechnet: `floor(lengthCm / Pflanzabstand) + 1`.
+
+`origin` hat im Schema den Standardwert `TRANSPLANT`: Der Garden-Service liest alte Einträge ohne das Feld ohne Datenmigration in DynamoDB und schreibt es bei jedem Speichern; Requests und Gast-Importe ohne `origin` (ältere App-Stände) bleiben gültig. Der Gastspeicher setzt es beim Wechsel auf Version 2 (`src/lib/local-api/store.ts`). Im Editor schaltet das Bearbeiten-Panel zwischen „Direktsaat“ und „Gepflanzt“ um; ein vorbelegtes Ende (gleich dem Ende aus dem Lebenszyklus) wandert dabei mit, ein von Hand gesetztes bleibt.
 
 ### Plant (Sorte)
 
@@ -99,7 +102,7 @@ Umsetzung in `packages/garden-rules` (`geometry.ts`):
 Geplant wird in Wochen, angezeigt werden aber echte Daten: Im UI steht „30. März – 5. April 2026“ im Vordergrund, die KW nur klein daneben. Intern werden ISO-Datumswerte gespeichert, Wochen folgen ISO-8601 (Montag bis Sonntag), gerechnet wird mit date-fns.
 
 - **Wochen-Slider** über jedem Beet, beschriftet mit Monatsnamen. Er zeigt, was in der gewählten Woche im Beet steht. Vorgänger und Nachfolger an derselben Stelle erscheinen als blasse „Geister“.
-- **Einjährige Sorten** enden nach Pflanzdatum plus Kulturdauer; das Ende ist pro Pflanzung anpassbar.
+- **Einjährige Sorten** enden nach Pflanzdatum plus Kulturdauer, bei Direktsaat plus `directSowExtraWeeks` der Sorte; das Ende ist pro Pflanzung anpassbar.
 - **Erdbeeren** (`MULTI_YEAR`, 3 Jahre) bleiben automatisch drei Jahre im Beet, außer sie werden vorher entfernt.
 - **Dauerkulturen** wie Rosmarin bleiben unbegrenzt, bis man „Entfernen ab …“ wählt.
 - **Entfernen** setzt `removedDate` auf den Montag der gewählten Woche. Die Pflanzung bleibt in der Historie sichtbar und zählt für die Fruchtfolge.
@@ -107,7 +110,8 @@ Geplant wird in Wochen, angezeigt werden aber echte Daten: Im UI steht „30. M�
 Umsetzung in `packages/garden-rules` (`time.ts`):
 
 - **Zeitraum einer Pflanzung:** halboffen `[Start, Ende)`. Das Ende ist der erste Tag, an dem die Pflanzung nicht mehr im Beet steht; endet eine Pflanzung am Montag, an dem die nächste beginnt, überlappen sie nicht. Kein Ende heißt unbegrenzt.
-- **Effektives Ende:** `removedDate` vor `endDate` vor dem Lebenszyklus (`ANNUAL`: Start + Kulturwochen, `MULTI_YEAR`: Start + Jahre, `PERENNIAL`: kein Ende). `removedDate` gewinnt auch, wenn es nach dem geplanten Ende liegt.
+- **Effektives Ende:** `removedDate` vor `endDate` vor dem Lebenszyklus (`plannedEnd()`; `ANNUAL`: Start + Kulturwochen, bei `origin: 'DIRECT_SOW'` plus `sowing.directSowExtraWeeks`; `MULTI_YEAR`: Start + Jahre; `PERENNIAL`: kein Ende). `removedDate` gewinnt auch, wenn es nach dem geplanten Ende liegt.
+- **Vorbelegung neuer Pflanzungen:** `defaultOrigin()` (Direktsaat nur bei `method: 'DIRECT'`) und `endDate = plannedEnd()`; gilt für Pflanzungen aus der Palette (`newPlanting()`) und für Vorschläge des Assistenten (`candidatePlanting()`).
 - **Woche:** ISO-8601, Montag bis Sonntag. Eine Pflanzung ist in einer Woche sichtbar, wenn sie an mindestens einem Tag der Woche im Beet steht.
 - **Anzeige:** `formatWeek()` liefert „30. März – 5. April 2026 · KW 14“; Frontend und Regeln nutzen dieselbe Funktion.
 

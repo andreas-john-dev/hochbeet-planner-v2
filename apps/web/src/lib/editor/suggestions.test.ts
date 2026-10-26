@@ -58,6 +58,7 @@ describe('suggestions in the editor', () => {
           kind: 'SINGLE',
           x: 50,
           y: 50,
+          origin: 'TRANSPLANT',
           startDate: '2026-09-28',
           endDate: '2026-12-28',
           removedDate: null,

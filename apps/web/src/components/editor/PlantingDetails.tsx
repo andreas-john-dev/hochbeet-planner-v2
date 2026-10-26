@@ -1,4 +1,4 @@
-import type { Plant, Planting } from '@hochbeet/contracts';
+import type { Plant, Planting, PlantingOrigin } from '@hochbeet/contracts';
 import { formatWeek } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { CalendarX, Trash2, Undo2, X } from 'lucide-react';
@@ -6,7 +6,7 @@ import { useId, useState } from 'react';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { checkEnd, formatDate, plantingEnd, removalDate } from '@/lib/editor/details';
+import { checkEnd, formatDate, plantingEnd, removalDate, withOrigin } from '@/lib/editor/details';
 import { plantPositions } from '@/lib/editor/plantings';
 import { cn } from '@/lib/utils';
 
@@ -17,10 +17,15 @@ const END_HINT = {
   none: 'mehrjährig, ohne Ende',
 } as const;
 
+const ORIGINS: { origin: PlantingOrigin; label: string }[] = [
+  { origin: 'DIRECT_SOW', label: 'Direktsaat' },
+  { origin: 'TRANSPLANT', label: 'Gepflanzt' },
+];
+
 /**
- * Side panel for the selected planting: plant, position, real dates, a custom end,
- * "Entfernen ab" the chosen week and delete. Every change goes through `onChange`
- * so that it can be undone.
+ * Side panel for the selected planting: plant, position, direct sown or planted out, real
+ * dates, a custom end, "Entfernen ab" the chosen week and delete. Every change goes through
+ * `onChange` so that it can be undone.
  */
 export function PlantingDetails({
   planting,
@@ -40,10 +45,18 @@ export function PlantingDetails({
   onClose: () => void;
   className?: string;
 }) {
-  const endId = useId();
+  const ids = { end: useId(), origin: useId(), originHint: useId() };
   const { end, source, lifecycleEnd } = plantingEnd(planting, plant);
   const [endValue, setEndValue] = useState(planting.endDate ?? '');
   const [endError, setEndError] = useState<string | null>(null);
+  // The end changes from outside too (switching the origin, undo): show the new one.
+  const [shownEnd, setShownEnd] = useState(planting.endDate);
+  if (shownEnd !== planting.endDate) {
+    setShownEnd(planting.endDate);
+    setEndValue(planting.endDate ?? '');
+    setEndError(null);
+  }
+  const extraWeeks = plant.sowing?.directSowExtraWeeks ?? 0;
   const removal = removalDate(planting, week);
   const weekLabel = formatWeek(week).week;
 
@@ -84,12 +97,45 @@ export function PlantingDetails({
         </Button>
       </div>
 
+      <fieldset className="flex flex-col gap-2" aria-describedby={ids.originHint}>
+        <legend className="mb-1 text-sm font-medium">Ins Beet gekommen als</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {ORIGINS.map(({ origin, label }) => (
+            <label
+              key={origin}
+              className={cn(
+                'has-focus-visible:ring-ring/50 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm has-focus-visible:ring-[3px] md:min-h-10',
+                planting.origin === origin ? 'border-primary bg-secondary' : 'hover:bg-accent',
+              )}
+            >
+              <input
+                type="radio"
+                name={ids.origin}
+                className="accent-primary"
+                checked={planting.origin === origin}
+                onChange={() => {
+                  onChange(planting, withOrigin(planting, plant, origin));
+                }}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        <p id={ids.originHint} className="text-muted-foreground text-xs">
+          {extraWeeks > 0 && plant.lifecycle.type === 'ANNUAL'
+            ? `Bei Direktsaat ${String(extraWeeks)} Wochen länger im Beet.`
+            : 'Die Standzeit ist bei beiden gleich.'}
+        </p>
+      </fieldset>
+
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Position</dt>
         <dd>
           {String(planting.x)} × {String(planting.y)} cm
         </dd>
-        <dt className="text-muted-foreground">Gepflanzt</dt>
+        <dt className="text-muted-foreground">
+          {planting.origin === 'DIRECT_SOW' ? 'Gesät' : 'Gepflanzt'}
+        </dt>
         <dd>{formatDate(planting.startDate)}</dd>
         <dt className="text-muted-foreground">Ende</dt>
         <dd>
@@ -99,12 +145,12 @@ export function PlantingDetails({
       </dl>
 
       <form onSubmit={saveEnd} className="flex flex-col gap-2" noValidate>
-        <label htmlFor={endId} className="text-sm font-medium">
+        <label htmlFor={ids.end} className="text-sm font-medium">
           Ende anpassen
         </label>
         <div className="flex gap-2">
           <Input
-            id={endId}
+            id={ids.end}
             type="date"
             value={endValue}
             min={planting.startDate}

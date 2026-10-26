@@ -36,7 +36,8 @@ export async function seedGuestGarden(page: Page, garden: Garden) {
     ([key, data]) => {
       if (!sessionStorage.getItem('guest-garden-seeded')) {
         sessionStorage.setItem('guest-garden-seeded', '1');
-        localStorage.setItem(key, JSON.stringify({ version: 1, garden: data }));
+        // GUEST_STORAGE_VERSION in apps/web/src/lib/local-api/store.ts.
+        localStorage.setItem(key, JSON.stringify({ version: 2, garden: data }));
       }
     },
     [GUEST_STORAGE_KEY, garden] as const,
@@ -111,6 +112,7 @@ export const planting = (
   id,
   bedId,
   plantId,
+  origin: 'TRANSPLANT',
   kind: 'SINGLE',
   x: 0,
   y: 0,

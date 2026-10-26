@@ -30,6 +30,15 @@ describe('PlantingSchema', () => {
     expect(PlantingSchema.parse(rowPlanting)).toEqual(rowPlanting);
   });
 
+  it('reads a planting without origin as planted out and knows direct sowing', () => {
+    const { origin: _origin, ...withoutOrigin } = singlePlanting;
+    expect(PlantingSchema.parse(withoutOrigin)).toEqual(singlePlanting);
+    expect(PlantingSchema.parse({ ...rowPlanting, origin: 'DIRECT_SOW' }).origin).toBe(
+      'DIRECT_SOW',
+    );
+    expect(PlantingSchema.safeParse({ ...singlePlanting, origin: 'SOWN' }).success).toBe(false);
+  });
+
   it('requires orientation and length only for rows', () => {
     expect(PlantingSchema.safeParse({ ...rowPlanting, lengthCm: undefined }).success).toBe(false);
     expect(PlantingSchema.safeParse({ ...rowPlanting, lengthCm: 102 }).success).toBe(false);

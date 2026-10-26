@@ -32,7 +32,12 @@ export function plant(id: string, overrides: Partial<Plant> = {}): Plant {
   };
 }
 
-const dates = { startDate: '2026-05-04', endDate: null, removedDate: null };
+const dates = {
+  origin: 'TRANSPLANT',
+  startDate: '2026-05-04',
+  endDate: null,
+  removedDate: null,
+} as const;
 
 export function single(
   id: string,

@@ -54,7 +54,10 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
       - name: Test
-        run: pnpm test
+        # At most two packages at once: when a shared package changes, every test task misses the
+        # cache, and all of them in parallel (with DynamoDB Local containers) starve the 4-core
+        # runner until single tests hit the 5 s timeout.
+        run: pnpm test --concurrency=2
       - name: Build
         run: pnpm build
       - name: CDK synth

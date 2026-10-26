@@ -42,6 +42,7 @@ export function planting(
     kind: 'SINGLE',
     plantId: plantId(plant),
     ...at,
+    origin: 'TRANSPLANT',
     startDate: '2026-05-04',
     endDate: '2026-08-31',
     removedDate: null,

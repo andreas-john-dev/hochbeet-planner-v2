@@ -35,6 +35,7 @@ export const plantings: Planting[] = Array.from({ length: 200 }, (_, i): Plantin
     plantId: `p${String(i % 25)}`,
     x,
     y,
+    origin: 'TRANSPLANT' as const,
     startDate,
     endDate: null,
     removedDate: null,

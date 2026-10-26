@@ -54,6 +54,7 @@ describe('new planting', () => {
       kind: 'SINGLE',
       bedId: bed.id,
       plantId: plant('Tomate').id,
+      origin: 'TRANSPLANT',
       x: 40,
       y: 50,
       startDate: '2026-10-05',
@@ -61,6 +62,18 @@ describe('new planting', () => {
       removedDate: null,
     });
     expect(isTempId(p.id)).toBe(true);
+  });
+
+  it('sows directly sown plants straight into the bed', () => {
+    const at = { x: 40, y: 50 };
+    expect(newPlanting({ bed, plant: plant('Möhre'), kind: 'ROW', at, today })).toMatchObject({
+      origin: 'DIRECT_SOW',
+      endDate: '2027-01-11', // 14 weeks, no extra weeks
+    });
+    // Lettuce can be sown or planted; planted out is the usual way into a raised bed.
+    expect(
+      newPlanting({ bed, plant: plant('Kopfsalat'), kind: 'SINGLE', at, today }),
+    ).toMatchObject({ origin: 'TRANSPLANT' });
   });
 
   it('has no end for perennials', () => {
