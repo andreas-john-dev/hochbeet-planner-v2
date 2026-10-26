@@ -1,10 +1,14 @@
 import type { Page } from '@playwright/test';
 import { expect, open, signInAs, test } from './fixtures';
-import { bed, planting, seedGarden } from './garden';
+import { bed, ownPlant, planting, seedGarden } from './garden';
 
 const BED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0S1A';
 const LETTUCE = '01M49THV00RK9E9PC83NEE87CJ'; // Kopfsalat, 25 cm in the row
 const TOO_CLOSE = /Kopfsalat und Kopfsalat stehen zu eng/;
+const TOMATO = '01M49THV00QS1SEJEM64991JH5';
+const CARROT = '01M49THV0022SSWEDY081PHP6T';
+const STRAWBERRY = '01M49THV00W40ZTZ5PDDE1E2S8';
+const OWN_ID = '01J9ZQ3W8D6V2K5M7N8P9R0W01';
 
 const findings = (page: Page) => page.getByRole('list', { name: 'Hinweise' });
 
@@ -53,6 +57,45 @@ test('shows all values and links to the neighbours', async ({ page }) => {
   const name = (await neighbor.textContent()) ?? '';
   await neighbor.click();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+});
+
+test('shows the sowing calendar of a raised and a direct sown plant', async ({ page }) => {
+  await signInAs(page, 'user');
+  // The clock is fixed in 2026: 53 ISO weeks, 15 May is a Friday.
+  await open(page, `/katalog/${TOMATO}`, 'Tomate');
+  const calendar = page.getByRole('region', { name: 'Aussaatkalender' });
+  const rows = calendar.getByRole('list', { name: 'Aussaatkalender 2026' }).getByRole('listitem');
+  await expect(rows).toHaveText([
+    /^Vorkultur:\s*KW 11–16 · Anfang März bis Mitte April$/,
+    // Out after 7–13 weeks, but frost sensitive: not before the week after 15 May.
+    /^Auspflanzen:\s*KW 21–29 · Mitte Mai bis Mitte Juli$/,
+    /^Im Beet \/ Ernte:\s*KW 21–50 · Mitte Mai bis Mitte Dezember$/,
+  ]);
+  const plantOut = calendar.locator('[data-row="plantOut"] [data-from]');
+  await expect(plantOut).toHaveAttribute('data-from', '21');
+  await expect(plantOut).toHaveAttribute('data-to', '29');
+  await expect(calendar).toContainText('7–13 Wochen bis zum Auspflanzen');
+  await expect(calendar).toContainText('Frostempfindlich, erst nach dem 15. Mai ins Freie');
+
+  await open(page, `/katalog/${CARROT}`, 'Möhre');
+  await expect(rows).toHaveText([
+    /^Direktsaat:\s*KW 10–29 · Anfang März bis Mitte Juli$/,
+    /^Im Beet \/ Ernte:\s*KW 10–42 · Anfang März bis Mitte Oktober$/,
+  ]);
+  await expect(calendar).not.toContainText('Frostempfindlich');
+});
+
+test('explains a missing sowing calendar and links own plants to their form', async ({ page }) => {
+  await signInAs(page, 'user');
+  await seedGarden(page, { beds: [], plantings: [], ownPlants: [ownPlant(OWN_ID, 'Haferwurzel')] });
+  await open(page, `/katalog/${STRAWBERRY}`, 'Erdbeere');
+  const calendar = page.getByRole('region', { name: 'Aussaatkalender' });
+  await expect(calendar).toContainText('noch keine Angaben zu Aussaat und Anzucht');
+  await expect(calendar.getByRole('link')).toHaveCount(0);
+
+  await open(page, `/katalog/${OWN_ID}`, 'Haferwurzel');
+  await calendar.getByRole('link', { name: 'Angaben ergänzen' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Sorte bearbeiten' })).toBeVisible();
 });
 
 test('an adjusted spacing changes the warnings in the editor and can be reset', async ({

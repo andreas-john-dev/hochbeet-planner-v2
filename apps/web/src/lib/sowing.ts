@@ -42,28 +42,44 @@ export function windowText(window: WeekWindow, year?: number): string {
   return `KW ${range(window.from, window.to)} (${from} bis ${to})`;
 }
 
+/** The details besides method and windows, e.g. "4–6 Wochen bis zum Auspflanzen". */
+function details(sowing: Sowing) {
+  const span = (r: { min: number; max: number } | undefined, text: (range: string) => string) =>
+    r && text(range(r.min, r.max));
+  return {
+    propagation: span(sowing.propagationWeeks, (r) => `${r} Wochen bis zum Auspflanzen`),
+    prickOut:
+      sowing.prickOutWeeks === undefined
+        ? undefined
+        : `Pikieren nach ${String(sowing.prickOutWeeks)} Wochen`,
+    extra: sowing.directSowExtraWeeks
+      ? `Bei Direktsaat ${String(sowing.directSowExtraWeeks)} Wochen länger im Beet`
+      : undefined,
+    germinationDays: span(sowing.germinationDays, (r) => `Keimt in ${r} Tagen`),
+    germinationTemp: span(sowing.germinationTempC, (r) => `Keimtemperatur ${r} °C`),
+  };
+}
+
+const present = (lines: readonly (string | undefined)[]) =>
+  lines.filter((line): line is string => line !== undefined);
+
 /** The sowing details as short German lines, e.g. for the plant page. */
 export function sowingLines(sowing: Sowing, year?: number): string[] {
-  const lines = [SOWING_METHOD_LABEL[sowing.method]];
-  if (sowing.presowWeeks) lines.push(`Vorkultur ${windowText(sowing.presowWeeks, year)}`);
-  if (sowing.propagationWeeks) {
-    const { min, max } = sowing.propagationWeeks;
-    lines.push(`${range(min, max)} Wochen bis zum Auspflanzen`);
-  }
-  if (sowing.prickOutWeeks !== undefined) {
-    lines.push(`Pikieren nach ${String(sowing.prickOutWeeks)} Wochen`);
-  }
-  if (sowing.directSowWeeks) lines.push(`Direktsaat ${windowText(sowing.directSowWeeks, year)}`);
-  if (sowing.directSowExtraWeeks) {
-    lines.push(`Bei Direktsaat ${String(sowing.directSowExtraWeeks)} Wochen länger im Beet`);
-  }
-  if (sowing.germinationDays) {
-    const { min, max } = sowing.germinationDays;
-    lines.push(`Keimt in ${range(min, max)} Tagen`);
-  }
-  if (sowing.germinationTempC) {
-    const { min, max } = sowing.germinationTempC;
-    lines.push(`Keimtemperatur ${range(min, max)} °C`);
-  }
-  return lines;
+  const d = details(sowing);
+  return present([
+    SOWING_METHOD_LABEL[sowing.method],
+    sowing.presowWeeks && `Vorkultur ${windowText(sowing.presowWeeks, year)}`,
+    d.propagation,
+    d.prickOut,
+    sowing.directSowWeeks && `Direktsaat ${windowText(sowing.directSowWeeks, year)}`,
+    d.extra,
+    d.germinationDays,
+    d.germinationTemp,
+  ]);
+}
+
+/** Durations, pricking out and germination: what the sowing calendar does not draw. */
+export function sowingFacts(sowing: Sowing): string[] {
+  const d = details(sowing);
+  return present([d.propagation, d.prickOut, d.extra, d.germinationDays, d.germinationTemp]);
 }

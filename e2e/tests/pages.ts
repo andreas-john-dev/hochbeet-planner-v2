@@ -80,9 +80,17 @@ export const appPages: readonly AppPage[] = [
     access: 'user',
   },
   {
+    // Kopfsalat: raised or sown directly, so the sowing calendar shows all four rows.
     id: 'katalog-sorte',
     path: '/katalog/01M49THV00RK9E9PC83NEE87CJ',
     heading: 'Kopfsalat',
+    access: 'user',
+  },
+  {
+    // Tomate: raised and frost sensitive, planted out only after 15 May.
+    id: 'katalog-sorte-vorkultur',
+    path: '/katalog/01M49THV00QS1SEJEM64991JH5',
+    heading: 'Tomate',
     access: 'user',
   },
   { id: 'profil', path: '/profil', heading: 'Profil', access: 'user', navLabel: 'Profil' },

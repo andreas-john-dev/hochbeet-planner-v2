@@ -6,6 +6,7 @@ import { type ReactNode, useState } from 'react';
 import { AdjustPlantDialog } from '@/components/catalog/AdjustPlantDialog';
 import { PublicationPanel } from '@/components/catalog/PublicationPanel';
 import { SourceBadge } from '@/components/catalog/SourceBadge';
+import { SowingCalendar } from '@/components/catalog/SowingCalendar';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -236,6 +237,8 @@ function PlantDetails({
           )}
         </dl>
       </section>
+
+      <SowingCalendar plant={plant} />
 
       <Neighbors
         title="Gute Nachbarn"
