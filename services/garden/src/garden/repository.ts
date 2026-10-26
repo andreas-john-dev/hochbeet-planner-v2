@@ -13,6 +13,10 @@ import {
   GardenSettingsSchema,
   type Planting,
   PlantingSchema,
+  type SowingBatch,
+  SowingBatchSchema,
+  type SowingPlanting,
+  type SowingWithPlantings,
 } from '@hochbeet/contracts';
 import { z } from 'zod';
 import {
@@ -22,6 +26,8 @@ import {
   PLANTING_INFIX,
   plantingSk,
   SETTINGS_SK,
+  SOWING_PREFIX,
+  sowingSk,
   userPk,
 } from '../table';
 
@@ -38,10 +44,25 @@ export const ImportRecordSchema = z.object({
 });
 export type ImportRecord = z.infer<typeof ImportRecordSchema>;
 
+/** What an import writes, with the new ids. */
+export interface ImportedGarden {
+  beds: readonly Bed[];
+  plantings: readonly Planting[];
+  sowings: readonly SowingBatch[];
+}
+
 export interface BedWithPlantings {
   bed: Bed;
   plantings: Planting[];
 }
+
+/** The fields of a planting a batch lists. */
+const sowingPlanting = (planting: Planting): SowingPlanting => {
+  const { id, bedId, startDate } = planting;
+  return planting.kind === 'ROW'
+    ? { id, bedId, startDate, kind: 'ROW', lengthCm: planting.lengthCm }
+    : { id, bedId, startDate, kind: 'SINGLE' };
+};
 
 export class GardenRepository {
   constructor(
@@ -156,6 +177,63 @@ export class GardenRepository {
     return true;
   }
 
+  /**
+   * All sowing batches with their linked plantings from all beds. Batches and plantings live
+   * under different sort keys, so this reads the user's whole partition in one query.
+   */
+  async listSowings(userId: string): Promise<SowingWithPlantings[]> {
+    const items = await this.query(userId);
+    const linked = new Map<string, SowingPlanting[]>();
+    for (const item of items) {
+      if (!String(item.SK).includes(PLANTING_INFIX) || typeof item.sowingId !== 'string') continue;
+      const planting = PlantingSchema.parse(item);
+      if (planting.sowingId === undefined) continue;
+      const list = linked.get(planting.sowingId) ?? [];
+      list.push(sowingPlanting(planting));
+      linked.set(planting.sowingId, list);
+    }
+    return items
+      .filter((item) => String(item.SK).startsWith(SOWING_PREFIX))
+      .map((item) => {
+        const sowing = SowingBatchSchema.parse(item);
+        return { sowing, plantings: linked.get(sowing.id) ?? [] };
+      });
+  }
+
+  /**
+   * Writes a sowing batch. `create` refuses to overwrite, `replace` needs an existing batch;
+   * false if that condition fails.
+   */
+  async putSowing(
+    userId: string,
+    sowing: SowingBatch,
+    mode: 'create' | 'replace' = 'create',
+  ): Promise<boolean> {
+    return this.ifConditionHolds(() =>
+      this.client.send(
+        new PutCommand({
+          TableName: this.tableName,
+          Item: { PK: userPk(userId), SK: sowingSk(sowing.id), ...sowing },
+          ConditionExpression:
+            mode === 'create' ? 'attribute_not_exists(PK)' : 'attribute_exists(PK)',
+        }),
+      ),
+    );
+  }
+
+  /** Deletes a batch; linked plantings keep their `sowingId`. False if it does not exist. */
+  async deleteSowing(userId: string, sowingId: string): Promise<boolean> {
+    return this.ifConditionHolds(() =>
+      this.client.send(
+        new DeleteCommand({
+          TableName: this.tableName,
+          Key: { PK: userPk(userId), SK: sowingSk(sowingId) },
+          ConditionExpression: 'attribute_exists(PK)',
+        }),
+      ),
+    );
+  }
+
   /** The user's settings, or undefined while they were never saved. */
   async getSettings(userId: string): Promise<GardenSettings | undefined> {
     const { Item } = await this.client.send(
@@ -193,12 +271,14 @@ export class GardenRepository {
   }
 
   /**
-   * Writes imported beds and their plantings without conditions: the ids are new and fixed
-   * by the import record, so writing them again after an interruption changes nothing.
+   * Writes imported beds, plantings and sowing batches without conditions: the ids are new
+   * and fixed by the import record, so writing them again after an interruption changes
+   * nothing.
    */
-  async putImported(userId: string, beds: readonly Bed[], plantings: readonly Planting[]) {
+  async putImported(userId: string, { beds, plantings, sowings }: ImportedGarden): Promise<void> {
     const items = [
       ...beds.map((bed) => ({ PK: userPk(userId), SK: bedSk(bed.id), ...bed })),
+      ...sowings.map((sowing) => ({ PK: userPk(userId), SK: sowingSk(sowing.id), ...sowing })),
       ...plantings.map((p) => ({ PK: userPk(userId), SK: plantingSk(p.bedId, p.id), ...p })),
     ];
     for (let i = 0; i < items.length; i += WRITE_CONCURRENCY) {
@@ -224,16 +304,23 @@ export class GardenRepository {
     await this.client.send(new DeleteCommand({ TableName: this.tableName, Key: key }));
   }
 
-  /** All items of the user whose sort key starts with `prefix`, following pagination. */
-  private async query(userId: string, prefix: string): Promise<Item[]> {
+  /**
+   * All items of the user whose sort key starts with `prefix`, or all of them without one,
+   * following pagination.
+   */
+  private async query(userId: string, prefix?: string): Promise<Item[]> {
     const items: Item[] = [];
     let startKey: Item | undefined;
     do {
       const page = await this.client.send(
         new QueryCommand({
           TableName: this.tableName,
-          KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-          ExpressionAttributeValues: { ':pk': userPk(userId), ':prefix': prefix },
+          KeyConditionExpression:
+            prefix === undefined ? 'PK = :pk' : 'PK = :pk AND begins_with(SK, :prefix)',
+          ExpressionAttributeValues: {
+            ':pk': userPk(userId),
+            ...(prefix === undefined ? {} : { ':prefix': prefix }),
+          },
           ExclusiveStartKey: startKey,
         }),
       );

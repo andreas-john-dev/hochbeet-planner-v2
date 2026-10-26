@@ -14,3 +14,6 @@ export const plantingSk = (bedId: string, plantingId: string) =>
 export const importSk = (importId: string) => `IMPORT#${importId}`;
 /** The user's garden settings, one item per user. */
 export const SETTINGS_SK = 'SETTINGS';
+/** A sowing batch of the user; plantings of any bed may point to it. */
+export const SOWING_PREFIX = 'SOWING#';
+export const sowingSk = (sowingId: string) => `${SOWING_PREFIX}${sowingId}`;

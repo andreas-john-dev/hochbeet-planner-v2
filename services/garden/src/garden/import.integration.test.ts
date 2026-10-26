@@ -3,6 +3,7 @@ import type {
   ErrorResponse,
   ImportGardenResponse,
   ListBedsResponse,
+  ListSowingsResponse,
 } from '@hochbeet/contracts';
 import { createLogger } from '@hochbeet/service-kit';
 import { authorized, startDynamoDbTable } from '@hochbeet/service-kit/testing';
@@ -15,6 +16,8 @@ const USER_A = 'a1b2c3d4-0000-4000-8000-00000000000a';
 const USER_B = 'a1b2c3d4-0000-4000-8000-00000000000b';
 const GUEST_BED = '01J9ZQ3W8D6V2K5M7N8P9R0BDA';
 const OWN_PLANT = '01J9ZQ3W8D6V2K5M7N8P9R0WN1';
+const GUEST_SOWING = '01J9ZQ3W8D6V2K5M7N8P9R0SW1';
+const DELETED_SOWING = '01J9ZQ3W8D6V2K5M7N8P9R0SW2';
 
 const importBody = (importId: string) => ({
   importId,
@@ -104,15 +107,68 @@ describe('/api/garden/import against DynamoDB Local', () => {
     expect(await listBeds(USER_B)).toEqual([]);
   });
 
+  it('imports sowing batches and points plantings to the new ones', async () => {
+    const sowing = {
+      id: GUEST_SOWING,
+      plantId: OWN_PLANT,
+      sowDate: '2026-03-09',
+      sownCount: 10,
+      aliveCount: 8,
+      stage: 'HARDENING',
+      location: 'Fensterbank',
+    };
+    const guest = importBody('01J9ZQ3W8D6V2K5M7N8P9R0MP4');
+    const [fromBatch, fromDeleted] = guest.plantings;
+    const body = {
+      ...guest,
+      sowings: [sowing],
+      plantings: [
+        { ...fromBatch, origin: 'TRANSPLANT', sowingId: GUEST_SOWING },
+        // The guest deleted this batch; the planting kept its id.
+        { ...fromDeleted, sowingId: DELETED_SOWING },
+      ],
+    };
+    const { bedIds } = (await (
+      await call(USER_B, 'POST', '/import', body)
+    ).json()) as ImportGardenResponse;
+    const newBedId = bedIds[GUEST_BED] ?? '';
+
+    const { sowings } = (await (
+      await call(USER_B, 'GET', '/sowings')
+    ).json()) as ListSowingsResponse;
+    expect(sowings).toHaveLength(1);
+    const [imported] = sowings;
+    const { id: newSowingId, ...fields } = imported?.sowing ?? sowing;
+    const { id: _, ...guestFields } = sowing;
+    expect(fields).toEqual(guestFields);
+    expect(newSowingId).not.toBe(GUEST_SOWING);
+    expect(imported?.plantings).toEqual([
+      expect.objectContaining({ bedId: newBedId, kind: 'SINGLE' }),
+    ]);
+
+    const details = (await (
+      await call(USER_B, 'GET', `/beds/${newBedId}`)
+    ).json()) as BedWithPlantingsResponse;
+    const byX = Object.fromEntries(details.plantings.map((p) => [p.x, p]));
+    expect(byX[20]?.sowingId).toBe(imported?.sowing.id);
+    expect(imported?.plantings[0]?.id).toBe(byX[20]?.id);
+    expect(byX[60]).not.toHaveProperty('sowingId');
+
+    // Repeating the import adds no second batch.
+    await call(USER_B, 'POST', '/import', body);
+    const again = (await (await call(USER_B, 'GET', '/sowings')).json()) as ListSowingsResponse;
+    expect(again.sowings).toEqual(sowings);
+  });
+
   it('refuses plantings of beds that are not part of the import', async () => {
     const body = importBody('01J9ZQ3W8D6V2K5M7N8P9R0MP3');
-    const response = await call(USER_B, 'POST', '/import', { ...body, beds: [] });
+    const response = await call(USER_A, 'POST', '/import', { ...body, beds: [] });
     expect(response.status).toBe(400);
     const error = (await response.json()) as ErrorResponse;
     expect(error.issues).toContainEqual({
       path: 'plantings.0.bedId',
       message: 'Dieses Beet fehlt im Import.',
     });
-    expect(await listBeds(USER_B)).toEqual([]);
+    expect(await listBeds(USER_A)).toHaveLength(2);
   });
 });

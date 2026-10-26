@@ -1,6 +1,14 @@
 import { z } from 'zod';
-import { BedFieldsSchema, BedSchema, PlantingFieldsSchema, PlantingSchema } from '../domain';
-import { UlidSchema } from '../primitives';
+import {
+  BedFieldsSchema,
+  BedSchema,
+  PlantingFieldsSchema,
+  PlantingSchema,
+  PositiveGridCmSchema,
+  SowingBatchFieldsSchema,
+  SowingBatchSchema,
+} from '../domain';
+import { MondaySchema, UlidSchema } from '../primitives';
 
 // Garden-Service, routes under /api/garden (docs/architecture/garden.md).
 
@@ -22,6 +30,33 @@ export type BedWithPlantingsResponse = z.infer<typeof BedWithPlantingsResponseSc
 /** POST /garden/beds/{bedId}/plantings, PUT /garden/beds/{bedId}/plantings/{id} */
 export const SavePlantingRequestSchema = PlantingFieldsSchema;
 export type SavePlantingRequest = z.infer<typeof SavePlantingRequestSchema>;
+
+/** POST /garden/sowings, PUT /garden/sowings/{id} */
+export const SaveSowingRequestSchema = SowingBatchFieldsSchema;
+export type SaveSowingRequest = z.infer<typeof SaveSowingRequestSchema>;
+
+const sowingPlantingIds = { id: UlidSchema, bedId: UlidSchema, startDate: MondaySchema };
+
+/**
+ * A planting linked to a batch, only with what counting and listing need. The service
+ * does not know the spacing of plants, so the client counts the plants of a row.
+ */
+export const SowingPlantingSchema = z.discriminatedUnion('kind', [
+  z.object({ ...sowingPlantingIds, kind: z.literal('SINGLE') }),
+  z.object({ ...sowingPlantingIds, kind: z.literal('ROW'), lengthCm: PositiveGridCmSchema }),
+]);
+export type SowingPlanting = z.infer<typeof SowingPlantingSchema>;
+
+/** A batch with the plantings from all beds that point to it. */
+export const SowingWithPlantingsSchema = z.object({
+  sowing: SowingBatchSchema,
+  plantings: z.array(SowingPlantingSchema),
+});
+export type SowingWithPlantings = z.infer<typeof SowingWithPlantingsSchema>;
+
+/** GET /garden/sowings */
+export const ListSowingsResponseSchema = z.object({ sowings: z.array(SowingWithPlantingsSchema) });
+export type ListSowingsResponse = z.infer<typeof ListSowingsResponseSchema>;
 
 /** Last frost when the user has not set one: after the Eisheiligen. */
 export const DEFAULT_LAST_FROST = '05-15';
@@ -50,10 +85,12 @@ export const DEFAULT_GARDEN_SETTINGS: GardenSettings = { lastFrost: DEFAULT_LAST
 /** Most beds and plantings one import may carry; more than any guest plans in a browser. */
 export const MAX_IMPORT_BEDS = 50;
 export const MAX_IMPORT_PLANTINGS = 1000;
+export const MAX_IMPORT_SOWINGS = 200;
 
 /**
- * POST /garden/import: a guest's beds and plantings from the browser, after sign-in. The
- * service gives everything new ids and maps the plantings to the new beds. `importId` makes
+ * POST /garden/import: a guest's beds, plantings and sowing batches from the browser, after
+ * sign-in. The service gives everything new ids and maps the plantings to the new beds and
+ * batches; a `sowingId` of a batch outside the import is dropped. `importId` makes
  * the call idempotent: repeating it with the same id writes nothing twice. Plant ids of the
  * plantings must already point to the user's catalogue (see POST /catalog/import).
  */
@@ -69,11 +106,19 @@ export const ImportGardenRequestSchema = z
         MAX_IMPORT_PLANTINGS,
         `Höchstens ${String(MAX_IMPORT_PLANTINGS)} Pflanzungen auf einmal.`,
       ),
+    /** Missing in requests of app versions before sowing batches. */
+    sowings: z
+      .array(SowingBatchSchema)
+      .max(MAX_IMPORT_SOWINGS, `Höchstens ${String(MAX_IMPORT_SOWINGS)} Anzuchten auf einmal.`)
+      .default([]),
   })
-  .superRefine(({ beds, plantings }, ctx) => {
+  .superRefine(({ beds, plantings, sowings }, ctx) => {
     const bedIds = new Set(beds.map((b) => b.id));
     if (bedIds.size !== beds.length) {
       ctx.addIssue({ code: 'custom', path: ['beds'], message: 'Beet doppelt.' });
+    }
+    if (new Set(sowings.map((s) => s.id)).size !== sowings.length) {
+      ctx.addIssue({ code: 'custom', path: ['sowings'], message: 'Anzucht doppelt.' });
     }
     plantings.forEach((planting, index) => {
       if (!bedIds.has(planting.bedId)) {

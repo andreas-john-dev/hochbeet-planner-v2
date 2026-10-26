@@ -56,6 +56,11 @@ const PlantingBaseSchema = z.object({
   endDate: IsoDateSchema.nullable(),
   /** Manual removal from this Monday on; takes precedence over endDate. */
   removedDate: MondaySchema.nullable(),
+  /**
+   * The sowing batch the seedlings come from; only for planted out plantings. May point to
+   * a deleted batch, which counts as none.
+   */
+  sowingId: UlidSchema.optional(),
 });
 
 const SinglePlantingFieldsSchema = PlantingBaseSchema.extend({ kind: z.literal('SINGLE') });
@@ -66,10 +71,23 @@ const RowPlantingFieldsSchema = PlantingBaseSchema.extend({
   lengthCm: PositiveGridCmSchema,
 });
 
-function checkDates(
-  planting: { startDate: string; endDate: string | null; removedDate: string | null },
+function checkPlanting(
+  planting: {
+    origin: PlantingOrigin;
+    startDate: string;
+    endDate: string | null;
+    removedDate: string | null;
+    sowingId?: string | undefined;
+  },
   ctx: z.RefinementCtx,
 ) {
+  if (planting.sowingId !== undefined && planting.origin !== 'TRANSPLANT') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['sowingId'],
+      message: 'Nur gepflanzte Pflanzungen stammen aus einer Anzucht.',
+    });
+  }
   if (planting.endDate !== null && planting.endDate <= planting.startDate) {
     ctx.addIssue({
       code: 'custom',
@@ -89,7 +107,7 @@ function checkDates(
 /** Planting without id and bedId, as sent when creating or updating one. */
 export const PlantingFieldsSchema = z
   .discriminatedUnion('kind', [SinglePlantingFieldsSchema, RowPlantingFieldsSchema])
-  .superRefine(checkDates);
+  .superRefine(checkPlanting);
 
 const ids = { id: UlidSchema, bedId: UlidSchema };
 
@@ -98,12 +116,78 @@ export const PlantingSchema = z
     SinglePlantingFieldsSchema.extend(ids),
     RowPlantingFieldsSchema.extend(ids),
   ])
-  .superRefine(checkDates);
+  .superRefine(checkPlanting);
 
 export type PlantingFields = z.infer<typeof PlantingFieldsSchema>;
 export type Planting = z.infer<typeof PlantingSchema>;
 export type SinglePlanting = Extract<Planting, { kind: 'SINGLE' }>;
 export type RowPlanting = Extract<Planting, { kind: 'ROW' }>;
+
+// ---------------------------------------------------------------------------
+// Sowing batch
+// ---------------------------------------------------------------------------
+
+/** Where a batch of seedlings stands, from planned to done. */
+export const SowingStageSchema = z.enum([
+  'PLANNED',
+  'SOWN',
+  'GERMINATED',
+  'PRICKED',
+  'HARDENING',
+  'DONE',
+]);
+export type SowingStage = z.infer<typeof SowingStageSchema>;
+
+/** Seeds or seedlings of a batch; more than any hobby gardener raises of one plant. */
+export const MAX_SOWING_COUNT = 9999;
+
+const countOf = (min: number) =>
+  z
+    .number()
+    .int('Ganze Stück angeben.')
+    .min(min, `${String(min)} bis ${String(MAX_SOWING_COUNT)} Stück angeben.`)
+    .max(MAX_SOWING_COUNT, `${String(min)} bis ${String(MAX_SOWING_COUNT)} Stück angeben.`);
+
+const SowingBatchObjectSchema = z.object({
+  plantId: UlidSchema,
+  /** Monday of the week it is (or will be) sown. */
+  sowDate: MondaySchema,
+  sownCount: countOf(1),
+  /** Seedlings left, kept by hand (losses, given away); planted ones are not subtracted. */
+  aliveCount: countOf(0),
+  stage: SowingStageSchema,
+  /** Where the batch stands, e.g. "Fensterbank Küche". */
+  location: z.string().trim().max(60, 'Höchstens 60 Zeichen.').optional(),
+  /** Monday of the week the seedlings are meant to go into the bed. */
+  plannedTransplantDate: MondaySchema.optional(),
+  notes: z.string().trim().max(500, 'Höchstens 500 Zeichen.').optional(),
+});
+
+function checkSowingBatch(
+  batch: { sowDate: string; plannedTransplantDate?: string | undefined },
+  ctx: z.RefinementCtx,
+) {
+  if (batch.plannedTransplantDate !== undefined && batch.plannedTransplantDate <= batch.sowDate) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['plannedTransplantDate'],
+      message: 'Auspflanzen muss nach der Aussaat liegen.',
+    });
+  }
+}
+
+/** A batch without id, as sent when creating or updating one. */
+export const SowingBatchFieldsSchema = SowingBatchObjectSchema.superRefine(checkSowingBatch);
+
+/**
+ * One plant sown in one week, raised as seedlings (Anzucht-Charge). Belongs to the user,
+ * not to a bed; plantings point to it with `sowingId`.
+ */
+export const SowingBatchSchema = SowingBatchObjectSchema.extend({ id: UlidSchema }).superRefine(
+  checkSowingBatch,
+);
+export type SowingBatchFields = z.infer<typeof SowingBatchFieldsSchema>;
+export type SowingBatch = z.infer<typeof SowingBatchSchema>;
 
 // ---------------------------------------------------------------------------
 // Plant

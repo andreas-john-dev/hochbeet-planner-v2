@@ -7,8 +7,11 @@ import {
   ImportGardenRequestSchema,
   type ListBedsResponse,
   type Planting,
+  type ListSowingsResponse,
   SaveBedRequestSchema,
   SavePlantingRequestSchema,
+  SaveSowingRequestSchema,
+  type SowingBatch,
 } from '@hochbeet/contracts';
 import { createServiceApp, type Logger, NotFoundError, parseBody } from '@hochbeet/service-kit';
 import { ulid } from 'ulid';
@@ -30,6 +33,9 @@ export type GardenStore = Pick<
   | 'putImported'
   | 'getSettings'
   | 'putSettings'
+  | 'listSowings'
+  | 'putSowing'
+  | 'deleteSowing'
 >;
 
 export interface AppDeps {
@@ -43,6 +49,7 @@ export const BASE_PATH = '/api/garden';
 
 const BED_NOT_FOUND = 'Dieses Beet gibt es nicht.';
 const PLANTING_NOT_FOUND = 'Diese Pflanzung gibt es nicht.';
+const SOWING_NOT_FOUND = 'Diese Anzucht gibt es nicht.';
 
 const byName = (a: Bed, b: Bed) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id);
 
@@ -114,6 +121,43 @@ export function createApp({ store, logger, newId = () => ulid() }: AppDeps) {
     return c.body(null, 204);
   });
 
+  // Sowing batches. Like plantings, only the structure is checked: the plant is not looked
+  // up, and plantings may keep the id of a deleted batch, which then counts as none.
+  app.get('/sowings', async (c) => {
+    const sowings = await store.listSowings(c.get('user').id);
+    const body: ListSowingsResponse = {
+      sowings: sowings.sort(
+        (a, b) =>
+          a.sowing.sowDate.localeCompare(b.sowing.sowDate) ||
+          a.sowing.id.localeCompare(b.sowing.id),
+      ),
+    };
+    return c.json(body);
+  });
+
+  app.post('/sowings', async (c) => {
+    const fields = await parseBody(c, SaveSowingRequestSchema);
+    const sowing: SowingBatch = { ...fields, id: newId() };
+    await store.putSowing(c.get('user').id, sowing, 'create');
+    return c.json(sowing, 201);
+  });
+
+  app.put('/sowings/:id', async (c) => {
+    const fields = await parseBody(c, SaveSowingRequestSchema);
+    const sowing: SowingBatch = { ...fields, id: c.req.param('id') };
+    if (!(await store.putSowing(c.get('user').id, sowing, 'replace'))) {
+      throw new NotFoundError(SOWING_NOT_FOUND);
+    }
+    return c.json(sowing);
+  });
+
+  app.delete('/sowings/:id', async (c) => {
+    if (!(await store.deleteSowing(c.get('user').id, c.req.param('id')))) {
+      throw new NotFoundError(SOWING_NOT_FOUND);
+    }
+    return c.body(null, 204);
+  });
+
   // Settings for all beds; without a saved item the defaults apply.
   app.get('/settings', async (c) => {
     const body: GardenSettings =
@@ -127,7 +171,7 @@ export function createApp({ store, logger, newId = () => ulid() }: AppDeps) {
     return c.json(settings);
   });
 
-  // A guest's beds and plantings after sign-in; idempotent per importId.
+  // A guest's beds, plantings and sowing batches after sign-in; idempotent per importId.
   app.post('/import', async (c) => {
     const request = await parseBody(c, ImportGardenRequestSchema);
     return c.json(await importGarden(store, c.get('user').id, request, newId));

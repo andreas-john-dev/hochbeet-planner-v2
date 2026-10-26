@@ -3,6 +3,7 @@ export * from './geometry';
 export * from './time';
 export * from './findings';
 export * from './context';
+export * from './sowings';
 export { spacingRule } from './rules/spacing';
 export { bedEdgeRule } from './rules/bed-edge';
 export { frostRule } from './rules/frost';
