@@ -3,6 +3,7 @@ import type {
   BedFields,
   CatalogPlant,
   BedWithPlantingsResponse,
+  GardenSettings,
   ListBedsResponse,
   ListPlantsResponse,
   Planting,
@@ -20,6 +21,7 @@ export const queryKeys = {
   bed: (bedId: string) => ['beds', bedId] as const,
   plants: ['plants'] as const,
   publications: ['publications'] as const,
+  settings: ['settings'] as const,
 };
 
 export function useBeds() {
@@ -35,6 +37,32 @@ export function useBedWithPlantings(bedId: string) {
   return useQuery({
     queryKey: queryKeys.bed(bedId),
     queryFn: () => api<BedWithPlantingsResponse>(`/api/garden/beds/${bedId}`),
+  });
+}
+
+/** Garden settings such as the last frost; the defaults while nothing is saved (and for guests). */
+export function useGardenSettings() {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.settings,
+    queryFn: () => api<GardenSettings>('/api/garden/settings'),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Replaces the garden settings; the answer becomes the cached settings at once. */
+export function useSaveGardenSettings() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: GardenSettings) =>
+      api<GardenSettings>('/api/garden/settings', {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      }),
+    onSuccess: (settings) => {
+      queryClient.setQueryData(queryKeys.settings, settings);
+    },
   });
 }
 

@@ -7,6 +7,7 @@ Teil der [Architektur](../architecture.md). Beete und Pflanzungen der User sowie
 | `USER#<uid>` | `BED#<bedId>` | Beet |
 | `USER#<uid>` | `BED#<bedId>#PLANTING#<id>` | Pflanzung |
 | `USER#<uid>` | `IMPORT#<importId>` | Stand eines Imports aus dem Gastmodus (ID-Zuordnung, Antwort) |
+| `USER#<uid>` | `SETTINGS` | Einstellungen für alle Beete, z. B. letzter Frost (`GardenSettingsSchema`) |
 
 Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen über alle Zeiträume. Die Mandantentrennung ist damit Teil des Schlüssels.
 
@@ -21,6 +22,8 @@ Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen �
 | PUT | `/garden/beds/{bedId}/plantings/{id}` | Pflanzung ändern (verschieben, Daten, Entfernen) |
 | DELETE | `/garden/beds/{bedId}/plantings/{id}` | Pflanzung löschen |
 | POST | `/garden/import` | Beete und Pflanzungen aus dem Gastmodus übernehmen |
+| GET | `/garden/settings` | Einstellungen des Users, ohne Eintrag die Standardwerte |
+| PUT | `/garden/settings` | Einstellungen ersetzen |
 
 Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erzeugen den Hinweis „Beetrand“.
 
@@ -41,6 +44,7 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
   - `origin` (Direktsaat oder gepflanzt) fehlt in Einträgen von vor T-51: Das Schema liest sie als `TRANSPLANT`, eine Datenmigration in DynamoDB gibt es nicht; jedes Speichern schreibt das Feld mit. Requests ohne `origin` bekommen ebenfalls `TRANSPLANT`.
   - Fachliche Befunde wie „Beetrand“ berechnet der Client. Sie blockieren das Speichern nie, auch eine Pflanzung außerhalb des Beets wird gespeichert.
   - Ob die Sorte existiert, prüft der Garden-Service nicht, weil Services sich nie gegenseitig aufrufen.
+- **Einstellungen** (T-53): `lastFrost` als Monat und Tag (`MM-DD`, gilt jedes Jahr; der 29. Februar wird abgelehnt, weil es ihn nicht jedes Jahr gibt). `GET` liefert ohne Eintrag `DEFAULT_GARDEN_SETTINGS` (letzter Frost `05-15`), `PUT` ersetzt den Eintrag. Das Datum eines Jahres berechnet `lastFrostDate(settings, year)` in `packages/garden-rules/src/time.ts`. Gäste haben kein Profil; die lokale API liefert ihnen die Standardwerte (`settings` im Gastspeicher ist optional, die Version bleibt).
 - **Import aus dem Gastmodus** (`POST /garden/import`, `src/garden/import.ts`): siehe „Übernahme aus dem Gastmodus“.
 - **Mandantentrennung:** Fremde und unbekannte Beete liefern 404. Weil der User Teil jedes Schlüssels ist, kann eine Query nie fremde Beete treffen.
 - **Tests:** Integrationstests gegen DynamoDB Local; die Hilfsfunktionen dafür stellt `@hochbeet/service-kit/testing` bereit.

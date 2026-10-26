@@ -23,6 +23,30 @@ export type BedWithPlantingsResponse = z.infer<typeof BedWithPlantingsResponseSc
 export const SavePlantingRequestSchema = PlantingFieldsSchema;
 export type SavePlantingRequest = z.infer<typeof SavePlantingRequestSchema>;
 
+/** Last frost when the user has not set one: after the Eisheiligen. */
+export const DEFAULT_LAST_FROST = '05-15';
+
+/** Days per month of a common year: 29 February has no date in most years. */
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** A day of the year without year, `MM-DD`, e.g. `05-15`; 29 February is refused. */
+export const MonthDaySchema = z
+  .string()
+  .regex(/^\d{2}-\d{2}$/, 'Datum als MM-TT angeben.')
+  .refine((value) => {
+    const [month = 0, day = 0] = value.split('-').map(Number);
+    return month >= 1 && month <= 12 && day >= 1 && day <= (DAYS_IN_MONTH[month - 1] ?? 0);
+  }, 'Diesen Tag gibt es nicht in jedem Jahr.');
+
+/** GET and PUT /garden/settings: the user's settings for all beds. */
+export const GardenSettingsSchema = z.object({
+  /** Last frost, every year on this day; frost sensitive plants go outside after it. */
+  lastFrost: MonthDaySchema,
+});
+export type GardenSettings = z.infer<typeof GardenSettingsSchema>;
+
+export const DEFAULT_GARDEN_SETTINGS: GardenSettings = { lastFrost: DEFAULT_LAST_FROST };
+
 /** Most beds and plantings one import may carry; more than any guest plans in a browser. */
 export const MAX_IMPORT_BEDS = 50;
 export const MAX_IMPORT_PLANTINGS = 1000;

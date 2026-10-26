@@ -98,6 +98,16 @@ describe('createLocalFetch', () => {
     });
   });
 
+  it('keeps the garden settings, with the defaults until they are saved', async () => {
+    expect(await (await send('/api/garden/settings')).json()).toEqual({ lastFrost: '05-15' });
+    const saved = await send('/api/garden/settings', 'PUT', { lastFrost: '04-25' });
+    expect(await saved.json()).toEqual({ lastFrost: '04-25' });
+    expect((await send('/api/garden/settings', 'PUT', { lastFrost: '02-29' })).status).toBe(400);
+    // Survives a reload of the stored garden.
+    expect(createGuestRepository(localStorage).read().settings).toEqual({ lastFrost: '04-25' });
+    expect(await (await send('/api/garden/settings')).json()).toEqual({ lastFrost: '04-25' });
+  });
+
   it('answers 400 with German issues for invalid requests', async () => {
     const response = await send('/api/garden/beds', 'POST', { ...bedFields('X'), widthCm: 203 });
     expect(response.status).toBe(400);

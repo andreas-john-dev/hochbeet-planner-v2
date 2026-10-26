@@ -1,6 +1,9 @@
 import {
   type Bed,
   type BedWithPlantingsResponse,
+  DEFAULT_GARDEN_SETTINGS,
+  type GardenSettings,
+  GardenSettingsSchema,
   ImportGardenRequestSchema,
   type ListBedsResponse,
   type Planting,
@@ -25,6 +28,8 @@ export type GardenStore = Pick<
   | 'getImport'
   | 'putImport'
   | 'putImported'
+  | 'getSettings'
+  | 'putSettings'
 >;
 
 export interface AppDeps {
@@ -107,6 +112,19 @@ export function createApp({ store, logger, newId = () => ulid() }: AppDeps) {
     );
     if (!deleted) throw new NotFoundError(PLANTING_NOT_FOUND);
     return c.body(null, 204);
+  });
+
+  // Settings for all beds; without a saved item the defaults apply.
+  app.get('/settings', async (c) => {
+    const body: GardenSettings =
+      (await store.getSettings(c.get('user').id)) ?? DEFAULT_GARDEN_SETTINGS;
+    return c.json(body);
+  });
+
+  app.put('/settings', async (c) => {
+    const settings = await parseBody(c, GardenSettingsSchema);
+    await store.putSettings(c.get('user').id, settings);
+    return c.json(settings);
   });
 
   // A guest's beds and plantings after sign-in; idempotent per importId.

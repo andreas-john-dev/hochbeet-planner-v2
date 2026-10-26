@@ -10,7 +10,9 @@ import {
   FindPlantsToolInputSchema,
   GetBedToolInputSchema,
   BedWithPlantingsResponseSchema,
+  DEFAULT_GARDEN_SETTINGS,
   ErrorResponseSchema,
+  GardenSettingsSchema,
   ImportCatalogRequestSchema,
   ImportGardenRequestSchema,
   RejectPublicationRequestSchema,
@@ -35,6 +37,21 @@ describe('garden API contracts', () => {
   it('returns a bed with its plantings', () => {
     const body = { bed, plantings: [singlePlanting, rowPlanting] };
     expect(BedWithPlantingsResponseSchema.parse(body)).toEqual(body);
+  });
+
+  it('accepts a last frost day of every year and nothing else', () => {
+    expect(GardenSettingsSchema.parse(DEFAULT_GARDEN_SETTINGS)).toEqual({ lastFrost: '05-15' });
+    for (const lastFrost of ['01-01', '04-30', '02-28', '12-31']) {
+      expect(GardenSettingsSchema.safeParse({ lastFrost }).success).toBe(true);
+    }
+    const message = (lastFrost: string) =>
+      GardenSettingsSchema.safeParse({ lastFrost }).error?.issues[0]?.message;
+    expect(message('02-29')).toBe('Diesen Tag gibt es nicht in jedem Jahr.');
+    expect(message('04-31')).toBe('Diesen Tag gibt es nicht in jedem Jahr.');
+    expect(message('13-01')).toBe('Diesen Tag gibt es nicht in jedem Jahr.');
+    expect(message('00-10')).toBe('Diesen Tag gibt es nicht in jedem Jahr.');
+    expect(message('5-15')).toBe('Datum als MM-TT angeben.');
+    expect(message('2026-05-15')).toBe('Datum als MM-TT angeben.');
   });
 });
 

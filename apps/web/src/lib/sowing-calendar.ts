@@ -1,17 +1,16 @@
-import type { Lifecycle, Sowing } from '@hochbeet/contracts';
+import { DEFAULT_LAST_FROST, type Lifecycle, type Sowing } from '@hochbeet/contracts';
+import { lastFrostDate } from '@hochbeet/garden-rules';
 import {
   addDays,
   differenceInCalendarDays,
   format,
   getISOWeek,
   getISOWeeksInYear,
+  parseISO,
   startOfISOWeek,
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { weekHint } from './sowing';
-
-/** Last frost as month and day (`MM-DD`); 15 May after the Eisheiligen until the profile has one. */
-export const DEFAULT_LAST_FROST = '05-15';
 
 export type CalendarRowKind = 'presow' | 'direct' | 'plantOut' | 'inBed';
 
@@ -54,7 +53,7 @@ interface Span {
  * the last frost (`MM-DD`), e.g. KW 21 for 15 May 2026, a Friday.
  */
 export function frostWeek(year: number, lastFrost = DEFAULT_LAST_FROST): number {
-  const dayAfter = addDays(new Date(`${String(year)}-${lastFrost}T00:00:00`), 1);
+  const dayAfter = addDays(parseISO(lastFrostDate({ lastFrost }, year)), 1);
   const monday = startOfISOWeek(dayAfter);
   return getISOWeek(monday < dayAfter ? addDays(monday, 7) : monday);
 }

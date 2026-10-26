@@ -1,6 +1,7 @@
 import type { CatalogPlant } from '@hochbeet/contracts';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { useGardenSettings } from '@/lib/garden';
 import { sowingFacts } from '@/lib/sowing';
 import {
   CALENDAR_ROW_LABEL,
@@ -27,7 +28,9 @@ const ROW_COLOR: Record<CalendarRowKind, string> = {
  */
 export function SowingCalendar({ plant }: { plant: CatalogPlant }) {
   const [year] = useState(() => new Date().getFullYear());
-  const calendar = sowingCalendar(plant, { year });
+  // The user's last frost from the profile; the default until it has loaded.
+  const lastFrost = useGardenSettings().data?.lastFrost;
+  const calendar = sowingCalendar(plant, { year, ...(lastFrost ? { lastFrost } : {}) });
   const ticks = monthTicks(year);
 
   return (
@@ -91,7 +94,7 @@ export function SowingCalendar({ plant }: { plant: CatalogPlant }) {
             {sowingFacts(plant.sowing).map((fact) => (
               <li key={fact}>{fact}</li>
             ))}
-            {plant.frostSensitive && <li>{frostText()}</li>}
+            {plant.frostSensitive && <li>{frostText(lastFrost)}</li>}
           </ul>
         </div>
       ) : (
