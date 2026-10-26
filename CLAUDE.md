@@ -62,7 +62,7 @@ Paketnamen für `--filter`: `web`, `infra`, `e2e`, `@hochbeet/<paket>` für `pac
 Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src/index.ts`) und brauchen keinen eigenen Build.
 Deployment: `deploy.yml` deployt jeden grünen `main`-Commit per OIDC nach `prod` und führt danach die Smoke-Tests aus;
 einmalige Einrichtung und Fehlersuche in `docs/deployment.md`.
-Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test, build und synth aus, dazu Playwright je Projekt als parallele Matrix (Job `e2e`) und Lighthouse (Job `lighthouse`);
+Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test (`--concurrency=2`, sonst laufen Tests auf dem Runner in den 5-s-Timeout), build und synth aus, dazu Playwright je Projekt als parallele Matrix (Job `e2e`) und Lighthouse (Job `lighthouse`);
 der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
 Frontend (`apps/web`): Routen code-basiert in `src/router.tsx` (deutsche Pfade `/beete`, `/katalog`, `/profil`, `/admin`),
 Seiten in `src/routes/`, shadcn/ui-Komponenten in `src/components/ui/` (Konfiguration `components.json`), Import-Alias `@/` → `src/`.
