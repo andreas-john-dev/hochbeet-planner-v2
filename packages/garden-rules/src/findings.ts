@@ -2,7 +2,13 @@ import type { Interval } from './time';
 
 /** Rules of the engine (docs/architecture/rules.md). */
 export type RuleId =
-  'SPACING' | 'BAD_NEIGHBOR' | 'GOOD_NEIGHBOR' | 'HEAVY_FEEDER' | 'CROP_ROTATION' | 'BED_EDGE';
+  | 'SPACING'
+  | 'BAD_NEIGHBOR'
+  | 'GOOD_NEIGHBOR'
+  | 'HEAVY_FEEDER'
+  | 'CROP_ROTATION'
+  | 'BED_EDGE'
+  | 'FROST';
 
 /** `WARNING` (red), `POSITIVE` (green, good neighbours) or `HINT` (subtle, e.g. bed edge). */
 export type Severity = 'WARNING' | 'POSITIVE' | 'HINT';

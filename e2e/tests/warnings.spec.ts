@@ -143,3 +143,55 @@ test.describe('findings list', () => {
     );
   });
 });
+
+test.describe('frost hint', () => {
+  // Two tomatoes far apart: one from KW 18 (27 April), one from KW 21 (18 May 2026).
+  const EARLY_ID = '01J9ZQ3W8D6V2K5M7N8P9R0T04';
+  const LATE_ID = '01J9ZQ3W8D6V2K5M7N8P9R0T05';
+  const frostGarden = (settings?: { lastFrost: string }) => ({
+    beds: [bed(BED_ID, 'Hochbeet Süd', 200, 100)],
+    plantings: [
+      planting(EARLY_ID, BED_ID, TOMATO, { x: 40, y: 50, startDate: '2026-04-27' }),
+      planting(LATE_ID, BED_ID, TOMATO, { x: 160, y: 50, startDate: '2026-05-18' }),
+    ],
+    ...(settings ? { settings } : {}),
+  });
+  const frostHints = (page: Page) =>
+    page
+      .getByRole('list', { name: 'Hinweise' })
+      .getByRole('button', { name: /Tomate ist frostempfindlich/ });
+
+  test('shows the hint for a tomato from KW 18 but not from KW 21', async ({ page }) => {
+    await signInAs(page, 'user');
+    await seedGarden(page, frostGarden());
+    await open(page, `/beete/${BED_ID}`, 'Hochbeet Süd');
+
+    await expect(frostHints(page)).toHaveCount(1);
+    await expect(frostHints(page)).toContainText(
+      'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
+    );
+    await frostHints(page).click();
+    await expect(page.getByTestId('week-label')).toContainText('KW 18');
+    const early = page.getByTestId(`planting-${EARLY_ID}`);
+    await expect(early).toHaveAttribute('data-highlighted', 'true');
+    await expect(early).toHaveAttribute('data-status', 'hint');
+
+    // In KW 21 both stand in the bed; only the early one carries the hint.
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Nächste Woche' }).click();
+    await expect(page.getByTestId('week-label')).toContainText('KW 21');
+    await expect(early).toHaveAttribute('data-status', 'hint');
+    await expect(page.getByTestId(`planting-${LATE_ID}`)).not.toHaveAttribute(
+      'data-status',
+      'hint',
+    );
+  });
+
+  test('uses the last frost from the profile', async ({ page }) => {
+    await signInAs(page, 'user');
+    await seedGarden(page, frostGarden({ lastFrost: '04-20' }));
+    await open(page, `/beete/${BED_ID}`, 'Hochbeet Süd');
+    // Planted on 27 April, after the user's last frost on 20 April: nothing to report.
+    await expect(page.getByTestId('findings-summary')).toHaveText('Keine Warnungen');
+    await expect(frostHints(page)).toHaveCount(0);
+  });
+});

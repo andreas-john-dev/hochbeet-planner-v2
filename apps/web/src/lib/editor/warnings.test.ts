@@ -76,6 +76,18 @@ describe('season', () => {
     expect(bad('2026-10-05')).toEqual([['kartoffel', 'tomate']]);
     expect(bad('2027-06-07')).toEqual([['kartoffel-27', 'tomate-27']]);
   });
+
+  it('hints at frost sensitive plants before the user’s last frost', () => {
+    // Tomate from Monday 4 May 2026: before 15 May, but after a last frost on 20 April.
+    const frost = (lastFrost?: string) =>
+      seasonFindings(bed, [planting('tomate', 'Tomate')], seedPlants, '2026-05-04', lastFrost)
+        .filter((f) => f.rule === 'FROST')
+        .map((f) => f.message);
+    expect(frost()).toEqual([
+      'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
+    ]);
+    expect(frost('04-20')).toEqual([]);
+  });
 });
 
 describe('status per planting', () => {

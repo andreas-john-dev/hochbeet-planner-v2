@@ -143,7 +143,12 @@ async function evaluate(
   week?: string,
   candidates: readonly CandidatePlanting[] = [],
 ): Promise<EvaluateBedToolOutput> {
-  const [{ bed, plantings }, { plants }] = await Promise.all([api.getBed(bedId), api.listPlants()]);
+  // The user's last frost, so the frost hint matches what the app shows.
+  const [{ bed, plantings }, { plants }, { lastFrost }] = await Promise.all([
+    api.getBed(bedId),
+    api.listPlants(),
+    api.getSettings(),
+  ]);
   const names = plantNames(plants);
   const byId = new Map(plants.map((plant) => [plant.id, plant]));
   const unknownCandidates: number[] = [];
@@ -158,7 +163,7 @@ async function evaluate(
   const all = [...plantings, ...planned];
   const plantOf = new Map(all.map((p) => [p.id, names.get(p.plantId) ?? 'Unbekannte Sorte']));
   const indexOf = new Map(planned.map((p) => [p.id, Number(p.id.slice('candidate-'.length))]));
-  const findings = evaluateBed(bed, all, plants, week ? { week } : {});
+  const findings = evaluateBed(bed, all, plants, week ? { week, lastFrost } : { lastFrost });
   return {
     findings: findings.map((finding) => ({
       severity: finding.severity,

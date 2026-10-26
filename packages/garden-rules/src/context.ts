@@ -35,10 +35,12 @@ export function resolvePlantings(
   });
 }
 
-/** Everything a rule gets: the bed and its resolved plantings. */
+/** Everything a rule gets: the bed, its resolved plantings and the user's settings. */
 export interface RuleContext {
   bed: Bed;
   plantings: readonly ResolvedPlanting[];
+  /** Last frost as `MM-DD`, every year. */
+  lastFrost: string;
 }
 
 /** Calls `visit` once for every unordered pair of plantings. */

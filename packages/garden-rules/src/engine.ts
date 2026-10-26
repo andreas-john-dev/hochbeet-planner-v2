@@ -1,15 +1,29 @@
-import type { Bed, IsoDate, Plant, Planting } from '@hochbeet/contracts';
+import {
+  type Bed,
+  DEFAULT_LAST_FROST,
+  type IsoDate,
+  type Plant,
+  type Planting,
+} from '@hochbeet/contracts';
 import { resolvePlantings, type RuleContext } from './context';
 import type { Finding, Severity } from './findings';
 import { bedEdgeRule } from './rules/bed-edge';
 import { cropRotationRule } from './rules/crop-rotation';
+import { frostRule } from './rules/frost';
 import { heavyFeedersRule } from './rules/heavy-feeders';
 import { neighborsRule } from './rules/neighbors';
 import { spacingRule } from './rules/spacing';
 import { isActiveInWeek } from './time';
 
 /** All rules in display order. */
-const rules = [spacingRule, neighborsRule, heavyFeedersRule, cropRotationRule, bedEdgeRule];
+const rules = [
+  spacingRule,
+  neighborsRule,
+  heavyFeedersRule,
+  cropRotationRule,
+  bedEdgeRule,
+  frostRule,
+];
 
 const severityOrder: Record<Severity, number> = { WARNING: 0, HINT: 1, POSITIVE: 2 };
 
@@ -27,6 +41,8 @@ function compareFindings(a: Finding, b: Finding): number {
 export interface EvaluateOptions {
   /** Only return findings that apply in the ISO week containing this date. */
   week?: IsoDate | Date;
+  /** The user's last frost as `MM-DD` (GardenSettings); missing means 15 May. */
+  lastFrost?: string;
 }
 
 /**
@@ -43,7 +59,11 @@ export function evaluateBed(
   plants: readonly Plant[],
   options: EvaluateOptions = {},
 ): Finding[] {
-  const context: RuleContext = { bed, plantings: resolvePlantings(plantings, plants) };
+  const context: RuleContext = {
+    bed,
+    plantings: resolvePlantings(plantings, plants),
+    lastFrost: options.lastFrost ?? DEFAULT_LAST_FROST,
+  };
   const findings = rules.flatMap((rule) => rule(context));
   const { week } = options;
   const relevant =

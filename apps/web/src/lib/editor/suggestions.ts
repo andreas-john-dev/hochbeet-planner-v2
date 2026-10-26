@@ -33,6 +33,7 @@ export function showSuggestions(
   plantings: readonly Planting[],
   plants: readonly Plant[],
   week: IsoDate,
+  lastFrost?: string,
 ): ShownSuggestion[] {
   const byId = new Map(plants.map((plant) => [plant.id, plant]));
   const shown = suggestions.flatMap(({ index, suggestion }) => {
@@ -46,9 +47,12 @@ export function showSuggestions(
     );
     return [{ index, suggestion, plant, planting }];
   });
-  const findings = evaluateBed(bed, [...plantings, ...shown.map((s) => s.planting)], plants).filter(
-    (f) => isActiveInWeek(f.period, week),
-  );
+  const findings = evaluateBed(
+    bed,
+    [...plantings, ...shown.map((s) => s.planting)],
+    plants,
+    lastFrost ? { lastFrost } : {},
+  ).filter((f) => isActiveInWeek(f.period, week));
   const statuses = statusByPlanting(findings);
   return shown.map((s) => {
     const status = statuses.get(s.planting.id);

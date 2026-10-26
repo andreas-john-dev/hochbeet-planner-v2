@@ -1,4 +1,10 @@
-import type { Bed, CatalogPlant, Planting } from '@hochbeet/contracts';
+import {
+  type Bed,
+  type CatalogPlant,
+  DEFAULT_GARDEN_SETTINGS,
+  type GardenSettings,
+  type Planting,
+} from '@hochbeet/contracts';
 import { seedPlantByName, seedPlants } from '@hochbeet/catalog-seed';
 
 const base64url = (value: string) => Buffer.from(value).toString('base64url');
@@ -52,6 +58,8 @@ export function planting(
 export interface FakeGarden {
   beds: Bed[];
   plantings: Planting[];
+  /** Saved garden settings; missing means the defaults, like the service. */
+  settings?: GardenSettings;
 }
 
 /**
@@ -69,6 +77,9 @@ export function fakeApi(gardens: Record<string, FakeGarden>) {
     if (!garden) return Promise.resolve(json({ message: 'Bitte melde dich an.' }, 401));
     if (url.pathname === '/api/garden/beds') return Promise.resolve(json({ beds: garden.beds }));
     if (url.pathname === '/api/catalog/plants') return Promise.resolve(json({ plants: catalog }));
+    if (url.pathname === '/api/garden/settings') {
+      return Promise.resolve(json(garden.settings ?? DEFAULT_GARDEN_SETTINGS));
+    }
     const bedId = /^\/api\/garden\/beds\/([^/]+)$/.exec(url.pathname)?.[1];
     const found = garden.beds.find((b) => b.id === bedId);
     if (!found) return Promise.resolve(json({ message: 'Beet nicht gefunden.' }, 404));

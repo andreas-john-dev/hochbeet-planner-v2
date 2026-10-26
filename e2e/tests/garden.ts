@@ -11,6 +11,8 @@ export interface Garden {
   plantings: unknown[];
   /** Own plants as the catalogue lists them (`source: 'OWN'`, with `publication`). */
   ownPlants?: unknown[];
+  /** Garden settings such as `{ lastFrost: '04-20' }`; missing means the defaults. */
+  settings?: unknown;
 }
 
 /**
