@@ -534,6 +534,12 @@
     "access": "user"
   },
   {
+    "id": "katalog-sorte-vorkultur",
+    "path": "/katalog/01M49THV00QS1SEJEM64991JH5",
+    "heading": "Tomate",
+    "access": "user"
+  },
+  {
     "id": "profil",
     "path": "/profil",
     "heading": "Profil",
