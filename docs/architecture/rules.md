@@ -1,10 +1,10 @@
 # Regel-Engine
 
-Teil der [Architektur](../architecture.md). Die Fachregeln in `packages/garden-rules` (Abstand, Nachbarn, Starkzehrer, Fruchtfolge) und ihre Schnittstelle.
+Teil der [Architektur](../architecture.md). Die Fachregeln in `packages/garden-rules` (Abstand, Nachbarn, Starkzehrer, Fruchtfolge, Beetrand, Frost) und ihre Schnittstelle.
 
 Alle Warnungen werden von einer reinen TypeScript-Bibliothek `packages/garden-rules` berechnet und nie gespeichert. Warnungen blockieren das Speichern nie. Sie veralten deshalb auch nicht, wenn eine Sorte angepasst wird.
 
-Alle Regeln außer der Fruchtfolge gelten nur zwischen Pflanzungen, deren Zeiträume sich überlappen. Der Einflussradius für Nachbarschaft und Starkzehrer beträgt 30 cm und ist als Konstante zentral konfigurierbar.
+Alle Regeln für Paare außer der Fruchtfolge gelten nur zwischen Pflanzungen, deren Zeiträume sich überlappen. Der Einflussradius für Nachbarschaft und Starkzehrer beträgt 30 cm und ist als Konstante zentral konfigurierbar.
 
 | Regel | Bedingung | Stufe |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ Alle Regeln außer der Fruchtfolge gelten nur zwischen Pflanzungen, deren Zeitr�
 | Starkzehrer | Beide sind `STARK`, stehen quer zur Reihenrichtung nebeneinander und die Lücke ist < 30 cm; hintereinander in Reihenrichtung nie | Warnung |
 | Fruchtfolge | Auf mindestens einer Rasterzelle gehört der direkte Vorgänger zur selben Familie, und dazwischen wurde die Erde nicht erneuert | Warnung |
 | Beetrand | Standfläche ragt über den Beetrand | Dezenter Hinweis |
+| Frost | Sorte ist `frostSensitive` und kommt am oder vor dem letzten Frosttermin desselben Jahres ins Beet (Direktsaat wie Pflanzung) | Dezenter Hinweis |
 
 ## Details
 
@@ -40,13 +41,16 @@ Ein `Finding` hat `rule`, `severity` (`WARNING`, `POSITIVE` oder `HINT`), sortie
 
 Der Einflussradius (`INFLUENCE_RADIUS_CM = 30` in `constants.ts`) gilt, solange die Lücke **kleiner** als 30 cm ist; bei genau 30 cm greift die Regel nicht mehr. Gute und schlechte Nachbarn werden symmetrisch ausgewertet: Es genügt, wenn eine der beiden Sorten die andere listet.
 
+**Frost** (`rules/frost.ts`, T-54): Maßgeblich ist nur der Start der Pflanzung (`startDate`) gegenüber dem Frosttermin seines Jahres (`lastFrostDate()`); der Frosttag selbst zählt noch als zu früh, passend zum Aussaatkalender („erst nach dem 15. Mai ins Freie“). Eine Pflanzung, die nach dem Frost beginnt und über den Winter steht, bekommt keinen Hinweis. Pro Pflanzung entsteht ein Befund mit ihrer Standzeit als Zeitraum, Text z. B. „Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.“
+
 ## Schnittstelle
 
-Die Engine erhält ein Beet, alle seine Pflanzungen und die effektiven Sorten des Users: `evaluateBed(bed, plantings, plants, { week? })`. Sie liefert eine Liste von Befunden mit Regel, Stufe, betroffenen Pflanzungs-IDs, Zeitraum und einem deutschen Anzeigetext. Optional kann man auf eine Woche filtern. Die Engine ist isomorph und läuft im Browser wie in Node.
+Die Engine erhält ein Beet, alle seine Pflanzungen und die effektiven Sorten des Users: `evaluateBed(bed, plantings, plants, { week?, lastFrost? })`. Sie liefert eine Liste von Befunden mit Regel, Stufe, betroffenen Pflanzungs-IDs, Zeitraum und einem deutschen Anzeigetext. Optional kann man auf eine Woche filtern. Die Engine ist isomorph und läuft im Browser wie in Node.
 
 Umsetzung (`packages/garden-rules/src/engine.ts`):
 
 - `evaluateBed` verbindet die Pflanzungen einmal mit ihren Sorten und ruft alle Regeln auf. Die Befunde kommen in fester Reihenfolge: Warnungen, dann dezente Hinweise, dann positive Hinweise; innerhalb davon nach Regel, Pflanzungs-IDs und Zeitraum.
+- `lastFrost` ist der letzte Frost des Users als `MM-DD` (`GardenSettings`, T-53); fehlt er, gilt `DEFAULT_LAST_FROST` (15. Mai). Die Regeln bekommen ihn über `RuleContext.lastFrost`. Der Editor übergibt ihn aus `useGardenSettings()` (Gäste: Standard), das Gateway-Tool `evaluate_bed` liest ihn mit dem Token des Users über `GET /api/garden/settings`, damit Assistent und App dieselben Befunde sehen.
 - Mit `week` wird trotzdem die ganze Historie ausgewertet (die Fruchtfolge braucht Vorgänger); zurück kommen nur Befunde, deren Zeitraum die ISO-Woche berührt.
 - Property-Tests (fast-check) sichern zu: Das Ergebnis hängt nicht von der Reihenfolge der Pflanzungen oder Sorten ab, Nachbarlisten wirken symmetrisch, Befunde sind wohlgeformt, und der Wochenfilter liefert genau die passende Teilmenge.
 - Leistung: 200 Pflanzungen in einem 6 × 3 m Beet über zwei Saisons brauchen im Median etwa 15 ms (Vorgabe: unter 50 ms; `engine.perf.test.ts` misst die CPU-Zeit des Prozesses, damit parallel laufende Test-Suites das Ergebnis nicht verfälschen). Die Fruchtfolge nutzt dafür einen Zellindex mit kleinen ganzzahligen Schlüsseln und prüft Familie und Erneuerung nur einmal pro Paar.

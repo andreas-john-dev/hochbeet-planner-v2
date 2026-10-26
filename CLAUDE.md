@@ -81,7 +81,7 @@ Beet-Editor unter `/beete/$bedId`: SVG in cm über einen `viewBox`, Viewport-Mat
 Platzierlogik rein in `src/lib/editor/placement.ts`, Drag & Drop mit `@dnd-kit/core` nur in `BedEditorPage`.
 Die gewählte Woche steht als `week` (Montag) im Editor-Store; Zeitachse und Geister in `src/lib/editor/timeline.ts`.
 Neue Pflanzungen (Palette und Vorschläge) bekommen `origin` über `defaultOrigin()` und das Ende über `plannedEnd()` aus `@hochbeet/garden-rules` (Direktsaat mit `directSowExtraWeeks`); umgeschaltet wird im Panel über `withOrigin()` (`src/lib/editor/details.ts`).
-Warnungen im Editor: Saison, Status je Pflanzung und Liste über `src/lib/editor/warnings.ts`; Pflanzungen tragen `data-status` (`warning`/`hint`/`positive`).
+Warnungen im Editor: Saison, Status je Pflanzung und Liste über `src/lib/editor/warnings.ts` (mit dem letzten Frost des Users für die Frostregel, `evaluateBed(…, { lastFrost })`); Pflanzungen tragen `data-status` (`warning`/`hint`/`positive`).
 Erneuerungen der Erde (Saisongrenzen) pflegt der Beet-Dialog über `src/lib/soil-renewals.ts`.
 Änderungen an Pflanzungen im Editor laufen über `commit({ before, after })` in `BedEditorPage`, damit sie in der Undo-Historie (`src/lib/editor/history.ts`) landen.
 Unter `md` ersetzen Bottom-Sheets (`src/components/ui/sheet.tsx`) die Seitenleisten des Editors; Touch-Gesten in Playwright über `touchDrag()` in `e2e/tests/mobile.spec.ts` (CDP mit Zeitstempeln).

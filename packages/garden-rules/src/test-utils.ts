@@ -76,6 +76,7 @@ export function context(
   plants: Plant[],
   plantings: Planting[],
   bedOverrides: Partial<Bed> = {},
+  lastFrost = '05-15',
 ): RuleContext {
-  return { bed: bed(bedOverrides), plantings: resolvePlantings(plantings, plants) };
+  return { bed: bed(bedOverrides), plantings: resolvePlantings(plantings, plants), lastFrost };
 }

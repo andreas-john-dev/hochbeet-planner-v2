@@ -1,6 +1,8 @@
 import {
   type BedWithPlantingsResponse,
   BedWithPlantingsResponseSchema,
+  type GardenSettings,
+  GardenSettingsSchema,
   type ListBedsResponse,
   ListBedsResponseSchema,
   type ListPlantsResponse,
@@ -21,6 +23,8 @@ export interface GardenReader {
   listBeds(): Promise<ListBedsResponse>;
   getBed(bedId: string): Promise<BedWithPlantingsResponse>;
   listPlants(): Promise<ListPlantsResponse>;
+  /** The user's garden settings, e.g. the last frost; the defaults while none are saved. */
+  getSettings(): Promise<GardenSettings>;
 }
 
 /**
@@ -57,5 +61,6 @@ export function createApiReader(
     listBeds: () => get('/api/garden/beds', ListBedsResponseSchema),
     getBed: (bedId) => get(`/api/garden/beds/${bedId}`, BedWithPlantingsResponseSchema),
     listPlants: () => get('/api/catalog/plants', ListPlantsResponseSchema),
+    getSettings: () => get('/api/garden/settings', GardenSettingsSchema),
   };
 }

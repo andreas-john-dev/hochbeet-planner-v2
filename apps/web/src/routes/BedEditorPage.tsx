@@ -53,7 +53,13 @@ import { seasonFindings, statusByPlanting, weekOfFinding } from '@/lib/editor/wa
 import { ghosts, withPlants, type Ghost } from '@/lib/editor/timeline';
 import { toCm } from '@/lib/editor/viewport';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/media-query';
-import { useBedWithPlantings, useDeletePlanting, usePlants, useSavePlanting } from '@/lib/garden';
+import {
+  useBedWithPlantings,
+  useDeletePlanting,
+  useGardenSettings,
+  usePlants,
+  useSavePlanting,
+} from '@/lib/garden';
 
 const ZOOM_STEP = 1.4;
 
@@ -73,6 +79,8 @@ function bedIdParam(params: unknown): string {
 function BedEditor({ bedId }: { bedId: string }) {
   const details = useBedWithPlantings(bedId);
   const plants = usePlants();
+  // The user's last frost for the frost hint; guests and a pending load use 15 May.
+  const lastFrost = useGardenSettings().data?.lastFrost;
   const [today] = useState(() => new Date());
   const [store] = useState(() => createEditorStore(today));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -101,9 +109,10 @@ function BedEditor({ bedId }: { bedId: string }) {
             details.data?.plantings ?? [],
             plants.data,
             week,
+            lastFrost,
           )
         : [],
-    [suggested, suggestionBed, details.data?.plantings, plants.data, week],
+    [suggested, suggestionBed, details.data?.plantings, plants.data, week, lastFrost],
   );
   // Undo and redo run one after another, each after all running requests have finished,
   // so that temporary ids are resolved first and no key press gets lost.
@@ -367,6 +376,7 @@ function BedEditor({ bedId }: { bedId: string }) {
               suggestions={suggestions}
               store={store}
               week={weekDate}
+              lastFrost={lastFrost}
               onCommit={commit}
             />
           ) : (
@@ -485,6 +495,7 @@ function Workspace({
   suggestions,
   store,
   week,
+  lastFrost,
   onCommit,
 }: {
   bed: Bed;
@@ -499,6 +510,8 @@ function Workspace({
   store: EditorStore;
   /** The week the editor shows; new plantings start on its Monday. */
   week: Date;
+  /** The user's last frost (`MM-DD`), undefined for the default. */
+  lastFrost: string | undefined;
   onCommit: (change: Change) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -531,10 +544,10 @@ function Workspace({
         }),
       );
     }
-    const season = seasonFindings(bed, live, plants, weekIso);
+    const season = seasonFindings(bed, live, plants, weekIso, lastFrost);
     const thisWeek = season.filter((f) => isActiveInWeek(f.period, weekIso));
     return { seasonal: season, statuses: statusByPlanting(thisWeek) };
-  }, [allPlantings, draft, preview, bed, kind, week, plants, weekIso]);
+  }, [allPlantings, draft, preview, bed, kind, week, plants, weekIso, lastFrost]);
 
   const pick = (finding: Finding) => {
     const state = store.getState();

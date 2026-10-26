@@ -23,15 +23,21 @@ export function seasonOf(bed: Pick<Bed, 'soilRenewals'>, date: IsoDate): Interva
   return { start, end };
 }
 
-/** Findings that touch the season of `date`, with all plantings of the bed evaluated. */
+/**
+ * Findings that touch the season of `date`, with all plantings of the bed evaluated.
+ * `lastFrost` is the user's last frost (`MM-DD`); missing means 15 May.
+ */
 export function seasonFindings(
   bed: Bed,
   plantings: readonly Planting[],
   plants: readonly Plant[],
   date: IsoDate,
+  lastFrost?: string,
 ): Finding[] {
   const season = seasonOf(bed, date);
-  return evaluateBed(bed, plantings, plants).filter((f) => overlaps(f.period, season));
+  return evaluateBed(bed, plantings, plants, lastFrost ? { lastFrost } : {}).filter((f) =>
+    overlaps(f.period, season),
+  );
 }
 
 const rank: Record<Severity, number> = { WARNING: 3, HINT: 2, POSITIVE: 1 };

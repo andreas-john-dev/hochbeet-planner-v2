@@ -47,6 +47,26 @@ describe('evaluateBed', () => {
     ]);
   });
 
+  it('hints at frost sensitive plants before the last frost, 15 May unless given', () => {
+    // Started Monday 4 May 2026; the tomato becomes frost sensitive here.
+    const frosty = [{ ...tomato, frostSensitive: true }, potato, basil];
+    const frost = (lastFrost?: string) =>
+      evaluateBed(bed(), [single('t', 'tomate', 30, 30)], frosty, lastFrost ? { lastFrost } : {})
+        .filter((f) => f.rule === 'FROST')
+        .map((f) => f.message);
+    expect(frost()).toEqual([
+      'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
+    ]);
+    expect(frost('04-20')).toEqual([]);
+    expect(frost('05-04')).toEqual([
+      'Tomate ist frostempfindlich und sollte erst nach dem 4. Mai ins Beet.',
+    ]);
+    // Without frost sensitive plants nothing changes.
+    expect(evaluateBed(bed(), plantings, plants, { lastFrost: '06-30' })).toEqual(
+      evaluateBed(bed(), plantings, plants),
+    );
+  });
+
   it('filters to findings that apply in a given week', () => {
     // Basil starts in June: its hints are not there in May.
     const may = evaluateBed(bed(), plantings, plants, { week: '2026-05-13' });

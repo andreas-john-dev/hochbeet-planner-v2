@@ -128,6 +128,25 @@ describe('tools through the gateway path', () => {
     expect(winter.result).toEqual({ findings: [], unknownCandidates: [] });
   });
 
+  it('uses the user’s last frost for the frost hint, like the app', async () => {
+    // The tomatoes start on Monday 4 May 2026: before 15 May, after 20 April.
+    const frost = async (settings?: { lastFrost: string }) => {
+      const api = fakeApi({
+        'user-a': { ...gardens['user-a'], ...(settings ? { settings } : {}) },
+      });
+      const { result } = await callAsUser('user-a', 'evaluate_bed', { bedId: BED_A }, api);
+      expect(api.calls).toContainEqual({ path: '/api/garden/settings', sub: 'user-a' });
+      return EvaluateBedToolOutputSchema.parse(result)
+        .findings.filter((f) => f.message.includes('frostempfindlich'))
+        .map((f) => f.message);
+    };
+    expect(await frost()).toEqual([
+      'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
+      'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
+    ]);
+    expect(await frost({ lastFrost: '04-20' })).toEqual([]);
+  });
+
   it('checks planned plantings together with the bed and marks them', async () => {
     const { result } = await callAsUser('user-a', 'evaluate_bed', {
       bedId: BED_A,
