@@ -122,7 +122,10 @@ test.describe('adding plants on the desktop', () => {
       await page.keyboard.press('Enter');
       await page.keyboard.press(name === 'Möhre' ? 'Shift+ArrowLeft' : 'Shift+ArrowRight');
       await page.keyboard.press('Enter');
-      await page.locator(`[data-plant-id="${plantId}"]`).click();
+      // Changes wait until the server has created the planting (temporary id until then).
+      const planting = page.locator(`[data-plant-id="${plantId}"]`);
+      await expect(planting).toHaveAttribute('data-testid', /^planting-[0-9A-Z]{26}$/);
+      await planting.click();
       return page.getByRole('complementary', { name: `Pflanzung ${name}` });
     };
 
