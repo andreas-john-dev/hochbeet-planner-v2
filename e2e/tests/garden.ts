@@ -2,7 +2,8 @@ import type { Page } from '@playwright/test';
 import { USERS } from './fixtures';
 import type { Access } from './pages';
 
-const MOCK_API_KEY = 'hochbeet-mock-api';
+/** Data of the mock API per user (apps/web/src/mocks/store.ts), keyed by e-mail. */
+export const MOCK_API_KEY = 'hochbeet-mock-api';
 /** Guest data in the browser (apps/web/src/lib/local-api/keys.ts), versioned envelope. */
 export const GUEST_STORAGE_KEY = 'hochbeet-guest';
 
@@ -13,6 +14,8 @@ export interface Garden {
   ownPlants?: unknown[];
   /** Garden settings such as `{ lastFrost: '04-20' }`; missing means the defaults. */
   settings?: unknown;
+  /** Sowing batches, see `sowing()`; plantings point to them with `sowingId`. */
+  sowings?: unknown[];
 }
 
 /**
@@ -39,7 +42,7 @@ export async function seedGuestGarden(page: Page, garden: Garden) {
       if (!sessionStorage.getItem('guest-garden-seeded')) {
         sessionStorage.setItem('guest-garden-seeded', '1');
         // GUEST_STORAGE_VERSION in apps/web/src/lib/local-api/store.ts.
-        localStorage.setItem(key, JSON.stringify({ version: 2, garden: data }));
+        localStorage.setItem(key, JSON.stringify({ version: 3, garden: data }));
       }
     },
     [GUEST_STORAGE_KEY, garden] as const,
@@ -121,6 +124,17 @@ export const planting = (
   startDate: '2026-05-04',
   endDate: null,
   removedDate: null,
+  ...extra,
+});
+
+/** A sowing batch; `extra` sets e.g. `stage`, `location` or `plannedTransplantDate`. */
+export const sowing = (id: string, plantId: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  plantId,
+  sowDate: '2026-03-09',
+  sownCount: 12,
+  aliveCount: 10,
+  stage: 'SOWN',
   ...extra,
 });
 

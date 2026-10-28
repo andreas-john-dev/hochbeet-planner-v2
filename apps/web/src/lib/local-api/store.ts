@@ -9,6 +9,8 @@ import {
   type PlantOverride,
   PlantOverrideSchema,
   PlantingSchema,
+  type SowingBatch,
+  SowingBatchSchema,
 } from '@hochbeet/contracts';
 import { z } from 'zod';
 import { GUEST_BACKUP_KEY, GUEST_STORAGE_KEY } from './keys';
@@ -31,6 +33,8 @@ export interface LocalGarden {
   ownPlants?: OwnPlant[];
   /** Garden settings; missing means the defaults (guests have no profile to set them). */
   settings?: GardenSettings;
+  /** Sowing batches; plantings point to them with `sowingId`. Missing means none. */
+  sowings?: SowingBatch[];
 }
 
 /** Storage of one user's data; the local API reads and writes the whole garden at once. */
@@ -42,7 +46,7 @@ export interface GardenRepository {
 export const emptyGarden = (): LocalGarden => ({ beds: [], plantings: [] });
 
 export { GUEST_BACKUP_KEY, GUEST_STORAGE_KEY } from './keys';
-export const GUEST_STORAGE_VERSION = 2;
+export const GUEST_STORAGE_VERSION = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -63,6 +67,8 @@ const migrations: Record<number, (garden: unknown) => unknown> = {
           ),
         }
       : garden,
+  // 2 → 3: sowing batches; older data has none.
+  2: (garden) => (isRecord(garden) ? { sowings: [], ...garden } : garden),
 };
 
 const validItems = <T>(schema: z.ZodType<T>, items: unknown): T[] =>
@@ -85,7 +91,9 @@ export function sanitizeGarden(raw: unknown): LocalGarden {
   );
   const ownPlants = validItems(OwnPlantSchema, data.ownPlants);
   const settings = GardenSettingsSchema.safeParse(data.settings).data;
-  return { beds, plantings, overrides, ownPlants, ...(settings ? { settings } : {}) };
+  // Plantings may keep the id of a deleted batch, like in the garden service.
+  const sowings = validItems(SowingBatchSchema, data.sowings);
+  return { beds, plantings, overrides, ownPlants, sowings, ...(settings ? { settings } : {}) };
 }
 
 const EnvelopeSchema = z.object({ version: z.number().int().min(1), garden: z.unknown() });

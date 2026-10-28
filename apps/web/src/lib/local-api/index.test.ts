@@ -4,6 +4,9 @@ import type {
   BedWithPlantingsResponse,
   CatalogPlant,
   ListPlantsResponse,
+  ListSowingsResponse,
+  Planting,
+  SowingBatch,
 } from '@hochbeet/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalFetch, publicCatalog } from './index';
@@ -37,6 +40,13 @@ const ownFields = {
   badNeighbors: [] as string[],
   color: '#c9a66b',
   icon: 'category-gemuese',
+};
+const sowingFields = {
+  plantId: '01M49THV00SZ6Q8R32BYJM5P2S',
+  sowDate: '2026-03-09',
+  sownCount: 12,
+  aliveCount: 12,
+  stage: 'SOWN',
 };
 const lettuce = '01M49THV00RK9E9PC83NEE87CJ'; // Kopfsalat, 25 cm
 const UNKNOWN = '01J9ZQ3W8D6V2K5M7N8P9R0XXX';
@@ -108,12 +118,76 @@ describe('createLocalFetch', () => {
     expect(await (await send('/api/garden/settings')).json()).toEqual({ lastFrost: '04-25' });
   });
 
+  it('keeps sowing batches with their plantings from all beds, sorted by sowing week', async () => {
+    const later = (await (
+      await send('/api/garden/sowings', 'POST', { ...sowingFields, sowDate: '2026-04-06' })
+    ).json()) as SowingBatch;
+    const created = await send('/api/garden/sowings', 'POST', sowingFields);
+    expect(created.status).toBe(201);
+    const sowing = (await created.json()) as SowingBatch;
+    expect(sowing).toMatchObject(sowingFields);
+
+    const south = (await (await send('/api/garden/beds', 'POST', bedFields('Süd'))).json()) as Bed;
+    const north = (await (await send('/api/garden/beds', 'POST', bedFields('Nord'))).json()) as Bed;
+    const single = (await (
+      await send(`/api/garden/beds/${south.id}/plantings`, 'POST', {
+        ...plantingFields,
+        sowingId: sowing.id,
+      })
+    ).json()) as Planting;
+    const row = (await (
+      await send(`/api/garden/beds/${north.id}/plantings`, 'POST', {
+        ...plantingFields,
+        kind: 'ROW',
+        orientation: 'V',
+        lengthCm: 50,
+        sowingId: sowing.id,
+      })
+    ).json()) as Planting;
+    // Direct sowing cannot come from a batch.
+    const sown = await send(`/api/garden/beds/${south.id}/plantings`, 'POST', {
+      ...plantingFields,
+      origin: 'DIRECT_SOW',
+      sowingId: sowing.id,
+    });
+    expect(sown.status).toBe(400);
+
+    const list = async () =>
+      ((await (await send('/api/garden/sowings')).json()) as ListSowingsResponse).sowings;
+    expect(await list()).toEqual([
+      {
+        sowing,
+        plantings: [
+          { id: single.id, bedId: south.id, kind: 'SINGLE', startDate: '2026-05-04' },
+          { id: row.id, bedId: north.id, kind: 'ROW', lengthCm: 50, startDate: '2026-05-04' },
+        ],
+      },
+      { sowing: later, plantings: [] },
+    ]);
+
+    const changed = { ...sowingFields, stage: 'HARDENING', aliveCount: 9, location: 'Balkon' };
+    const updated = await send(`/api/garden/sowings/${sowing.id}`, 'PUT', changed);
+    expect(await updated.json()).toEqual({ ...changed, id: sowing.id });
+
+    // Deleting the batch keeps the plantings and their sowingId, like the service.
+    expect((await send(`/api/garden/sowings/${sowing.id}`, 'DELETE')).status).toBe(204);
+    expect((await list()).map((s) => s.sowing.id)).toEqual([later.id]);
+    const stored = createGuestRepository(localStorage).read();
+    expect(stored.plantings.map((p) => p.sowingId)).toEqual([sowing.id, sowing.id]);
+  });
+
   it('answers 400 with German issues for invalid requests', async () => {
     const response = await send('/api/garden/beds', 'POST', { ...bedFields('X'), widthCm: 203 });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
       message: 'Bitte prüfe deine Eingaben.',
       issues: [{ path: 'widthCm', message: 'Muss ein Vielfaches von 5 cm sein.' }],
+    });
+    const sowing = await send('/api/garden/sowings', 'POST', { ...sowingFields, sownCount: 0 });
+    expect(sowing.status).toBe(400);
+    expect(await sowing.json()).toEqual({
+      message: 'Bitte prüfe deine Eingaben.',
+      issues: [{ path: 'sownCount', message: '1 bis 9999 Stück angeben.' }],
     });
   });
 
@@ -126,6 +200,8 @@ describe('createLocalFetch', () => {
       [`/api/garden/beds/${UNKNOWN}/plantings`, 'POST', plantingFields],
       [`/api/garden/beds/${bed.id}/plantings/${UNKNOWN}`, 'PUT', plantingFields],
       [`/api/garden/beds/${bed.id}/plantings/${UNKNOWN}`, 'DELETE'],
+      [`/api/garden/sowings/${UNKNOWN}`, 'PUT', sowingFields],
+      [`/api/garden/sowings/${UNKNOWN}`, 'DELETE'],
       [`/api/catalog/plants/${UNKNOWN}`, 'PUT', ownFields],
       [`/api/catalog/plants/${UNKNOWN}`, 'DELETE'],
       [`/api/catalog/plants/${UNKNOWN}/override`, 'PUT', { spacingInRowCm: 30 }],

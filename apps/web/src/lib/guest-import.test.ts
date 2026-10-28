@@ -1,4 +1,4 @@
-import type { Bed, Planting } from '@hochbeet/contracts';
+import type { Bed, Planting, SowingBatch } from '@hochbeet/contracts';
 import { seedPlants } from '@hochbeet/catalog-seed';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiFetch } from './api';
@@ -54,16 +54,33 @@ const garden: LocalGarden = {
   overrides: { [global.id]: { spacingInRowCm: 30 } },
 };
 
+const sowing = (id: string, plantId: string): SowingBatch => ({
+  id,
+  plantId,
+  sowDate: '2026-03-09',
+  sownCount: 10,
+  aliveCount: 8,
+  stage: 'HARDENING',
+});
+const SOWING = '01J9ZQ3W8D6V2K5M7N8P9R0SW1';
+
 describe('guest data', () => {
   it('knows whether there is anything worth importing', () => {
     expect(hasGuestData({ beds: [], plantings: [] })).toBe(false);
     expect(hasGuestData({ beds: [], plantings: [], overrides: {} })).toBe(false);
     expect(hasGuestData(garden)).toBe(true);
+    // Batches alone are worth keeping, too.
+    expect(hasGuestData({ beds: [], plantings: [], sowings: [sowing(SOWING, OWN)] })).toBe(true);
   });
 
   it('describes it in German', () => {
     expect(describeGuestData(garden)).toBe('1 Beet, 2 Pflanzungen, 1 eigene Sorte und 1 Anpassung');
     expect(describeGuestData({ beds: [bed, bed], plantings: [] })).toBe('2 Beete');
+    expect(describeGuestData({ beds: [bed], plantings: [], sowings: [sowing(SOWING, OWN)] })).toBe(
+      '1 Beet und 1 Anzucht',
+    );
+    const two = [sowing(SOWING, OWN), sowing('01J9ZQ3W8D6V2K5M7N8P9R0SW2', OWN)];
+    expect(describeGuestData({ beds: [], plantings: [], sowings: two })).toBe('2 Anzuchten');
   });
 });
 
@@ -78,6 +95,21 @@ describe('import requests', () => {
   it('points plantings to the new ids of imported own plants', () => {
     const request = gardenImportRequest(garden, 'IMPORT', { [OWN]: 'NEW-OWN' });
     expect(request.plantings.map((p) => p.plantId)).toEqual(['NEW-OWN', global.id]);
+    expect(request.sowings).toEqual([]);
+  });
+
+  it('sends batches with the new ids of own plants and keeps sowingId for the service', () => {
+    const withSowings: LocalGarden = {
+      ...garden,
+      plantings: [{ ...planting('01J9ZQ3W8D6V2K5M7N8P9R0PA1', OWN), sowingId: SOWING }],
+      sowings: [sowing(SOWING, OWN), sowing('01J9ZQ3W8D6V2K5M7N8P9R0SW2', global.id)],
+    };
+    const request = gardenImportRequest(withSowings, 'IMPORT', { [OWN]: 'NEW-OWN' });
+    expect(request.sowings).toEqual([
+      { ...sowing(SOWING, OWN), plantId: 'NEW-OWN' },
+      sowing('01J9ZQ3W8D6V2K5M7N8P9R0SW2', global.id),
+    ]);
+    expect(request.plantings[0]).toMatchObject({ plantId: 'NEW-OWN', sowingId: SOWING });
   });
 });
 
@@ -93,6 +125,17 @@ describe('importGuestData', () => {
     ]);
     const body = JSON.parse(api.mock.calls[1]?.[1]?.body as string) as { plantings: Planting[] };
     expect(body.plantings[0]?.plantId).toBe('NEW-OWN');
+  });
+
+  it('imports batches even without beds', async () => {
+    const api = vi.fn((_path: string, _init?: RequestInit) => Promise.resolve({}));
+    const onlySowings = { beds: [], plantings: [], sowings: [sowing(SOWING, global.id)] };
+    await importGuestData(api as unknown as ApiFetch, onlySowings, 'IMPORT');
+    expect(api.mock.calls.map(([path]) => path)).toEqual(['/api/garden/import']);
+    const body = JSON.parse(api.mock.calls[0]?.[1]?.body as string) as {
+      sowings: SowingBatch[];
+    };
+    expect(body.sowings).toEqual(onlySowings.sowings);
   });
 
   it('skips a service that has nothing to import', async () => {

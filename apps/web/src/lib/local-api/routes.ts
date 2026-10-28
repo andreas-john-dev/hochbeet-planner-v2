@@ -7,6 +7,7 @@ import {
   GardenSettingsSchema,
   type ListBedsResponse,
   type ListPlantsResponse,
+  type ListSowingsResponse,
   type Plant,
   type Planting,
   type PlantFields,
@@ -15,6 +16,9 @@ import {
   SaveOverrideRequestSchema,
   SavePlantingRequestSchema,
   SavePlantRequestSchema,
+  SaveSowingRequestSchema,
+  type SowingBatch,
+  type SowingPlanting,
 } from '@hochbeet/contracts';
 import { ulid } from 'ulid';
 import { error, json, noContent, parseJson, route, type Route } from './router';
@@ -30,6 +34,18 @@ export interface LocalApiOptions {
 const byName = (a: Bed, b: Bed) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id);
 const BED_NOT_FOUND = 'Dieses Beet gibt es nicht.';
 const PLANTING_NOT_FOUND = 'Diese Pflanzung gibt es nicht.';
+const SOWING_NOT_FOUND = 'Diese Anzucht gibt es nicht.';
+
+/** The fields of a planting a batch lists, like the garden service. */
+const sowingPlanting = (planting: Planting): SowingPlanting => {
+  const { id, bedId, startDate } = planting;
+  return planting.kind === 'ROW'
+    ? { id, bedId, startDate, kind: 'ROW', lengthCm: planting.lengthCm }
+    : { id, bedId, startDate, kind: 'SINGLE' };
+};
+
+const bySowDate = (a: SowingBatch, b: SowingBatch) =>
+  a.sowDate.localeCompare(b.sowDate) || a.id.localeCompare(b.id);
 export const PLANT_NOT_FOUND = 'Diese Sorte gibt es nicht.';
 export const GLOBAL_NEIGHBORS_ONLY = 'Globale Sorten dürfen nur auf globale Sorten verweisen.';
 
@@ -183,6 +199,45 @@ export function localRoutes({ repo, globals, newId = () => ulid() }: LocalApiOpt
       if (parsed.response) return parsed.response;
       repo.write({ ...repo.read(), settings: parsed.data });
       return json<GardenSettings>(parsed.data);
+    }),
+
+    // Sowing batches; like the garden service, plantings keep the id of a deleted batch.
+    route('GET', '/api/garden/sowings', () => {
+      const garden = repo.read();
+      return json<ListSowingsResponse>({
+        sowings: [...(garden.sowings ?? [])].sort(bySowDate).map((sowing) => ({
+          sowing,
+          plantings: garden.plantings.filter((p) => p.sowingId === sowing.id).map(sowingPlanting),
+        })),
+      });
+    }),
+
+    route('POST', '/api/garden/sowings', async ({ request }) => {
+      const parsed = await parseJson(request, SaveSowingRequestSchema);
+      if (parsed.response) return parsed.response;
+      const sowing: SowingBatch = { ...parsed.data, id: newId() };
+      const garden = repo.read();
+      repo.write({ ...garden, sowings: [...(garden.sowings ?? []), sowing] });
+      return json(sowing, 201);
+    }),
+
+    route('PUT', '/api/garden/sowings/:id', async ({ request, params }) => {
+      const parsed = await parseJson(request, SaveSowingRequestSchema);
+      if (parsed.response) return parsed.response;
+      const garden = repo.read();
+      const sowings = garden.sowings ?? [];
+      if (!sowings.some((s) => s.id === params.id)) return error(SOWING_NOT_FOUND, 404);
+      const sowing: SowingBatch = { ...parsed.data, id: params.id ?? '' };
+      repo.write({ ...garden, sowings: sowings.map((s) => (s.id === sowing.id ? sowing : s)) });
+      return json(sowing);
+    }),
+
+    route('DELETE', '/api/garden/sowings/:id', ({ params }) => {
+      const garden = repo.read();
+      const sowings = garden.sowings ?? [];
+      if (!sowings.some((s) => s.id === params.id)) return error(SOWING_NOT_FOUND, 404);
+      repo.write({ ...garden, sowings: sowings.filter((s) => s.id !== params.id) });
+      return noContent();
     }),
 
     route('GET', '/api/garden/beds', () =>

@@ -1,4 +1,4 @@
-import type { Bed, Planting } from '@hochbeet/contracts';
+import type { Bed, Planting, SowingBatch } from '@hochbeet/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createGuestRepository,
@@ -28,6 +28,14 @@ const planting: Planting = {
   startDate: '2026-05-04',
   endDate: null,
   removedDate: null,
+};
+const sowing: SowingBatch = {
+  id: '01J9ZQ3W8D6V2K5M7N8P9R0SW1',
+  plantId: planting.plantId,
+  sowDate: '2026-03-09',
+  sownCount: 12,
+  aliveCount: 10,
+  stage: 'PRICKED',
 };
 const envelope = (garden: unknown, version = GUEST_STORAGE_VERSION) =>
   JSON.stringify({ version, garden });
@@ -62,7 +70,22 @@ describe('loadGarden', () => {
       plantings: [planting],
       overrides: { a: { spacingInRowCm: 30 } },
       ownPlants: [],
+      sowings: [],
     });
+  });
+
+  it('keeps sowing batches and plantings pointing to them, also to deleted ones', () => {
+    const linked = { ...planting, sowingId: sowing.id };
+    const orphan = { ...planting, id: '01J9ZQ3W8D6V2K5M7N8P9R0PA2', sowingId: bed.id };
+    const garden = loadGarden(
+      envelope({
+        beds: [bed],
+        plantings: [linked, orphan],
+        sowings: [sowing, { ...sowing, id: '01J9ZQ3W8D6V2K5M7N8P9R0SW2', sownCount: 0 }],
+      }),
+    );
+    expect(garden?.sowings).toEqual([sowing]);
+    expect(garden?.plantings).toEqual([linked, orphan]);
   });
 
   it('cannot read broken JSON, other shapes and newer versions', () => {
@@ -75,7 +98,6 @@ describe('loadGarden', () => {
     const { origin: _origin, ...withoutOrigin } = planting;
 
     it('marks the plantings as planted out', () => {
-      expect(GUEST_STORAGE_VERSION).toBe(2);
       expect(loadGarden(envelope({ beds: [bed], plantings: [withoutOrigin] }, 1))).toMatchObject({
         beds: [bed],
         plantings: [{ ...withoutOrigin, origin: 'TRANSPLANT' }],
@@ -96,7 +118,21 @@ describe('loadGarden', () => {
         plantings: [],
         overrides: {},
         ownPlants: [],
+        sowings: [],
       });
+    });
+  });
+
+  describe('migration from version 2', () => {
+    it('starts without sowing batches', () => {
+      expect(GUEST_STORAGE_VERSION).toBe(3);
+      const migrated = loadGarden(envelope({ beds: [bed], plantings: [planting] }, 2));
+      expect(migrated).toMatchObject({ beds: [bed], plantings: [planting], sowings: [] });
+    });
+
+    it('keeps batches that are already there', () => {
+      const garden = { beds: [bed], plantings: [planting], sowings: [sowing] };
+      expect(loadGarden(envelope(garden, 2))?.sowings).toEqual([sowing]);
     });
   });
 });

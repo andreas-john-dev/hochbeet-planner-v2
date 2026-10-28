@@ -161,17 +161,27 @@ export function mockRoutes(
       const done = store.readImport(key);
       if (done) return json(done);
       const bedIds = Object.fromEntries(parsed.data.beds.map((b) => [b.id, newId()]));
+      const sowingIds = Object.fromEntries(parsed.data.sowings.map((s) => [s.id, newId()]));
       const garden = store.read(user.id);
       store.write(user.id, {
         ...garden,
         beds: [...garden.beds, ...parsed.data.beds.map((b) => ({ ...b, id: bedIds[b.id] ?? '' }))],
         plantings: [
           ...garden.plantings,
-          ...parsed.data.plantings.map((p) => ({
-            ...p,
-            id: newId(),
-            bedId: bedIds[p.bedId] ?? '',
-          })),
+          // A sowingId of a batch outside the import is dropped.
+          ...parsed.data.plantings.map(({ sowingId, ...p }) => {
+            const newSowingId = sowingId === undefined ? undefined : sowingIds[sowingId];
+            return {
+              ...p,
+              id: newId(),
+              bedId: bedIds[p.bedId] ?? '',
+              ...(newSowingId ? { sowingId: newSowingId } : {}),
+            };
+          }),
+        ],
+        sowings: [
+          ...(garden.sowings ?? []),
+          ...parsed.data.sowings.map((s) => ({ ...s, id: sowingIds[s.id] ?? '' })),
         ],
       });
       const result: ImportGardenResponse = { bedIds };
