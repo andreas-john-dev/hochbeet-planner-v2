@@ -145,7 +145,10 @@ test.describe('adding plants on the desktop', () => {
     await expect(lettuce).toContainText('Mo., 30. November 2026 (KW 49)aus der Standzeit');
     await expect(lettuce.getByLabel('Ende anpassen')).toHaveValue('2026-11-30');
 
-    await sown.check();
+    // The radio follows the optimistic update, which lands a moment after the click
+    // (`onMutate` cancels running bed queries first), so wait instead of `check()`.
+    await sown.click();
+    await expect(sown).toBeChecked();
     await expect(sown).toBeFocused();
     await expect(lettuce).toContainText('Mo., 21. Dezember 2026 (KW 52)aus der Standzeit');
     await expect(lettuce.getByLabel('Ende anpassen')).toHaveValue('2026-12-21');
