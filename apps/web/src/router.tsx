@@ -25,6 +25,7 @@ import { NotFoundPage } from '@/routes/NotFoundPage';
 import { PlantDetailPage } from '@/routes/PlantDetailPage';
 import { PlantFormPage } from '@/routes/PlantFormPage';
 import { ProfilePage } from '@/routes/ProfilePage';
+import { SowingsPage } from '@/routes/SowingsPage';
 
 export interface RouterContext {
   auth: AuthStore;
@@ -148,6 +149,7 @@ const routeTree = rootRoute.addChildren([
     indexRoute,
     createRoute({ getParentRoute: () => appLayout, path: '/beete', component: BedsPage }),
     bedEditorRoute,
+    createRoute({ getParentRoute: () => appLayout, path: '/anzucht', component: SowingsPage }),
     createRoute({ getParentRoute: () => appLayout, path: '/katalog', component: CatalogPage }),
     createRoute({
       getParentRoute: () => appLayout,

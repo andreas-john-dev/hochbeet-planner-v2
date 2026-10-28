@@ -1,6 +1,13 @@
 import type { Page } from '@playwright/test';
 import { askAssistant, requestSuggestions, showRememberedPreferences } from './assistant-helpers';
-import { EXAMPLE_BED_ID, exampleGarden, type Garden, PENDING_ID, pendingRequest } from './garden';
+import {
+  EXAMPLE_BED_ID,
+  exampleGarden,
+  type Garden,
+  PENDING_ID,
+  pendingRequest,
+  sowingsGarden,
+} from './garden';
 
 /**
  * Who opens a page: anyone signed out, any signed-in user, admins only, or a guest without
@@ -65,6 +72,14 @@ export const appPages: readonly AppPage[] = [
     access: 'admin',
     seed: exampleGarden,
     setup: requestSuggestions,
+  },
+  {
+    id: 'anzucht',
+    path: '/anzucht',
+    heading: 'Anzucht',
+    access: 'user',
+    navLabel: 'Anzucht',
+    seed: sowingsGarden,
   },
   {
     id: 'katalog',
@@ -144,6 +159,13 @@ export const appPages: readonly AppPage[] = [
     heading: 'Hochbeet Süd',
     access: 'guest',
     seed: exampleGarden,
+  },
+  {
+    id: 'gast-anzucht',
+    path: '/anzucht',
+    heading: 'Anzucht',
+    access: 'guest',
+    seed: sowingsGarden,
   },
   { id: 'gast-katalog', path: '/katalog', heading: 'Pflanzenkatalog', access: 'guest' },
 ];

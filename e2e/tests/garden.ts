@@ -66,6 +66,10 @@ export const PLANTS = {
   parsley: '01M49THV00W2T9ZJHHDX8H5YMY', // Petersilie, 30 weeks
   chives: '01M49THV00JTGP22ZW0RKZZT9K', // Schnittlauch, perennial
   thyme: '01M49THV00Y146B7QH3XHMRCBA', // Thymian, perennial
+  lettuce: '01M49THV00RK9E9PC83NEE87CJ', // Kopfsalat, 25 cm, raised 3–4 weeks
+  kohlrabi: '01M49THV007TNRTCQDEDDW9N6D', // Kohlrabi, raised 4–6 weeks
+  tomato: '01M49THV00QS1SEJEM64991JH5', // Tomate, raised 7–13 weeks, frost sensitive
+  pepper: '01M49THV00C3EM81MSEDXQCJ8S', // Paprika, raised 7–9 weeks, frost sensitive
 } as const;
 
 /** An own plant as the catalogue lists it; `extra` sets e.g. `publication` or `requestedAt`. */
@@ -180,6 +184,59 @@ export const exampleGarden: Garden = {
       orientation: 'V',
       lengthCm: 80,
       startDate: '2026-09-07',
+    }),
+  ],
+};
+
+export const sowingId = (n: number) => `01J9ZQ3W8D6V2K5M7N8P9R0SW${String(n)}`;
+
+/**
+ * The example bed with four batches on 7 October 2026: lettuce hardening off with a row of 3
+ * planned into the bed, kohlrabi just sown, tomatoes done this spring and peppers last year.
+ */
+export const sowingsGarden: Garden = {
+  beds: exampleGarden.beds,
+  plantings: [
+    ...exampleGarden.plantings,
+    planting(exampleId(9), EXAMPLE_BED_ID, PLANTS.lettuce, {
+      kind: 'ROW',
+      x: 50,
+      y: 85,
+      orientation: 'H',
+      lengthCm: 50,
+      startDate: '2026-10-12',
+      sowingId: sowingId(1),
+    }),
+  ],
+  sowings: [
+    sowing(sowingId(1), PLANTS.lettuce, {
+      sowDate: '2026-09-14',
+      sownCount: 24,
+      aliveCount: 18,
+      stage: 'HARDENING',
+      location: 'Fensterbank Küche',
+      plannedTransplantDate: '2026-10-12',
+    }),
+    sowing(sowingId(2), PLANTS.kohlrabi, {
+      sowDate: '2026-10-05',
+      sownCount: 12,
+      aliveCount: 0,
+      stage: 'SOWN',
+      location: 'Gewächshaus',
+      plannedTransplantDate: '2026-11-16',
+    }),
+    sowing(sowingId(3), PLANTS.tomato, {
+      sowDate: '2026-03-09',
+      sownCount: 12,
+      aliveCount: 0,
+      stage: 'DONE',
+      notes: 'Zwei Pflanzen an die Nachbarn verschenkt.',
+    }),
+    sowing(sowingId(4), PLANTS.pepper, {
+      sowDate: '2025-03-10',
+      sownCount: 8,
+      aliveCount: 0,
+      stage: 'DONE',
     }),
   ],
 };

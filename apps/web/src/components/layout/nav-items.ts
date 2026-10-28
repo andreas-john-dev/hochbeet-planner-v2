@@ -1,7 +1,7 @@
-import { Leaf, ShieldCheck, Sprout, UserRound, type LucideIcon } from 'lucide-react';
+import { Bean, Leaf, ShieldCheck, Sprout, UserRound, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
-  to: '/beete' | '/katalog' | '/profil' | '/admin';
+  to: '/beete' | '/anzucht' | '/katalog' | '/profil' | '/admin';
   label: string;
   icon: LucideIcon;
   /** Only shown to members of the Cognito group `admins`. */
@@ -12,6 +12,7 @@ export interface NavItem {
 
 export const navItems: readonly NavItem[] = [
   { to: '/beete', label: 'Beete', icon: Sprout },
+  { to: '/anzucht', label: 'Anzucht', icon: Bean },
   { to: '/katalog', label: 'Katalog', icon: Leaf },
   { to: '/profil', label: 'Profil', icon: UserRound, accountOnly: true },
   { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true, accountOnly: true },
