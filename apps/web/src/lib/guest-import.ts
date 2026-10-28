@@ -17,20 +17,22 @@ export function guestDataSummary(garden: LocalGarden) {
     plantings: garden.plantings.length,
     ownPlants: (garden.ownPlants ?? []).filter((p) => !p.archived).length,
     overrides: Object.keys(garden.overrides ?? {}).length,
+    sowings: (garden.sowings ?? []).length,
   };
 }
 
 export function hasGuestData(garden: LocalGarden): boolean {
-  const { beds, ownPlants, overrides } = guestDataSummary(garden);
-  return beds + ownPlants + overrides > 0;
+  const { beds, ownPlants, overrides, sowings } = guestDataSummary(garden);
+  return beds + ownPlants + overrides + sowings > 0;
 }
 
-/** „2 Beete, 5 Pflanzungen und 1 eigene Sorte“ */
+/** „2 Beete, 5 Pflanzungen, 1 Anzucht und 1 eigene Sorte“ */
 export function describeGuestData(garden: LocalGarden): string {
-  const { beds, plantings, ownPlants, overrides } = guestDataSummary(garden);
+  const { beds, plantings, ownPlants, overrides, sowings } = guestDataSummary(garden);
   const parts = [
     [beds, 'Beet', 'Beete'],
     [plantings, 'Pflanzung', 'Pflanzungen'],
+    [sowings, 'Anzucht', 'Anzuchten'],
     [ownPlants, 'eigene Sorte', 'eigene Sorten'],
     [overrides, 'Anpassung', 'Anpassungen'],
   ] as const;
@@ -57,16 +59,21 @@ export function catalogImportRequest(garden: LocalGarden, importId: string): Imp
   };
 }
 
-/** Beds and plantings, with plantings pointing to the new ids of imported own plants. */
+/**
+ * Beds, plantings and sowing batches, with plantings and batches pointing to the new ids of
+ * imported own plants. The garden service gives everything new ids and maps `sowingId`.
+ */
 export function gardenImportRequest(
   garden: LocalGarden,
   importId: string,
   plantIds: Readonly<Record<string, string>>,
 ): ImportGardenRequest {
+  const plantId = (id: string) => plantIds[id] ?? id;
   return {
     importId,
     beds: garden.beds,
-    plantings: garden.plantings.map((p) => ({ ...p, plantId: plantIds[p.plantId] ?? p.plantId })),
+    plantings: garden.plantings.map((p) => ({ ...p, plantId: plantId(p.plantId) })),
+    sowings: (garden.sowings ?? []).map((s) => ({ ...s, plantId: plantId(s.plantId) })),
   };
 }
 
@@ -84,7 +91,7 @@ export function guestImportId(storage: Storage = localStorage): string {
 
 /**
  * Moves the guest's data into the signed-in user's account: catalogue first, because the
- * plantings need the new ids of own plants, then beds and plantings.
+ * plantings and batches need the new ids of own plants, then beds, plantings and batches.
  */
 export async function importGuestData(api: ApiFetch, garden: LocalGarden, importId: string) {
   const catalog = catalogImportRequest(garden, importId);
@@ -95,7 +102,7 @@ export async function importGuestData(api: ApiFetch, garden: LocalGarden, import
       body: JSON.stringify(catalog),
     }));
   }
-  if (garden.beds.length > 0) {
+  if (garden.beds.length + (garden.sowings ?? []).length > 0) {
     await api<ImportGardenResponse>('/api/garden/import', {
       method: 'POST',
       body: JSON.stringify(gardenImportRequest(garden, importId, plantIds)),

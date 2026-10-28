@@ -6,12 +6,15 @@ import type {
   GardenSettings,
   ListBedsResponse,
   ListPlantsResponse,
+  ListSowingsResponse,
   Planting,
   PlantingFields,
   Plant,
   PlantFields,
   PlantOverride,
   PublicationQueueResponse,
+  SowingBatch,
+  SowingBatchFields,
 } from '@hochbeet/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api-context';
@@ -22,6 +25,7 @@ export const queryKeys = {
   plants: ['plants'] as const,
   publications: ['publications'] as const,
   settings: ['settings'] as const,
+  sowings: ['sowings'] as const,
 };
 
 export function useBeds() {
@@ -188,7 +192,47 @@ export function useDeleteBed() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<undefined>(`/api/garden/beds/${id}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.beds }),
+    // The bed's plantings go with it, so batches have fewer seedlings planned.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.beds }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.sowings }),
+      ]),
+  });
+}
+
+/** All sowing batches, each with its linked plantings from all beds. */
+export function useSowings() {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.sowings,
+    queryFn: async () => (await api<ListSowingsResponse>('/api/garden/sowings')).sowings,
+  });
+}
+
+/** Saves a batch: PUT with an id, POST without. */
+export function useSaveSowing() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fields }: { id?: string; fields: SowingBatchFields }) =>
+      id
+        ? api<SowingBatch>(`/api/garden/sowings/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(fields),
+          })
+        : api<SowingBatch>('/api/garden/sowings', { method: 'POST', body: JSON.stringify(fields) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sowings }),
+  });
+}
+
+/** Deletes a batch; plantings from it keep their `sowingId`, which then counts as none. */
+export function useDeleteSowing() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<undefined>(`/api/garden/sowings/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sowings }),
   });
 }
 
@@ -204,7 +248,8 @@ function applyChange(data: BedWithPlantingsResponse, change: PlantingChange) {
 
 /**
  * Shared optimistic update for planting changes: the editor shows the change at once and
- * rolls back if the request fails. Afterwards the bed is reloaded from the server.
+ * rolls back if the request fails. Afterwards the bed is reloaded from the server, and the
+ * batches too, because their planned seedlings come from the plantings.
  */
 function useOptimisticPlantingChange<TVariables, TResult>(
   bedId: string,
@@ -226,7 +271,11 @@ function useOptimisticPlantingChange<TVariables, TResult>(
     onError: (_error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(key, context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: key }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.sowings }),
+      ]),
   });
 }
 

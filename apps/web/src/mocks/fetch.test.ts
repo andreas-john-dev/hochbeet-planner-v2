@@ -3,6 +3,7 @@ import type {
   BedWithPlantingsResponse,
   ListBedsResponse,
   ListPlantsResponse,
+  ListSowingsResponse,
 } from '@hochbeet/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createMockFetch } from './fetch';
@@ -116,6 +117,61 @@ describe('mock API', () => {
     expect(deleted.status).toBe(204);
     expect(await listBeds('a@example.com')).toEqual([]);
     expect(new MockStore(localStorage).read('a@example.com').plantings).toEqual([]);
+  });
+
+  it('imports guest batches with new ids, once per import, and points plantings to them', async () => {
+    const GUEST_BED = '01J9ZQ3W8D6V2K5M7N8P9R0BED';
+    const SOWING = '01J9ZQ3W8D6V2K5M7N8P9R0SW1';
+    const sowing = {
+      id: SOWING,
+      plantId: '01M49THV00SZ6Q8R32BYJM5P2S',
+      sowDate: '2026-03-09',
+      sownCount: 10,
+      aliveCount: 8,
+      stage: 'HARDENING',
+    };
+    const guestPlanting = (id: string, sowingId: string) => ({
+      id,
+      bedId: GUEST_BED,
+      kind: 'SINGLE',
+      plantId: sowing.plantId,
+      origin: 'TRANSPLANT',
+      sowingId,
+      x: 20,
+      y: 20,
+      startDate: '2026-05-04',
+      endDate: null,
+      removedDate: null,
+    });
+    const body = JSON.stringify({
+      importId: '01J9ZQ3W8D6V2K5M7N8P9R0MP1',
+      beds: [{ ...bedFields('Gastbeet'), id: GUEST_BED }],
+      plantings: [
+        guestPlanting('01J9ZQ3W8D6V2K5M7N8P9R0PA1', SOWING),
+        // Its batch was deleted in the browser.
+        guestPlanting('01J9ZQ3W8D6V2K5M7N8P9R0PA2', '01J9ZQ3W8D6V2K5M7N8P9R0SW2'),
+      ],
+      sowings: [sowing],
+    });
+    const post = () =>
+      fetchFn('/api/garden/import', {
+        method: 'POST',
+        headers: { ...auth('a@example.com'), ...json },
+        body,
+      });
+    expect((await post()).status).toBe(200);
+    expect((await post()).status).toBe(200);
+
+    const { sowings } = (await (
+      await fetchFn('/api/garden/sowings', { headers: auth('a@example.com') })
+    ).json()) as ListSowingsResponse;
+    expect(sowings).toHaveLength(1);
+    const [imported] = sowings;
+    expect(imported?.sowing).toMatchObject({ plantId: sowing.plantId, aliveCount: 8 });
+    expect(imported?.sowing.id).not.toBe(SOWING);
+    expect(imported?.plantings).toHaveLength(1);
+    const { plantings } = new MockStore(localStorage).read('a@example.com');
+    expect(plantings.map((p) => p.sowingId)).toEqual([imported?.sowing.id, undefined]);
   });
 
   it('serves the start catalogue', async () => {
