@@ -15,6 +15,7 @@ import {
   GardenSettingsSchema,
   ImportCatalogRequestSchema,
   ImportGardenRequestSchema,
+  ListSowingsResponseSchema,
   RejectPublicationRequestSchema,
   SaveBedRequestSchema,
   SavePlantingRequestSchema,
@@ -37,6 +38,33 @@ describe('garden API contracts', () => {
   it('returns a bed with its plantings', () => {
     const body = { bed, plantings: [singlePlanting, rowPlanting] };
     expect(BedWithPlantingsResponseSchema.parse(body)).toEqual(body);
+  });
+
+  it('lists batches with their linked plantings in compact form', () => {
+    const sowing = {
+      id: '01J9ZQ3W8D6V2K5M7N8P9R0SW1',
+      plantId: tomato.id,
+      sowDate: '2026-03-09',
+      sownCount: 12,
+      aliveCount: 10,
+      stage: 'HARDENING',
+    };
+    const body = {
+      sowings: [
+        {
+          sowing,
+          plantings: [
+            { id: ID.planting, bedId: ID.bed, kind: 'SINGLE', startDate: '2026-05-18' },
+            { id: ID.basil, bedId: ID.bed, kind: 'ROW', lengthCm: 100, startDate: '2026-05-18' },
+          ],
+        },
+      ],
+    };
+    expect(ListSowingsResponseSchema.parse(body)).toEqual(body);
+    const rowWithoutLength = {
+      sowings: [{ sowing, plantings: [{ ...body.sowings[0]?.plantings[1], lengthCm: undefined }] }],
+    };
+    expect(ListSowingsResponseSchema.safeParse(rowWithoutLength).success).toBe(false);
   });
 
   it('accepts a last frost day of every year and nothing else', () => {
@@ -72,9 +100,34 @@ describe('catalog API contracts', () => {
 describe('import contracts', () => {
   const importId = '01J9ZQ3W8D6V2K5M7N8P9R0MP1';
 
-  it('imports beds with their plantings', () => {
+  it('imports beds with their plantings, batches only from newer app versions', () => {
     const body = { importId, beds: [bed], plantings: [singlePlanting, rowPlanting] };
+    expect(ImportGardenRequestSchema.parse(body)).toEqual({ ...body, sowings: [] });
+  });
+
+  it('imports batches once each and at most 200', () => {
+    const sowing = {
+      id: '01J9ZQ3W8D6V2K5M7N8P9R0SW1',
+      plantId: tomato.id,
+      sowDate: '2026-03-09',
+      sownCount: 12,
+      aliveCount: 10,
+      stage: 'SOWN',
+    };
+    const body = {
+      importId,
+      beds: [bed],
+      plantings: [{ ...singlePlanting, sowingId: sowing.id }],
+      sowings: [sowing],
+    };
     expect(ImportGardenRequestSchema.parse(body)).toEqual(body);
+    const twice = ImportGardenRequestSchema.safeParse({ ...body, sowings: [sowing, sowing] });
+    expect(twice.error?.issues.map((i) => i.message)).toEqual(['Anzucht doppelt.']);
+    const many = ImportGardenRequestSchema.safeParse({
+      ...body,
+      sowings: Array.from({ length: 201 }, () => sowing),
+    });
+    expect(many.error?.issues[0]?.message).toBe('Höchstens 200 Anzuchten auf einmal.');
   });
 
   it('refuses plantings of beds outside the import and duplicate beds', () => {

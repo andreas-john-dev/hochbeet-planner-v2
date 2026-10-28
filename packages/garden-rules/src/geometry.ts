@@ -154,3 +154,14 @@ export function defaultMainRowDirection(bed: Pick<Bed, 'widthCm' | 'depthCm'>): 
 export function rowPlantCount(lengthCm: number, spacingInRowCm: number): number {
   return Math.floor(lengthCm / spacingInRowCm) + 1;
 }
+
+/** What counting needs of a planting; also the compact plantings of a sowing batch. */
+export type CountablePlanting = { kind: 'SINGLE' } | { kind: 'ROW'; lengthCm: number };
+
+/** Number of plants of a planting: 1 for a single plant, every plant of a row. */
+export function plantCount(
+  planting: CountablePlanting,
+  plant: Pick<Plant, 'spacingInRowCm'>,
+): number {
+  return planting.kind === 'SINGLE' ? 1 : rowPlantCount(planting.lengthCm, plant.spacingInRowCm);
+}

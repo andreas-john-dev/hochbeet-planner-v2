@@ -1,4 +1,4 @@
-import type { Bed, ImportGardenRequest, Planting } from '@hochbeet/contracts';
+import type { Bed, ImportGardenRequest, Planting, SowingBatch } from '@hochbeet/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { importGarden, type ImportStore, planGardenImport } from './import';
 import type { ImportRecord } from './repository';
@@ -23,12 +23,21 @@ const planting = (id: string, bedId: string): Planting => ({
   endDate: null,
   removedDate: null,
 });
+const sowing = (id: string): SowingBatch => ({
+  id,
+  plantId: '01M49THV00SZ6Q8R32BYJM5P2S',
+  sowDate: '2026-03-09',
+  sownCount: 6,
+  aliveCount: 6,
+  stage: 'SOWN',
+});
 const BED_A = '01J9ZQ3W8D6V2K5M7N8P9R0BDA';
 const BED_B = '01J9ZQ3W8D6V2K5M7N8P9R0BDB';
 const request: ImportGardenRequest = {
   importId: '01J9ZQ3W8D6V2K5M7N8P9R0MP1',
   beds: [bed(BED_A), bed(BED_B)],
   plantings: [planting('01J9ZQ3W8D6V2K5M7N8P9R0PA1', BED_B)],
+  sowings: [],
 };
 const counter = () => {
   let n = 0;
@@ -45,6 +54,25 @@ describe('planGardenImport', () => {
     expect(plantings).toEqual([
       expect.objectContaining({ id: 'NEW00000000000000000000003', bedId: beds[1]?.id }),
     ]);
+  });
+
+  it('gives batches new ids and points plantings to them', () => {
+    const SOWING = '01J9ZQ3W8D6V2K5M7N8P9R0SW1';
+    const withSowings: ImportGardenRequest = {
+      ...request,
+      sowings: [sowing(SOWING)],
+      plantings: [
+        { ...planting('01J9ZQ3W8D6V2K5M7N8P9R0PA1', BED_A), sowingId: SOWING },
+        // A batch the guest deleted: the id leads nowhere and is dropped.
+        { ...planting('01J9ZQ3W8D6V2K5M7N8P9R0PA2', BED_A), sowingId: BED_B },
+      ],
+    };
+    const { sowings, plantings, ids } = planGardenImport(withSowings, {}, counter());
+    expect(sowings).toEqual([{ ...sowing(SOWING), id: 'NEW00000000000000000000003' }]);
+    expect(plantings[0]?.sowingId).toBe('NEW00000000000000000000003');
+    expect(plantings[1]).not.toHaveProperty('sowingId');
+    // Bed and batch ids are kept apart even if they were equal.
+    expect(ids[BED_B]).toBe('NEW00000000000000000000002');
   });
 
   it('keeps ids chosen by an earlier attempt', () => {

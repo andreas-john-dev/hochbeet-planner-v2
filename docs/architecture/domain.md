@@ -4,7 +4,7 @@ Teil der [Architektur](../architecture.md). Beet, Pflanzung, Sorte, Standfläche
 
 ## Domänenmodell
 
-Das Modell kennt drei Kernobjekte: das Beet, die Pflanzung und die Sorte. Alle Längen sind in Zentimetern angegeben. Positionen liegen auf einem 5-cm-Raster, dessen Ursprung die linke obere Ecke des Beets ist.
+Das Modell kennt drei Kernobjekte: das Beet, die Pflanzung und die Sorte; dazu kommt die Anzucht-Charge für vorgezogene Jungpflanzen. Alle Längen sind in Zentimetern angegeben. Positionen liegen auf einem 5-cm-Raster, dessen Ursprung die linke obere Ecke des Beets ist.
 
 ### Bed (Hochbeet)
 
@@ -32,10 +32,29 @@ Das Modell kennt drei Kernobjekte: das Beet, die Pflanzung und die Sorte. Alle L
 | `startDate` | ISO-Datum | Pflanz- bzw. Saatdatum, immer der Montag der gewählten Woche |
 | `endDate` | ISO-Datum \| null | Aus dem Lebenszyklus vorbelegt (bei Direktsaat mit Zuschlag), pro Pflanzung überschreibbar; leer bei Dauerkulturen |
 | `removedDate` | ISO-Datum \| null | Manuelles Entfernen „ab KW XY“; sticht `endDate` |
+| `sowingId` | ULID, optional | Anzucht-Charge, aus der die Jungpflanzen stammen; nur bei `origin: 'TRANSPLANT'`, sonst lehnt das Schema ab. Gekaufte Jungpflanzen haben keine |
 
-Die Stückzahl einer Reihe wird nicht gespeichert, sondern berechnet: `floor(lengthCm / Pflanzabstand) + 1`.
+Die Stückzahl einer Pflanzung wird nicht gespeichert, sondern berechnet: `plantCount()` in `packages/garden-rules` liefert 1 für eine Einzelpflanze und `floor(lengthCm / Pflanzabstand) + 1` für eine Reihe (`rowPlantCount()`).
 
 `origin` hat im Schema den Standardwert `TRANSPLANT`: Der Garden-Service liest alte Einträge ohne das Feld ohne Datenmigration in DynamoDB und schreibt es bei jedem Speichern; Requests und Gast-Importe ohne `origin` (ältere App-Stände) bleiben gültig. Der Gastspeicher setzt es beim Wechsel auf Version 2 (`src/lib/local-api/store.ts`). Im Editor schaltet das Bearbeiten-Panel zwischen „Direktsaat“ und „Gepflanzt“ um; ein vorbelegtes Ende (gleich dem Ende aus dem Lebenszyklus) wandert dabei mit, ein von Hand gesetztes bleibt.
+
+### SowingBatch (Anzucht-Charge)
+
+Eine Sorte, in einer Woche ausgesät und als Jungpflanzen vorgezogen (Epic #121). Die Charge gehört dem User, nicht einem Beet; Pflanzungen aus allen Beeten verweisen über `sowingId` auf sie.
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `id` | ULID | Eindeutige ID |
+| `plantId` | ULID | Verweis auf die Sorte |
+| `sowDate` | ISO-Datum | Aussaatwoche, immer der Montag |
+| `sownCount` | 1 bis 9999 | Gesäte Menge |
+| `aliveCount` | 0 bis 9999 | Aktueller Bestand, von Hand gepflegt (Ausfälle, verschenkt); „Charge abschließen“ setzt ihn auf 0 |
+| `stage` | `PLANNED` \| `SOWN` \| `GERMINATED` \| `PRICKED` \| `HARDENING` \| `DONE` | Phase: geplant, gesät, gekeimt, pikiert, abhärten, abgeschlossen |
+| `location` | string, optional | Standort als Freitext, höchstens 60 Zeichen |
+| `plannedTransplantDate` | ISO-Datum, optional | Geplantes Auspflanzen, Montag nach der Aussaatwoche |
+| `notes` | string, optional | Notiz, höchstens 500 Zeichen |
+
+Was schon in Beeten steht, wird nicht gespeichert, sondern berechnet: **verplant** = Summe der Stückzahlen aller verknüpften Pflanzungen (`plannedCount(batch, plants)` mit der effektiven Sorte), **verfügbar** = Bestand − verplant. Ändert sich eine Reihe, stimmen die Zahlen sofort. Wird eine Charge gelöscht, behalten ihre Pflanzungen die `sowingId`; App und Regeln behandeln sie wie „keine Charge“.
 
 ### Plant (Sorte)
 

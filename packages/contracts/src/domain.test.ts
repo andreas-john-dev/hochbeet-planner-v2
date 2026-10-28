@@ -6,6 +6,8 @@ import {
   PlantingSchema,
   PlantOverrideSchema,
   PlantSchema,
+  SowingBatchFieldsSchema,
+  SowingBatchSchema,
   SowingSchema,
 } from './domain';
 import { bed, rowPlanting, singlePlanting, tomato } from './fixtures.test-utils';
@@ -72,6 +74,95 @@ describe('PlantingSchema', () => {
       path: ['endDate'],
       message: 'Ende muss nach dem Start liegen.',
     });
+  });
+});
+
+describe('PlantingSchema with a sowing batch', () => {
+  const sowingId = '01J9ZQ3W8D6V2K5M7N8P9R0SW1';
+
+  it('links planted out plantings to a batch', () => {
+    expect(PlantingSchema.parse({ ...rowPlanting, sowingId }).sowingId).toBe(sowingId);
+    // Without origin the planting counts as planted out.
+    const { origin: _, ...withoutOrigin } = singlePlanting;
+    expect(PlantingSchema.safeParse({ ...withoutOrigin, sowingId }).success).toBe(true);
+  });
+
+  it('refuses a batch for direct sowing and ids that are no ULID', () => {
+    const sown = PlantingSchema.safeParse({ ...singlePlanting, origin: 'DIRECT_SOW', sowingId });
+    expect(sown.error?.issues).toEqual([
+      expect.objectContaining({
+        path: ['sowingId'],
+        message: 'Nur gepflanzte Pflanzungen stammen aus einer Anzucht.',
+      }),
+    ]);
+    expect(PlantingSchema.safeParse({ ...singlePlanting, sowingId: 'batch' }).success).toBe(false);
+  });
+});
+
+describe('SowingBatchSchema', () => {
+  const batch = {
+    id: '01J9ZQ3W8D6V2K5M7N8P9R0SW1',
+    plantId: tomato.id,
+    sowDate: '2026-03-09',
+    sownCount: 12,
+    aliveCount: 10,
+    stage: 'PRICKED',
+    location: 'Fensterbank Küche',
+    plannedTransplantDate: '2026-05-18',
+    notes: 'Zwei Sorten gemischt',
+  } as const;
+  const issues = (value: unknown) =>
+    SowingBatchSchema.safeParse(value).error?.issues.map((i) => [i.path.join('.'), i.message]);
+
+  it('accepts a full batch and one with only the required fields', () => {
+    expect(SowingBatchSchema.parse(batch)).toEqual(batch);
+    const { location, plannedTransplantDate, notes, ...required } = batch;
+    expect(SowingBatchSchema.parse({ ...required, stage: 'PLANNED' })).toEqual({
+      ...required,
+      stage: 'PLANNED',
+    });
+    const { id, ...fields } = batch;
+    expect(SowingBatchFieldsSchema.parse(batch)).toEqual(fields);
+  });
+
+  it('sows and plants out on Mondays, planting out after sowing', () => {
+    expect(issues({ ...batch, sowDate: '2026-03-10' })).toEqual([
+      ['sowDate', 'Muss ein Montag sein.'],
+    ]);
+    expect(issues({ ...batch, plannedTransplantDate: '2026-05-19' })).toEqual([
+      ['plannedTransplantDate', 'Muss ein Montag sein.'],
+    ]);
+    expect(issues({ ...batch, plannedTransplantDate: batch.sowDate })).toEqual([
+      ['plannedTransplantDate', 'Auspflanzen muss nach der Aussaat liegen.'],
+    ]);
+    const { id, ...fields } = batch;
+    expect(
+      SowingBatchFieldsSchema.safeParse({ ...fields, plannedTransplantDate: '2026-03-02' }).success,
+    ).toBe(false);
+  });
+
+  it('counts whole seeds and seedlings', () => {
+    expect(issues({ ...batch, sownCount: 0 })).toEqual([
+      ['sownCount', '1 bis 9999 Stück angeben.'],
+    ]);
+    expect(issues({ ...batch, sownCount: 2.5 })).toEqual([['sownCount', 'Ganze Stück angeben.']]);
+    expect(issues({ ...batch, aliveCount: -1 })).toEqual([
+      ['aliveCount', '0 bis 9999 Stück angeben.'],
+    ]);
+    expect(issues({ ...batch, aliveCount: 0 })).toBeUndefined();
+    expect(issues({ ...batch, sownCount: 10_000 })).toEqual([
+      ['sownCount', '1 bis 9999 Stück angeben.'],
+    ]);
+  });
+
+  it('knows the stages and limits the texts', () => {
+    expect(issues({ ...batch, stage: 'PLANTED' })?.[0]?.[0]).toBe('stage');
+    expect(issues({ ...batch, location: 'x'.repeat(61) })).toEqual([
+      ['location', 'Höchstens 60 Zeichen.'],
+    ]);
+    expect(issues({ ...batch, notes: 'x'.repeat(501) })).toEqual([
+      ['notes', 'Höchstens 500 Zeichen.'],
+    ]);
   });
 });
 

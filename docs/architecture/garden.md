@@ -1,11 +1,12 @@
 # Garden-Service
 
-Teil der [Architektur](../architecture.md). Beete und Pflanzungen der User sowie die Übernahme aus dem Gastmodus.
+Teil der [Architektur](../architecture.md). Beete, Pflanzungen und Anzucht-Chargen der User sowie die Übernahme aus dem Gastmodus.
 
 | PK | SK | Inhalt |
 | --- | --- | --- |
 | `USER#<uid>` | `BED#<bedId>` | Beet |
 | `USER#<uid>` | `BED#<bedId>#PLANTING#<id>` | Pflanzung |
+| `USER#<uid>` | `SOWING#<id>` | Anzucht-Charge (`SowingBatchSchema`) |
 | `USER#<uid>` | `IMPORT#<importId>` | Stand eines Imports aus dem Gastmodus (ID-Zuordnung, Antwort) |
 | `USER#<uid>` | `SETTINGS` | Einstellungen für alle Beete, z. B. letzter Frost (`GardenSettingsSchema`) |
 
@@ -21,7 +22,11 @@ Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen �
 | POST | `/garden/beds/{bedId}/plantings` | Pflanzung anlegen |
 | PUT | `/garden/beds/{bedId}/plantings/{id}` | Pflanzung ändern (verschieben, Daten, Entfernen) |
 | DELETE | `/garden/beds/{bedId}/plantings/{id}` | Pflanzung löschen |
-| POST | `/garden/import` | Beete und Pflanzungen aus dem Gastmodus übernehmen |
+| GET | `/garden/sowings` | Alle Anzucht-Chargen, je Charge mit den verknüpften Pflanzungen aus allen Beeten |
+| POST | `/garden/sowings` | Charge anlegen |
+| PUT | `/garden/sowings/{id}` | Charge ändern (Phase, Bestand, Standort, Notiz …) |
+| DELETE | `/garden/sowings/{id}` | Charge löschen; verknüpfte Pflanzungen bleiben |
+| POST | `/garden/import` | Beete, Pflanzungen und Chargen aus dem Gastmodus übernehmen |
 | GET | `/garden/settings` | Einstellungen des Users, ohne Eintrag die Standardwerte |
 | PUT | `/garden/settings` | Einstellungen ersetzen |
 
@@ -44,6 +49,11 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
   - `origin` (Direktsaat oder gepflanzt) fehlt in Einträgen von vor T-51: Das Schema liest sie als `TRANSPLANT`, eine Datenmigration in DynamoDB gibt es nicht; jedes Speichern schreibt das Feld mit. Requests ohne `origin` bekommen ebenfalls `TRANSPLANT`.
   - Fachliche Befunde wie „Beetrand“ berechnet der Client. Sie blockieren das Speichern nie, auch eine Pflanzung außerhalb des Beets wird gespeichert.
   - Ob die Sorte existiert, prüft der Garden-Service nicht, weil Services sich nie gegenseitig aufrufen.
+- **Anzucht-Chargen** (T-55):
+  - `GET /garden/sowings` liest die ganze Partition `USER#<uid>` in einer Query (bei Hobbymengen unkritisch) und hängt an jede Charge die Pflanzungen mit ihrer `sowingId` in kompakter Form (`id`, `bedId`, `kind`, `lengthCm` bei Reihen, `startDate`), sortiert nach Aussaatwoche. Die Stückzahl rechnet der Client mit `plannedCount()` und der effektiven Sorte, weil der Garden-Service die Abstände der Sorten nicht kennt und Services sich nie gegenseitig aufrufen.
+  - `POST` legt eine Charge mit neuer ULID an, `PUT` ersetzt eine bestehende, `DELETE` löscht sie; fremde und unbekannte Chargen liefern 404.
+  - Die API prüft nur die Struktur über `SaveSowingRequestSchema`: Aussaat und geplantes Auspflanzen am Montag (Auspflanzen danach), ganze Mengen, bekannte Phase, Textlängen. Ob Sorte oder Charge existieren, prüft sie nicht; auch eine Pflanzung darf auf eine gelöschte Charge zeigen.
+  - `sowingId` an Pflanzungen ist nur mit `origin: 'TRANSPLANT'` erlaubt, sonst 400.
 - **Einstellungen** (T-53): `lastFrost` als Monat und Tag (`MM-DD`, gilt jedes Jahr; der 29. Februar wird abgelehnt, weil es ihn nicht jedes Jahr gibt). `GET` liefert ohne Eintrag `DEFAULT_GARDEN_SETTINGS` (letzter Frost `05-15`), `PUT` ersetzt den Eintrag. Das Datum eines Jahres berechnet `lastFrostDate(settings, year)` in `packages/garden-rules/src/time.ts`. Gäste haben kein Profil; die lokale API liefert ihnen die Standardwerte (`settings` im Gastspeicher ist optional, die Version bleibt).
 - **Import aus dem Gastmodus** (`POST /garden/import`, `src/garden/import.ts`): siehe „Übernahme aus dem Gastmodus“.
 - **Mandantentrennung:** Fremde und unbekannte Beete liefern 404. Weil der User Teil jedes Schlüssels ist, kann eine Query nie fremde Beete treffen.
@@ -54,9 +64,9 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
 Meldet sich ein Gast an oder registriert sich, fragt die App nach der Übernahme seiner Daten aus dem Browser (T-39). Weil Services sich nie gegenseitig aufrufen, gibt es zwei Endpunkte, und der Client verbindet sie:
 
 1. `POST /catalog/import` mit eigenen Sorten (auch archivierten, weil Pflanzungen sie nutzen können) und Anpassungen. Eigene Sorten bekommen neue ULIDs und sind privat; Nachbarn zeigen auf die neuen IDs importierter Sorten oder auf globale Sorten, unbekannte fallen weg. Anpassungen gelten nur für globale Sorten und nur mit globalen Nachbarn; hat der User für eine Sorte schon eine Anpassung, bleibt seine (`PutItem` mit `attribute_not_exists`). Die Antwort ordnet alte Sorten-IDs den neuen zu.
-2. Der Client setzt diese IDs in die Pflanzungen ein und ruft `POST /garden/import` mit Beeten und Pflanzungen auf. Beete und Pflanzungen bekommen neue ULIDs, Pflanzungen zeigen auf die neuen Beete; eine Pflanzung eines Beets, das nicht im Import ist, ergibt 400.
+2. Der Client setzt diese IDs in die Pflanzungen und Chargen ein und ruft `POST /garden/import` mit Beeten, Pflanzungen und Chargen auf. Alle bekommen neue ULIDs, Pflanzungen zeigen auf die neuen Beete und Chargen; eine Pflanzung eines Beets, das nicht im Import ist, ergibt 400. Eine `sowingId` einer Charge, die nicht im Import ist (im Browser gelöscht), fällt weg. `sowings` fehlt in Requests älterer App-Stände und gilt dann als leer.
 
 - **Idempotenz:** Beide Requests tragen dieselbe `importId` (ULID aus dem Client, im `localStorage` unter `hochbeet-guest-import-id`, bis der Import gelungen ist). Jeder Service speichert unter `IMPORT#<importId>` zuerst die ID-Zuordnung, schreibt dann die Daten mit genau diesen IDs und zuletzt die Antwort. Ein wiederholter Request liefert die gespeicherte Antwort; ein unterbrochener Import wird mit denselben IDs zu Ende geschrieben. So entstehen nie Duplikate.
-- **Grenzen:** höchstens 50 Beete, 1000 Pflanzungen, 200 eigene Sorten und 200 Anpassungen je Import, mit deutscher Meldung; das reicht weit für alles, was ein Gast im Browser plant, und hält einen Request klein.
+- **Grenzen:** höchstens 50 Beete, 1000 Pflanzungen, 200 Chargen, 200 eigene Sorten und 200 Anpassungen je Import, mit deutscher Meldung; das reicht weit für alles, was ein Gast im Browser plant, und hält einen Request klein.
 - **Schreiben:** einzelne `PutItem`-Aufrufe, 25 parallel; die IAM-Policies der Lambdas bleiben unverändert.
 - **Frontend:** `GuestImportDialog` (im `AppShell`, nur angemeldet) liest die Gastdaten (`createGuestRepository()`), nennt, was in diesem Browser liegt, und bietet „Übernehmen“ bzw. „Lokale Beete hinzufügen“, wenn das Konto schon Beete hat, dazu „Verwerfen“ und „Später“. Nach Erfolg löscht es die Gastdaten und lädt alle Abfragen neu; bei Fehlern bleiben die Daten, und die Meldung kommt über `apiErrorMessage()`. Die Logik liegt in `src/lib/guest-import.ts`, die Mock-API bildet beide Endpunkte nach.
