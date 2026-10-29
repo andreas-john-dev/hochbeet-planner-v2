@@ -1,6 +1,6 @@
 # Frontend und Mobile-UX
 
-Teil der [Architektur](../architecture.md). React-SPA: Katalog, Beet-Editor, Barrierefreiheit, Bedienung nach Gerät, Laufzeitkonfiguration und Anmeldung.
+Teil der [Architektur](../architecture.md). React-SPA: Katalog, Beet-Editor, Anzucht, Barrierefreiheit, Bedienung nach Gerät, Laufzeitkonfiguration und Anmeldung.
 
 Das Frontend ist eine React-SPA, die auf Desktop und Smartphone gleich gut bedienbar ist.
 
@@ -175,6 +175,13 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
   - Dialog „Beet anlegen“ bzw. „Beet bearbeiten“ mit Name, Breite, Tiefe und Reihenrichtung. Die Reihenrichtung ist als Skizze erklärt und folgt dem Standard (parallel zur kürzeren Kante), bis der User selbst wählt.
   - Löschen fragt nach und weist darauf hin, dass die Pflanzungen mitgelöscht werden.
   - Ohne Beete erscheint ein leerer Zustand mit der Einladung zum ersten Beet.
+- **Anzucht (`/anzucht`, T-57):** `routes/SowingsPage.tsx` mit `components/sowings/` (`SowingCard`, `SowingFormDialog`, `DeleteSowingDialog`); Logik in `lib/sowings.ts`, Daten über `useSowings()` und `usePlants()`. Auch für Gäste, Navigationspunkt „Anzucht“ zwischen „Beete“ und „Katalog“.
+  - Chargen gruppiert nach Jahr (neuestes zuerst), im Jahr nach Aussaatwoche; Filter „Aktiv“ (Phase ≠ `DONE`, Standard), „Abgeschlossen“, „Alle“.
+  - Jede Karte zeigt Icon, Sorte, Aussaatwoche (`formatWeek()`), Phase, Standort, geplantes Auspflanzen, Notiz und den Bestand: vor der Keimung „24 gesät“ bzw. „24 geplant“, danach „lebend 18 · verplant 12 · frei 6“. Verplant ist `plannedCount()` mit der effektiven Sorte; ist die Sorte unbekannt, steht „–“, und frei darf negativ werden, wenn mehr verplant ist, als lebt.
+  - Schnellaktionen unten auf der Karte (auf dem Telefon mit dem Daumen erreichbar, 44 px hoch): „Weiter: <Phase>“ bis „Abhärten“, beim Schritt auf „Gekeimt“ wird der Bestand mit der gesäten Menge vorbelegt („18 von 24 gekeimt“); Stepper für den Bestand ab der Keimung; „Abschließen“ (Bestand 0, Phase `DONE`); Bearbeiten; Löschen mit Rückfrage, die verknüpfte Pflanzungen und ihre Beete nennt. Jede Aktion speichert sofort.
+  - Dialog „Neue Anzucht“: Sorte per Suche (Sorten mit Vorkultur zuerst, `plantsForSowing()`), Aussaatwoche als Datum, das auf den Montag fällt, gesäte Menge, Standort, Notiz. Das geplante Auspflanzen folgt Sorte und Woche (`defaultTransplantDate()`: Aussaat plus `propagationWeeks.max`, bei frostempfindlichen Sorten frühestens der Montag nach dem letzten Frost des Users), bis der User es selbst setzt. Neue Chargen ab der laufenden Woche sind gesät, spätere geplant; der Bestand beginnt bei 0. Bearbeiten ändert zusätzlich Phase und Bestand.
+  - Auf allen Breiten Karten (ab `lg` zwei Spalten) statt einer Tabelle: Eine Charge hat zu viele Aktionen für eine Tabellenzeile.
+  - Ohne Chargen ein leerer Zustand mit Erklärung und Link zum Katalog (dort zeigt jede Sorte ihren Aussaatkalender).
 - **Seiten:** `/anmelden`, `/registrieren` (mit Bestätigungscode) und `/passwort-vergessen`, mit react-hook-form, Zod und deutschen Fehlermeldungen. Die Passwortregeln spiegeln die Policy des User Pools. Fehler bei der Anmeldung verraten nicht, ob ein Konto existiert.
 - **Geschützte Routen:** Alles außer den drei Auth-Seiten und der Entwicklerseite `/dev/icons` verlangt eine Anmeldung. Ohne Login leitet der Router auf `/anmelden?redirect=<Pfad>` um und kehrt danach dorthin zurück; Weiterleitungen gehen nur auf Pfade der App. Der Admin-Bereich und sein Navigationseintrag erscheinen nur für die Gruppe `admins` (Claim `cognito:groups` im ID-Token); alle anderen sehen unter `/admin` eine 403-Seite. Das ist reine Bedienführung; geschützt werden die Admin-Daten im Catalog-Service.
 - **API-Client:** `createApiClient()` in `apps/web/src/lib/api.ts` sendet das ID-Token als `Authorization: Bearer …` an `/api/...`.

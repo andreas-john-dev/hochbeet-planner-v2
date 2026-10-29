@@ -9,6 +9,7 @@ Live unter https://hochbeet.andi-john-dev.de
 - **Beet-Editor** mit Zeitachse: Einzelpflanzen und Reihen per Drag & Drop oder Tastatur, Zoom und Gesten auf dem Smartphone, Undo/Redo.
 - **Regel-Engine** im Browser: Abstand, gute und schlechte Nachbarn, Starkzehrer quer zur Reihe, Fruchtfolge über Saisongrenzen.
 - **Pflanzenkatalog** mit 56 Sorten im Startkatalog, persönlichen Anpassungen und eigenen Sorten, die ein Admin für alle veröffentlichen kann.
+- **Anzucht**: Chargen von der Aussaat bis ins Beet mit Phase, Bestand und dem, was davon schon in Beeten verplant ist.
 - **Gastmodus** ohne Konto; die Daten lassen sich nach der Anmeldung übernehmen.
 - **Beet-Assistent** (für die Gruppe der Tester): erklärt Warnungen und macht geprüfte Pflanzvorschläge, auf Bedrock AgentCore mit festen Kostengrenzen.
 

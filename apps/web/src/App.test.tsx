@@ -69,7 +69,7 @@ describe('App', () => {
       await renderAt('/', 'user');
       expect(await heading('Meine Beete')).toBeVisible();
       const links = (await sidebarNav()).getAllByRole('link');
-      expect(links.map((l) => l.textContent)).toEqual(['Beete', 'Katalog', 'Profil']);
+      expect(links.map((l) => l.textContent)).toEqual(['Beete', 'Anzucht', 'Katalog', 'Profil']);
     });
 
     it('gets a 403 page for the admin area', async () => {
@@ -152,7 +152,7 @@ describe('App', () => {
       await startGuest();
       expect(screen.getByTestId('guest-banner')).toHaveTextContent('nur in diesem Browser');
       const links = (await sidebarNav()).getAllByRole('link');
-      expect(links.map((l) => l.textContent)).toEqual(['Beete', 'Katalog']);
+      expect(links.map((l) => l.textContent)).toEqual(['Beete', 'Anzucht', 'Katalog']);
       expect(await screen.findByRole('button', { name: 'Erstes Beet anlegen' })).toBeVisible();
       expect(localStorage.getItem(GUEST_MODE_KEY)).toBe('1');
       expect(paths()).toEqual([]);
