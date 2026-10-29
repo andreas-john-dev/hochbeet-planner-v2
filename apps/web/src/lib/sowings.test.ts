@@ -3,6 +3,7 @@ import type { SowingBatch, SowingWithPlantings } from '@hochbeet/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   advance,
+  availableSowings,
   complete,
   defaultStage,
   defaultTransplantDate,
@@ -11,6 +12,7 @@ import {
   groupByYear,
   linkedPlantingsText,
   nextStage,
+  originText,
   plantsForSowing,
   stockOf,
   stockText,
@@ -178,5 +180,52 @@ describe('linked plantings', () => {
     ).toMatch(
       /^3 Pflanzungen in „Hochbeet Süd“ und „Balkon“ stammen aus dieser Anzucht\. Sie bleiben/,
     );
+  });
+});
+
+describe('planting out in the editor', () => {
+  const week = '2026-10-05';
+
+  it('offers batches with free seedlings sown before the week', () => {
+    const list = [
+      item(batch('later', '2026-10-05')),
+      item(batch('done', '2026-09-07', { stage: 'DONE' })),
+      // 18 alive, 4 rows of 125 cm with 6 plants each: 24 planned, nothing free.
+      item(
+        batch('full', '2026-09-07'),
+        [1, 2, 3, 4].map((n) => row(String(n), 125)),
+      ),
+      item(batch('free', '2026-09-14'), [row('r', 125)]),
+      item(batch('first', '2026-08-31')),
+      item(batch('unknown', '2026-08-31', { plantId: 'gone' })),
+    ];
+    const offered = availableSowings(list, seedPlants, week);
+    expect(offered.map((o) => [o.item.sowing.id, o.plant.name, o.free])).toEqual([
+      ['first', 'Kopfsalat', 18],
+      ['free', 'Kopfsalat', 12],
+    ]);
+  });
+
+  it('names the batch a planting comes from and its share', () => {
+    const sowings = [item(batch('a', '2026-09-14'))];
+    const planting = {
+      id: 'p',
+      bedId: 'bed',
+      plantId: lettuce.id,
+      origin: 'TRANSPLANT',
+      kind: 'ROW',
+      orientation: 'V',
+      lengthCm: 125,
+      x: 0,
+      y: 0,
+      startDate: week,
+      endDate: null,
+      removedDate: null,
+      sowingId: 'a',
+    } as const;
+    expect(originText(planting, sowings, lettuce)).toBe(
+      'Aus der Anzucht vom 14. – 20. September 2026, 6 von 18',
+    );
+    expect(originText({ ...planting, sowingId: 'deleted' }, sowings, lettuce)).toBeUndefined();
   });
 });

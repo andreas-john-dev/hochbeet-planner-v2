@@ -1,4 +1,5 @@
 import type { Category, Plant } from '@hochbeet/contracts';
+import { formatWeek } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { useDraggable } from '@dnd-kit/core';
 import { Search } from 'lucide-react';
@@ -7,7 +8,8 @@ import { useStore } from 'zustand';
 import { Input } from '@/components/ui/input';
 import { CATEGORIES, filterPlants } from '@/lib/editor/palette';
 import type { PlantingKind } from '@/lib/editor/placement';
-import type { EditorStore } from '@/lib/editor/store';
+import type { EditorStore, PreviewSowing } from '@/lib/editor/store';
+import { type AvailableSowing, previewSowing } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
 
 const KINDS: readonly { value: PlantingKind; label: string }[] = [
@@ -49,27 +51,49 @@ function Choice({
 /** Data a palette item hands to the drag & drop handlers. */
 export interface PaletteDragData {
   plant: Plant;
+  /** Set for seedlings from a sowing batch. */
+  sowing?: PreviewSowing;
 }
 
-const itemClass = (active: boolean) =>
+const itemClass = (active: boolean, tall = false) =>
   cn(
-    'focus-visible:ring-ring/50 flex h-11 w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors outline-none focus-visible:ring-[3px]',
+    'focus-visible:ring-ring/50 flex w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors outline-none focus-visible:ring-[3px]',
+    tall ? 'min-h-12 py-1' : 'h-11',
     active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
   );
+
+/** Name and, for a sowing batch, its week and free seedlings. */
+function ItemLabel({ plant, sowing }: { plant: Plant; sowing: PreviewSowing | undefined }) {
+  return (
+    <>
+      <PlantIcon plant={plant} size={28} decorative />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate">{plant.name}</span>
+        {sowing && (
+          <span className="text-muted-foreground truncate text-xs">
+            {formatWeek(sowing.sowDate).week} · {String(sowing.free)} frei
+          </span>
+        )}
+      </span>
+    </>
+  );
+}
 
 /** Sidebar item: drag it into the bed, or click it to place it with the keyboard. */
 function DraggableItem({
   plant,
+  sowing,
   active,
   onChoose,
 }: {
   plant: Plant;
+  sowing?: PreviewSowing;
   active: boolean;
-  onChoose: (plant: Plant) => void;
+  onChoose: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `palette-${plant.id}`,
-    data: { plant } satisfies PaletteDragData,
+    id: sowing ? `sowing-${sowing.id}` : `palette-${plant.id}`,
+    data: { plant, ...(sowing ? { sowing } : {}) } satisfies PaletteDragData,
   });
   return (
     <li>
@@ -81,17 +105,14 @@ function DraggableItem({
         // dnd-kit makes the item a draggable; it is still a button that picks the plant.
         aria-roledescription={undefined}
         aria-pressed={active}
-        onClick={() => {
-          onChoose(plant);
-        }}
+        onClick={onChoose}
         className={cn(
-          itemClass(active),
+          itemClass(active, !!sowing),
           'cursor-grab touch-none active:cursor-grabbing',
           isDragging && 'opacity-50',
         )}
       >
-        <PlantIcon plant={plant} size={28} decorative />
-        <span className="truncate">{plant.name}</span>
+        <ItemLabel plant={plant} sowing={sowing} />
       </button>
     </li>
   );
@@ -100,25 +121,24 @@ function DraggableItem({
 /** Sheet item on phones: a plain button, so that the list scrolls by touch. */
 function TapItem({
   plant,
+  sowing,
   active,
   onChoose,
 }: {
   plant: Plant;
+  sowing?: PreviewSowing;
   active: boolean;
-  onChoose: (plant: Plant) => void;
+  onChoose: () => void;
 }) {
   return (
     <li>
       <button
         type="button"
         aria-pressed={active}
-        onClick={() => {
-          onChoose(plant);
-        }}
-        className={itemClass(active)}
+        onClick={onChoose}
+        className={itemClass(active, !!sowing)}
       >
-        <PlantIcon plant={plant} size={28} decorative />
-        <span className="truncate">{plant.name}</span>
+        <ItemLabel plant={plant} sowing={sowing} />
       </button>
     </li>
   );
@@ -131,14 +151,17 @@ function TapItem({
  */
 export function PlantPalette({
   plants,
+  sowings = [],
   store,
   onChoose,
   variant = 'sidebar',
   className,
 }: {
   plants: readonly Plant[];
+  /** Sowing batches with free seedlings in the week shown. */
+  sowings?: readonly AvailableSowing[];
   store: EditorStore;
-  onChoose: (plant: Plant) => void;
+  onChoose: (plant: Plant, sowing?: PreviewSowing) => void;
   variant?: 'sidebar' | 'sheet';
   className?: string;
 }) {
@@ -160,6 +183,29 @@ export function PlantPalette({
       )}
     >
       {!sheet && <h2 className="text-sm font-semibold">Pflanzen hinzufügen</h2>}
+      {sowings.length > 0 && (
+        <section aria-labelledby={`${searchId}-sowings`} className="flex flex-col gap-1">
+          <h3 id={`${searchId}-sowings`} className="text-muted-foreground text-xs font-medium">
+            Aus der Anzucht
+          </h3>
+          <ul aria-label="Anzuchten" className="-mx-1 flex max-h-40 flex-col overflow-y-auto px-1">
+            {sowings.map((available) => {
+              const sowing = previewSowing(available);
+              return (
+                <Item
+                  key={sowing.id}
+                  plant={available.plant}
+                  sowing={sowing}
+                  active={preview?.source === 'cursor' && preview.sowing?.id === sowing.id}
+                  onChoose={() => {
+                    onChoose(available.plant, sowing);
+                  }}
+                />
+              );
+            })}
+          </ul>
+        </section>
+      )}
       <div role="group" aria-label="Pflanzart" className="bg-muted flex gap-1 rounded-lg p-1">
         {KINDS.map((k) => (
           <Choice
@@ -222,8 +268,12 @@ export function PlantPalette({
             <Item
               key={plant.id}
               plant={plant}
-              active={preview?.source === 'cursor' && preview.plant.id === plant.id}
-              onChoose={onChoose}
+              active={
+                preview?.source === 'cursor' && !preview.sowing && preview.plant.id === plant.id
+              }
+              onChoose={() => {
+                onChoose(plant);
+              }}
             />
           ))}
         </ul>

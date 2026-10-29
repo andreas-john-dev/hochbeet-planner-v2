@@ -84,6 +84,12 @@ Umsetzung (Stand T-30):
   - Eine Reihe läuft in der Hauptreihenrichtung des Beets, zunächst bis zum Rand, höchstens 50 cm. Danach ist sie ausgewählt, und ihr Griff (`role="slider"`) zieht sie in 5-cm-Schritten auf Länge, auch mit den Pfeiltasten.
   - Pflanzdatum ist der Montag der gewählten Woche, das Ende kommt aus dem Lebenszyklus der Sorte.
   - Die Logik liegt rein in `lib/editor/placement.ts` und `lib/editor/palette.ts`.
+- **Auspflanzen aus der Anzucht (T-58):**
+  - Über der Sortenliste steht „Aus der Anzucht“ mit den Chargen, die in der gewählten Woche freie Jungpflanzen haben: Phase nicht `DONE`, frei > 0, gesät vor dieser Woche (`availableSowings()` in `lib/sowings.ts`, aus `useSowings()`). Je Charge Sorte, Aussaatwoche und „6 frei“.
+  - Eine Charge wird wie eine Sorte ins Beet gezogen oder per Tastatur bzw. Tipp gesetzt; die Vorschau trägt die Charge (`Preview.sowing`). Beim Setzen fragt `PlantOutDialog` (Dialog, auf dem Telefon Sheet) „Wie viele?“ (Standard: alle freien) und „Als Reihe“ oder „Als Einzelpflanzen“ (Standard: die Pflanzart der Palette).
+  - Reihe: Länge über `rowLengthFor()`, die kürzeste Länge auf dem 5-cm-Raster mit genau der Menge (`floor(Länge / Abstand) + 1`); trifft das Raster die Menge nicht (Abstand unter 5 cm), die längste Reihe mit weniger Pflanzen, nie mehr als gewünscht. Der Dialog nennt Länge und Stückzahl. Einzelpflanzen: `singlePositions()` reiht sie ab dem Ablagepunkt in der Hauptreihenrichtung, im Pflanzabstand auf das Raster aufgerundet, und beginnt am Beetrand eine neue Reihe im Reihenabstand.
+  - Die neuen Pflanzungen (`sowingPlantings()`) sind `TRANSPLANT` mit `sowingId` und starten in der gewählten Woche. Sie gehen in einem `commit()` und damit in einem Undo-Schritt; gespeichert wird parallel. Danach laden die Chargen neu, und die freie Menge stimmt; der Rest bleibt für weitere Beete.
+- **Herkunft im Detailpanel:** Bei gepflanzten Pflanzungen nennt das Panel die Charge („Aus der Anzucht vom 14. – 20. September 2026, 6 von 18“, `originText()`) mit Link „Zur Anzucht“ (Anker der Karte auf `/anzucht`) und bietet eine Auswahl „Aus der Anzucht“ mit allen Chargen derselben Sorte und „Keine (z. B. gekauft)“ (`withSowing()` in `lib/editor/details.ts`). Wird eine Pflanzung zur Direktsaat, fällt die Charge weg (`withOrigin()`), weil das Schema `sowingId` nur bei `TRANSPLANT` erlaubt.
 - **Tastatur:** Statt des Keyboard-Sensors von dnd-kit gibt es einen eigenen Platzier-Modus.
   - Enter auf einer Sorte setzt eine Vorschau in die Beetmitte und fokussiert das Beet. Pfeiltasten verschieben um 5 cm (mit Umschalt 25 cm), Enter oder ein Klick setzt, Escape bricht ab.
   - Grund: Der Keyboard-Sensor bewegt in Bildschirmpixeln, ausgehend von der Palette. Ein Cursor in Beet-cm passt besser zum Raster und lässt sich ansagen (Live-Region unter dem Beet).
@@ -99,7 +105,7 @@ Umsetzung (Stand T-30):
   - „Entfernen ab KW …“ setzt `removedDate` auf den Montag der im Editor gewählten Woche und ist gesperrt, wenn die Pflanzung später beginnt. Eine entfernte Pflanzung lässt sich wieder ins Beet nehmen.
   - „Pflanzung löschen“ löscht ohne Rückfrage, weil es sich rückgängig machen lässt.
 - **Undo/Redo:** Buttons „Rückgängig“/„Wiederholen“ sowie Strg+Z und Strg+Umschalt+Z (oder Strg+Y); in Textfeldern bleibt das native Undo.
-  - Jede Änderung ist ein Paar `{ before, after }` (`lib/editor/history.ts`, höchstens 100 Schritte je geöffnetem Beet, nicht gespeichert).
+  - Jede Änderung ist ein Paar `{ before, after }`; ein Eintrag der Historie fasst die Änderungen einer Aktion zusammen, etwa alle Pflanzungen aus einer Charge (`lib/editor/history.ts`, höchstens 100 Einträge je geöffnetem Beet, nicht gespeichert). Undo nimmt sie in umgekehrter Reihenfolge zurück.
   - Undo schickt den Zustand `before` an die API: PUT, DELETE oder POST für eine gelöschte Pflanzung. Weil der Server beim Anlegen eine neue ID vergibt, ersetzt `remapId` die alte ID in der ganzen Historie.
 - **Smartphone (unter `md`, `useMediaQuery` in `lib/media-query.ts`):**
   - Statt Seitenleisten gibt es Bottom-Sheets (`components/ui/sheet.tsx`, Radix Dialog).

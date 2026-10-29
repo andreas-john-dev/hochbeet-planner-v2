@@ -1,7 +1,7 @@
 import { seedPlants } from '@hochbeet/catalog-seed';
 import type { Planting } from '@hochbeet/contracts';
 import { describe, expect, it } from 'vitest';
-import { checkEnd, formatDate, plantingEnd, removalDate, withOrigin } from './details';
+import { checkEnd, formatDate, plantingEnd, removalDate, withOrigin, withSowing } from './details';
 
 const plant = (name: string) => {
   const found = seedPlants.find((p) => p.name === name);
@@ -67,6 +67,20 @@ describe('detail panel dates', () => {
     expect(plantingEnd(withOrigin(open, lettuce, 'DIRECT_SOW'), lettuce).end).toBe('2026-07-20');
     const manual = { ...planted, endDate: '2026-09-07' };
     expect(withOrigin(manual, lettuce, 'DIRECT_SOW')).toEqual({ ...manual, origin: 'DIRECT_SOW' });
+  });
+
+  it('drops the sowing batch when the planting becomes direct sown', () => {
+    const lettuce = plant('Kopfsalat');
+    const fromBatch = { ...tomato, plantId: lettuce.id, endDate: null, sowingId: 'SOWING' };
+    expect(withOrigin(fromBatch, lettuce, 'DIRECT_SOW')).not.toHaveProperty('sowingId');
+    expect(withOrigin(fromBatch, lettuce, 'TRANSPLANT')).toEqual(fromBatch);
+  });
+
+  it('assigns a planting to another batch or to none', () => {
+    const fromBatch = { ...tomato, sowingId: 'A' };
+    expect(withSowing(fromBatch, 'B')).toEqual({ ...tomato, sowingId: 'B' });
+    expect(withSowing(fromBatch, undefined)).toEqual(tomato);
+    expect(withSowing(tomato, 'A')).toEqual(fromBatch);
   });
 
   it('removes from the Monday of the chosen week, never before the start', () => {

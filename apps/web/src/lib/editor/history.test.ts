@@ -22,24 +22,43 @@ describe('undo history', () => {
     const h1 = record(emptyHistory, { before, after });
 
     const undone = undo(h1);
-    expect(undone?.step).toEqual({ target: before, current: after });
-    expect(undone?.history).toEqual({ past: [], future: [{ before, after }] });
+    expect(undone?.steps).toEqual([{ target: before, current: after }]);
+    expect(undone?.history).toEqual({ past: [], future: [[{ before, after }]] });
 
     const redone = undone && redo(undone.history);
-    expect(redone?.step).toEqual({ target: after, current: before });
+    expect(redone?.steps).toEqual([{ target: after, current: before }]);
     expect(redone?.history).toEqual(h1);
   });
 
   it('turns undoing a creation into a delete and undoing a delete into a creation', () => {
     const created = planting('a', 40);
-    expect(undo(record(emptyHistory, { before: null, after: created }))?.step).toEqual({
-      target: null,
-      current: created,
-    });
-    expect(undo(record(emptyHistory, { before: created, after: null }))?.step).toEqual({
-      target: created,
-      current: null,
-    });
+    expect(undo(record(emptyHistory, { before: null, after: created }))?.steps).toEqual([
+      { target: null, current: created },
+    ]);
+    expect(undo(record(emptyHistory, { before: created, after: null }))?.steps).toEqual([
+      { target: created, current: null },
+    ]);
+  });
+
+  it('undoes and redoes several changes of one action as one step', () => {
+    const a = planting('a', 0);
+    const b = planting('b', 25);
+    const h = record(emptyHistory, [
+      { before: null, after: a },
+      { before: null, after: b },
+    ]);
+    expect(h.past).toHaveLength(1);
+    const undone = undo(h);
+    // Taken back in reverse order, repeated in the original order.
+    expect(undone?.steps).toEqual([
+      { target: null, current: b },
+      { target: null, current: a },
+    ]);
+    const redone = undone && redo(undone.history);
+    expect(redone?.steps).toEqual([
+      { target: a, current: null },
+      { target: b, current: null },
+    ]);
   });
 
   it('has nothing to undo or redo when empty', () => {
@@ -61,14 +80,14 @@ describe('undo history', () => {
     for (let i = 0; i <= HISTORY_LIMIT; i++)
       h = record(h, { before: null, after: planting('a', i) });
     expect(h.past).toHaveLength(HISTORY_LIMIT);
-    expect(h.past[0]?.after?.x).toBe(1);
+    expect(h.past[0]?.[0]?.after?.x).toBe(1);
   });
 
   it('remaps a temporary or recreated id in all entries', () => {
     let h = record(emptyHistory, { before: null, after: planting('tmp-1', 40) });
     h = record(h, { before: planting('tmp-1', 40), after: planting('tmp-1', 60) });
     h = remapId(h, 'tmp-1', 'real');
-    expect(h.past.flatMap((c) => [c.before?.id, c.after?.id])).toEqual([
+    expect(h.past.flat().flatMap((c) => [c.before?.id, c.after?.id])).toEqual([
       undefined,
       'real',
       'real',
