@@ -40,14 +40,17 @@ export function plantingEnd(
 
 /**
  * The planting with another origin. A prefilled end moves along (direct sowing may stay
- * longer), an end set by hand stays.
+ * longer), an end set by hand stays. Direct sowing comes from no sowing batch.
  */
 export function withOrigin(
   planting: Planting,
   plant: TimedPlant,
   origin: PlantingOrigin,
 ): Planting {
-  const next = { ...planting, origin };
+  const next = {
+    ...withSowing(planting, origin === 'TRANSPLANT' ? planting.sowingId : undefined),
+    origin,
+  };
   if (planting.endDate === null || !endFromLifecycle(planting, plant)) return next;
   return { ...next, endDate: plannedEnd(next, plant) };
 }
@@ -70,4 +73,10 @@ export function checkEnd(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return { error: 'Bitte ein gültiges Datum angeben.' };
   if (value <= planting.startDate) return { error: 'Ende muss nach dem Start liegen.' };
   return { endDate: value };
+}
+
+/** The planting from another sowing batch, or from none. */
+export function withSowing(planting: Planting, sowingId: string | undefined): Planting {
+  const { sowingId: _old, ...rest } = planting;
+  return sowingId === undefined ? rest : { ...rest, sowingId };
 }

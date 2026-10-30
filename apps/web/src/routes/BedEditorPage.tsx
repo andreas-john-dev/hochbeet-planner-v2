@@ -1,4 +1,4 @@
-import type { Bed, Plant, Planting, Suggestion } from '@hochbeet/contracts';
+import type { Bed, Plant, Planting, Suggestion, SowingWithPlantings } from '@hochbeet/contracts';
 import { type Finding, isActiveInWeek, soilRenewalsIn } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import {
@@ -33,6 +33,7 @@ import { AssistantChat } from '@/components/editor/AssistantChat';
 import { BedCanvas } from '@/components/editor/BedCanvas';
 import { FindingsList } from '@/components/editor/FindingsList';
 import { PlantingDetails } from '@/components/editor/PlantingDetails';
+import { PlantOutDialog, type PlantOutRequest } from '@/components/editor/PlantOutDialog';
 import { PlantPalette, type PaletteDragData } from '@/components/editor/PlantPalette';
 import { SuggestionList } from '@/components/editor/SuggestionList';
 import { WeekSlider } from '@/components/editor/WeekSlider';
@@ -44,10 +45,17 @@ import { ApiError, apiErrorMessage } from '@/lib/api';
 import { activePlantings } from '@/lib/active-plantings';
 import { canUseAssistant } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth/context';
-import type { Change, Step } from '@/lib/editor/history';
-import { bedCentre, isTempId, newPlanting, snapToBed } from '@/lib/editor/placement';
+import type { Change, Entry, Step } from '@/lib/editor/history';
+import {
+  bedCentre,
+  isTempId,
+  newPlanting,
+  snapToBed,
+  sowingPlantings,
+  type PlantingKind,
+} from '@/lib/editor/placement';
 import { withDraft } from '@/lib/editor/plantings';
-import { createEditorStore, type EditorStore } from '@/lib/editor/store';
+import { createEditorStore, type EditorStore, type PreviewSowing } from '@/lib/editor/store';
 import { adoptedPlanting, type ShownSuggestion, showSuggestions } from '@/lib/editor/suggestions';
 import { seasonFindings, statusByPlanting, weekOfFinding } from '@/lib/editor/warnings';
 import { ghosts, withPlants, type Ghost } from '@/lib/editor/timeline';
@@ -59,7 +67,9 @@ import {
   useGardenSettings,
   usePlants,
   useSavePlanting,
+  useSowings,
 } from '@/lib/garden';
+import { availableSowings } from '@/lib/sowings';
 
 const ZOOM_STEP = 1.4;
 
@@ -79,6 +89,7 @@ function bedIdParam(params: unknown): string {
 function BedEditor({ bedId }: { bedId: string }) {
   const details = useBedWithPlantings(bedId);
   const plants = usePlants();
+  const sowings = useSowings();
   // The user's last frost for the frost hint; guests and a pending load use 15 May.
   const lastFrost = useGardenSettings().data?.lastFrost;
   const [today] = useState(() => new Date());
@@ -146,13 +157,19 @@ function BedEditor({ bedId }: { bedId: string }) {
     }
   };
 
-  /** A change made by the user: saved right away and undoable. */
-  const commit = (change: Change) => {
+  /**
+   * A change made by the user, or several from one action (e.g. plants from a sowing batch):
+   * saved right away and undone together.
+   */
+  const commit = (changes: Change | Entry) => {
+    const list: Entry = Array.isArray(changes) ? changes : [changes as Change];
     // A planting that is still being created cannot be changed yet.
-    if (change.before && isTempId(change.before.id)) return;
-    store.getState().record(change);
+    if (list.length === 0 || list.some((c) => c.before && isTempId(c.before.id))) return;
+    store.getState().record(list);
     // Errors are shown below the editor; the optimistic update rolls itself back.
-    apply({ target: change.after, current: change.before }).catch(() => undefined);
+    Promise.all(list.map((c) => apply({ target: c.after, current: c.before }))).catch(
+      () => undefined,
+    );
   };
 
   const receiveSuggestions = (list: Suggestion[], warnings: string[]) => {
@@ -190,10 +207,11 @@ function BedEditor({ bedId }: { bedId: string }) {
       .then(settled)
       .then(async () => {
         const state = store.getState();
-        const step = direction === 'undo' ? state.undo() : state.redo();
-        if (!step) return;
-        state.select(step.target?.id ?? null);
-        await apply(step);
+        const steps = direction === 'undo' ? state.undo() : state.redo();
+        if (!steps) return;
+        // One planting stays selected; after a group nothing is.
+        state.select(steps.length === 1 ? (steps[0]?.target?.id ?? null) : null);
+        await Promise.all(steps.map(apply));
       })
       .catch(() => undefined);
   };
@@ -377,6 +395,7 @@ function BedEditor({ bedId }: { bedId: string }) {
               store={store}
               week={weekDate}
               lastFrost={lastFrost}
+              sowings={sowings.data ?? []}
               onCommit={commit}
             />
           ) : (
@@ -496,6 +515,7 @@ function Workspace({
   store,
   week,
   lastFrost,
+  sowings,
   onCommit,
 }: {
   bed: Bed;
@@ -512,11 +532,15 @@ function Workspace({
   week: Date;
   /** The user's last frost (`MM-DD`), undefined for the default. */
   lastFrost: string | undefined;
-  onCommit: (change: Change) => void;
+  /** All sowing batches with their plantings from all beds. */
+  sowings: readonly SowingWithPlantings[];
+  onCommit: (changes: Change | Entry) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const hintId = useId();
-  const [dragged, setDragged] = useState<Plant | null>(null);
+  const [dragged, setDragged] = useState<PaletteDragData | null>(null);
+  // Seedlings dropped from a sowing batch, waiting for „Wie viele?“.
+  const [plantOut, setPlantOut] = useState<PlantOutRequest | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const {
     preview,
@@ -549,6 +573,11 @@ function Workspace({
     return { seasonal: season, statuses: statusByPlanting(thisWeek) };
   }, [allPlantings, draft, preview, bed, kind, week, plants, weekIso, lastFrost]);
 
+  const offered = useMemo(
+    () => availableSowings(sowings, plants, weekIso),
+    [sowings, plants, weekIso],
+  );
+
   const pick = (finding: Finding) => {
     const state = store.getState();
     const same = finding.plantingIds.join(',') === state.highlighted.join(',');
@@ -562,11 +591,34 @@ function Workspace({
 
   const place = (plant: Plant, at: { x: number; y: number }) => {
     const state = store.getState();
-    const planting = newPlanting({ bed, plant, kind: state.kind, at, today: week });
+    const sowing = state.preview?.sowing;
     state.setPreview(null);
+    if (sowing) {
+      setPlantOut({ plant, sowing, at });
+      return;
+    }
+    const planting = newPlanting({ bed, plant, kind: state.kind, at, today: week });
     // Rows get selected for their length handle; after a single plant the palette stays.
     state.select(planting.kind === 'ROW' ? planting.id : null);
     onCommit({ before: null, after: planting });
+  };
+
+  /** Plants `count` seedlings of the asked batch: one undo step for all of them. */
+  const plantOutFromSowing = (kind: PlantingKind, count: number) => {
+    if (!plantOut) return;
+    const created = sowingPlantings({
+      bed,
+      plant: plantOut.plant,
+      sowing: plantOut.sowing,
+      kind,
+      count,
+      at: plantOut.at,
+      week,
+    });
+    setPlantOut(null);
+    const [only] = created;
+    store.getState().select(created.length === 1 && only ? only.id : null);
+    onCommit(created.map((after) => ({ before: null, after })));
   };
 
   const change = (before: Planting, after: Planting) => {
@@ -597,8 +649,7 @@ function Workspace({
   };
 
   const onDragStart = (event: DragStartEvent) => {
-    const plant = (event.active.data.current as PaletteDragData | undefined)?.plant ?? null;
-    setDragged(plant);
+    setDragged((event.active.data.current as PaletteDragData | undefined) ?? null);
     store.getState().setPreview(null);
   };
 
@@ -612,7 +663,12 @@ function Workspace({
     }
     const current = state.preview;
     if (current?.at.x !== at.x || current.at.y !== at.y) {
-      state.setPreview({ plant: dragged, at, source: 'drag' });
+      state.setPreview({
+        plant: dragged.plant,
+        at,
+        source: 'drag',
+        ...(dragged.sowing ? { sowing: dragged.sowing } : {}),
+      });
     }
   };
 
@@ -627,11 +683,11 @@ function Workspace({
     setDragged(null);
   };
 
-  const choose = (plant: Plant) => {
+  const choose = (plant: Plant, sowing?: PreviewSowing) => {
     const state = store.getState();
     const at = state.preview?.at ?? bedCentre(bed);
     state.select(null);
-    state.setPreview({ plant, at, source: 'cursor' });
+    state.setPreview({ plant, at, source: 'cursor', ...(sowing ? { sowing } : {}) });
     // Keyboard users continue in the bed; on phones the sheet closes for tap-to-place.
     if (isDesktop) svgRef.current?.focus();
     else setPaletteOpen(false);
@@ -667,6 +723,7 @@ function Workspace({
               planting={selected.planting}
               plant={selected.plant}
               week={week}
+              sowings={sowings}
               onChange={change}
               onDelete={remove}
               onClose={() => {
@@ -677,6 +734,7 @@ function Workspace({
           ) : (
             <PlantPalette
               plants={plants}
+              sowings={offered}
               store={store}
               onChoose={choose}
               className="w-72 shrink-0"
@@ -742,6 +800,7 @@ function Workspace({
           <SheetTitle>Pflanze hinzufügen</SheetTitle>
           <PlantPalette
             plants={plants}
+            sowings={offered}
             store={store}
             onChoose={choose}
             variant="sheet"
@@ -764,6 +823,7 @@ function Workspace({
                 planting={selected.planting}
                 plant={selected.plant}
                 week={week}
+                sowings={sowings}
                 onChange={change}
                 onDelete={remove}
                 onClose={() => {
@@ -775,11 +835,20 @@ function Workspace({
           )}
         </SheetContent>
       </Sheet>
+      <PlantOutDialog
+        request={plantOut}
+        defaultKind={kind}
+        sheet={!isDesktop}
+        onConfirm={plantOutFromSowing}
+        onCancel={() => {
+          setPlantOut(null);
+        }}
+      />
       <DragOverlay dropAnimation={null}>
         {dragged && !preview ? (
           <div className="bg-card flex items-center gap-2 rounded-md border px-2 py-1 text-sm shadow-md">
-            <PlantIcon plant={dragged} size={28} decorative />
-            {dragged.name}
+            <PlantIcon plant={dragged.plant} size={28} decorative />
+            {dragged.plant.name}
           </div>
         ) : null}
       </DragOverlay>

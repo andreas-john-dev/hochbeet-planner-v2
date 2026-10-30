@@ -8,6 +8,7 @@ import {
   remapId,
   undo,
   type Change,
+  type Entry,
   type History,
   type Step,
 } from './history';
@@ -59,10 +60,11 @@ export interface EditorState {
 
   /** Undo/redo of planting changes made in this editor. */
   history: History;
-  record: (change: Change) => void;
-  /** Moves the last change to the redo stack and returns what to send, or null. */
-  undo: () => Step | null;
-  redo: () => Step | null;
+  /** One change, or several that undo together. */
+  record: (changes: Change | Entry) => void;
+  /** Moves the last entry to the redo stack and returns what to send, or null. */
+  undo: () => Step[] | null;
+  redo: () => Step[] | null;
   /** The server gave a (re)created planting a new id. */
   remapId: (from: string, to: string) => void;
 }
@@ -78,6 +80,15 @@ export interface Preview {
   plant: Plant;
   at: Point;
   source: 'drag' | 'cursor';
+  /** Seedlings from this sowing batch: placing asks how many and how. */
+  sowing?: PreviewSowing;
+}
+
+/** The batch a preview comes from and how many of its seedlings are free. */
+export interface PreviewSowing {
+  id: string;
+  sowDate: string;
+  free: number;
 }
 
 /** Editor state of one open bed: view, placement and selection. Plantings come from TanStack Query. */
@@ -131,20 +142,20 @@ export function createEditorStore(today: Date = new Date()) {
       set({ highlighted });
     },
     history: emptyHistory,
-    record: (change) => {
-      set({ history: record(get().history, change) });
+    record: (changes) => {
+      set({ history: record(get().history, changes) });
     },
     undo: () => {
       const result = undo(get().history);
       if (!result) return null;
       set({ history: result.history });
-      return result.step;
+      return result.steps;
     },
     redo: () => {
       const result = redo(get().history);
       if (!result) return null;
       set({ history: result.history });
-      return result.step;
+      return result.steps;
     },
     remapId: (from, to) => {
       const { history, selectedId } = get();

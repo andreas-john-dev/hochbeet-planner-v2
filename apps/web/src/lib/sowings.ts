@@ -1,13 +1,21 @@
 import {
   MAX_SOWING_COUNT,
   type Plant,
+  type Planting,
   type SowingBatch,
   type SowingBatchFields,
   type SowingStage,
   type SowingWithPlantings,
 } from '@hochbeet/contracts';
-import { formatWeek, lastFrostDate, plannedCount, weekStart } from '@hochbeet/garden-rules';
+import {
+  formatWeek,
+  lastFrostDate,
+  plantCount,
+  plannedCount,
+  weekStart,
+} from '@hochbeet/garden-rules';
 import { addWeeks, formatISO, parseISO } from 'date-fns';
+import type { PreviewSowing } from './editor/store';
 
 export const STAGE_LABEL: Record<SowingStage, string> = {
   PLANNED: 'Geplant',
@@ -186,4 +194,58 @@ export function linkedPlantingsText(
   return `${one ? '1 Pflanzung' : `${String(plantings.length)} Pflanzungen`} in ${where ?? ''} ${
     one ? 'stammt' : 'stammen'
   } aus dieser Anzucht. ${one ? 'Sie bleibt' : 'Sie bleiben'} im Beet, nur die Verbindung zur Anzucht geht verloren.`;
+}
+
+/** A batch the editor offers for planting out, with its plant and how many are free. */
+export interface AvailableSowing {
+  item: SowingWithPlantings;
+  plant: Plant;
+  free: number;
+}
+
+/** What the editor's preview needs of an offered batch. */
+export const previewSowing = ({ item, free }: AvailableSowing): PreviewSowing => ({
+  id: item.sowing.id,
+  sowDate: item.sowing.sowDate,
+  free,
+});
+
+/**
+ * Batches with free seedlings for the week shown: not done, sown before that week and with
+ * more alive than already planned; by sowing week.
+ */
+export function availableSowings(
+  sowings: readonly SowingWithPlantings[],
+  plants: readonly Plant[],
+  week: string,
+): AvailableSowing[] {
+  return sowings
+    .flatMap((item) => {
+      const plant = plants.find((p) => p.id === item.sowing.plantId);
+      const { free } = stockOf(item, plants);
+      return plant &&
+        free !== undefined &&
+        free > 0 &&
+        item.sowing.stage !== 'DONE' &&
+        item.sowing.sowDate < week
+        ? [{ item, plant, free }]
+        : [];
+    })
+    .sort((a, b) => a.item.sowing.sowDate.localeCompare(b.item.sowing.sowDate));
+}
+
+/**
+ * Where a planting's seedlings come from, e.g. „Aus der Anzucht vom 14. – 20. September
+ * 2026, 6 von 18“; undefined without a batch or for a deleted one.
+ */
+export function originText(
+  planting: Planting,
+  sowings: readonly SowingWithPlantings[],
+  plant: Pick<Plant, 'spacingInRowCm'>,
+): string | undefined {
+  const item = sowings.find((s) => s.sowing.id === planting.sowingId);
+  if (!item) return undefined;
+  return `Aus der Anzucht vom ${formatWeek(item.sowing.sowDate).range}, ${String(
+    plantCount(planting, plant),
+  )} von ${String(item.sowing.aliveCount)}`;
 }
