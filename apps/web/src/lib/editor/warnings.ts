@@ -1,4 +1,4 @@
-import type { Bed, IsoDate, Plant, Planting } from '@hochbeet/contracts';
+import type { Bed, IsoDate, Plant, Planting, SowingWithPlantings } from '@hochbeet/contracts';
 import {
   evaluateBed,
   type Finding,
@@ -25,7 +25,8 @@ export function seasonOf(bed: Pick<Bed, 'soilRenewals'>, date: IsoDate): Interva
 
 /**
  * Findings that touch the season of `date`, with all plantings of the bed evaluated.
- * `lastFrost` is the user's last frost (`MM-DD`); missing means 15 May.
+ * `lastFrost` is the user's last frost (`MM-DD`); missing means 15 May. `sowings` are the
+ * user's sowing batches, for the rules about planted out seedlings.
  */
 export function seasonFindings(
   bed: Bed,
@@ -33,11 +34,11 @@ export function seasonFindings(
   plants: readonly Plant[],
   date: IsoDate,
   lastFrost?: string,
+  sowings?: readonly SowingWithPlantings[],
 ): Finding[] {
   const season = seasonOf(bed, date);
-  return evaluateBed(bed, plantings, plants, lastFrost ? { lastFrost } : {}).filter((f) =>
-    overlaps(f.period, season),
-  );
+  const options = { ...(lastFrost ? { lastFrost } : {}), ...(sowings ? { sowings } : {}) };
+  return evaluateBed(bed, plantings, plants, options).filter((f) => overlaps(f.period, season));
 }
 
 const rank: Record<Severity, number> = { WARNING: 3, HINT: 2, POSITIVE: 1 };

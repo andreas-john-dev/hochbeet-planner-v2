@@ -568,10 +568,10 @@ function Workspace({
         }),
       );
     }
-    const season = seasonFindings(bed, live, plants, weekIso, lastFrost);
+    const season = seasonFindings(bed, live, plants, weekIso, lastFrost, sowings);
     const thisWeek = season.filter((f) => isActiveInWeek(f.period, weekIso));
     return { seasonal: season, statuses: statusByPlanting(thisWeek) };
-  }, [allPlantings, draft, preview, bed, kind, week, plants, weekIso, lastFrost]);
+  }, [allPlantings, draft, preview, bed, kind, week, plants, weekIso, lastFrost, sowings]);
 
   const offered = useMemo(
     () => availableSowings(sowings, plants, weekIso),
