@@ -1,6 +1,7 @@
+import { evaluateSowings, type SowingFinding } from '@hochbeet/garden-rules';
 import { Link } from '@tanstack/react-router';
 import { Bean, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -9,7 +10,7 @@ import { SowingFormDialog } from '@/components/sowings/SowingFormDialog';
 import { Button } from '@/components/ui/button';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
-import { usePlants, useSowings } from '@/lib/garden';
+import { useGardenSettings, usePlants, useSowings } from '@/lib/garden';
 import { filterSowings, groupByYear, SOWING_FILTERS, type SowingFilter } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +32,17 @@ export function SowingsPage() {
   const openCreate = () => {
     setCreating(true);
   };
-  const all = sowings.data ?? [];
+  const lastFrost = useGardenSettings().data?.lastFrost;
+  const all = useMemo(() => sowings.data ?? [], [sowings.data]);
+  // Findings about the batches, never stored: raising window, direct sowing, stock, frost.
+  const findings = useMemo(() => {
+    const byBatch = new Map<string, SowingFinding[]>();
+    const list = evaluateSowings(all, plants.data ?? [], lastFrost ? { lastFrost } : {});
+    for (const finding of list) {
+      byBatch.set(finding.sowingId, [...(byBatch.get(finding.sowingId) ?? []), finding]);
+    }
+    return byBatch;
+  }, [all, plants.data, lastFrost]);
   const groups = groupByYear(filterSowings(all, filter));
   const pending = sowings.isPending || plants.isPending;
   const error = sowings.error ?? plants.error;
@@ -114,7 +125,12 @@ export function SowingsPage() {
               </h2>
               <div className="grid gap-3 lg:grid-cols-2">
                 {list.map((item) => (
-                  <SowingCard key={item.sowing.id} item={item} plants={plants.data} />
+                  <SowingCard
+                    key={item.sowing.id}
+                    item={item}
+                    plants={plants.data}
+                    findings={findings.get(item.sowing.id) ?? []}
+                  />
                 ))}
               </div>
             </section>

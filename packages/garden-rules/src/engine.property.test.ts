@@ -1,10 +1,10 @@
-import type { Plant, Planting } from '@hochbeet/contracts';
+import type { Plant, Planting, SowingWithPlantings } from '@hochbeet/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { evaluateBed } from './engine';
+import { evaluateBed, evaluateSowings } from './engine';
 import { type Footprint, gap } from './geometry';
 import { isActiveInWeek } from './time';
-import { bed as makeBed, plant as makePlant } from './test-utils';
+import { batch, bed as makeBed, plant as makePlant } from './test-utils';
 
 const bed = makeBed({ widthCm: 200, depthCm: 100 });
 const grid = (max: number) => fc.integer({ min: 0, max: max / 5 }).map((n) => n * 5);
@@ -78,6 +78,73 @@ function plantingsArb(plants: Plant[]): fc.Arbitrary<Planting[]> {
 
 const scenario = plantsArb.chain((plants) => fc.tuple(fc.constant(plants), plantingsArb(plants)));
 
+/** The plants raised or sown directly, some frost sensitive. */
+function withSowing(plants: Plant[]): fc.Arbitrary<Plant[]> {
+  return fc.tuple(
+    ...plants.map((p) =>
+      fc
+        .record({
+          min: fc.integer({ min: 1, max: 6 }),
+          extra: fc.integer({ min: 0, max: 4 }),
+          direct: fc.boolean(),
+          frostSensitive: fc.boolean(),
+        })
+        .map(({ min, extra, direct, frostSensitive }): Plant => ({
+          ...p,
+          frostSensitive,
+          sowing: direct
+            ? { method: 'DIRECT', directSowWeeks: { from: 10, to: 20 } }
+            : {
+                method: 'PRESOW',
+                presowWeeks: { from: 10, to: 20 },
+                propagationWeeks: { min, max: min + extra },
+              },
+        })),
+    ),
+  );
+}
+
+/**
+ * Plants with sowing details, plantings of which some come from up to 5 batches (also ids of
+ * batches that do not exist), and the batches with their linked plantings.
+ */
+const sowingScenario = scenario.chain(([plants, plantings]) =>
+  fc
+    .tuple(
+      withSowing(plants),
+      fc.array(fc.option(fc.integer({ min: 0, max: 5 })), {
+        minLength: plantings.length,
+        maxLength: plantings.length,
+      }),
+      fc.array(
+        fc.record({
+          plantId: fc.constantFrom(...plants.map((p) => p.id)),
+          sowDate: monday,
+          aliveCount: fc.integer({ min: 0, max: 30 }),
+          stage: fc.constantFrom('SOWN', 'GERMINATED', 'HARDENING', 'DONE' as const),
+          plannedTransplantDate: fc.option(monday, { nil: undefined }),
+        }),
+        { maxLength: 5 },
+      ),
+    )
+    .map(([raised, links, batches]) => {
+      const linked = plantings.map((p, i): Planting => {
+        const k = links[i];
+        return k === null || k === undefined ? p : { ...p, sowingId: `s${String(k)}` };
+      });
+      const sowings: SowingWithPlantings[] = batches.map(({ plannedTransplantDate, ...b }, i) => {
+        const id = `s${String(i)}`;
+        return batch(
+          id,
+          b.plantId,
+          { ...b, ...(plannedTransplantDate ? { plannedTransplantDate } : {}) },
+          linked.filter((p) => p.sowingId === id),
+        );
+      });
+      return [raised, linked, sowings] as const;
+    }),
+);
+
 /** Deterministic shuffle driven by fast-check's random seed. */
 function shuffle<T>(items: readonly T[], seed: number): T[] {
   const result = [...items];
@@ -106,6 +173,39 @@ describe('rule engine properties', () => {
       fc.property(scenario, fc.integer(), ([plants, plantings], seed) => {
         expect(evaluateBed(bed, plantings, shuffle(plants, seed))).toEqual(
           evaluateBed(bed, plantings, plants),
+        );
+      }),
+    );
+  });
+
+  it('does not depend on the order of the sowing batches', () => {
+    fc.assert(
+      fc.property(sowingScenario, fc.integer(), ([plants, plantings, sowings], seed) => {
+        expect(evaluateBed(bed, plantings, plants, { sowings: shuffle(sowings, seed) })).toEqual(
+          evaluateBed(bed, plantings, plants, { sowings }),
+        );
+        expect(evaluateSowings(shuffle(sowings, seed), plants)).toEqual(
+          evaluateSowings(sowings, plants),
+        );
+      }),
+    );
+  });
+
+  it('only finds sowing problems at plantings of existing batches', () => {
+    fc.assert(
+      fc.property(sowingScenario, ([plants, plantings, sowings]) => {
+        const known = new Set(sowings.map((s) => s.sowing.id));
+        const fromBatch = new Set(
+          plantings.filter((p) => p.sowingId && known.has(p.sowingId)).map((p) => p.id),
+        );
+        const rules = ['TRANSPLANT_EARLY', 'TRANSPLANT_LATE', 'OVERPLANNED'];
+        for (const f of evaluateBed(bed, plantings, plants, { sowings })) {
+          if (rules.includes(f.rule))
+            expect(f.plantingIds.every((id) => fromBatch.has(id))).toBe(true);
+        }
+        // Without batches no sowing rule fires.
+        expect(evaluateBed(bed, plantings, plants).filter((f) => rules.includes(f.rule))).toEqual(
+          [],
         );
       }),
     );

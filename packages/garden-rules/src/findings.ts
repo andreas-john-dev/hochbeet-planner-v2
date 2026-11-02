@@ -8,7 +8,13 @@ export type RuleId =
   | 'HEAVY_FEEDER'
   | 'CROP_ROTATION'
   | 'BED_EDGE'
-  | 'FROST';
+  | 'FROST'
+  | 'TRANSPLANT_EARLY'
+  | 'TRANSPLANT_LATE'
+  | 'OVERPLANNED';
+
+/** Rules about sowing batches (`evaluateSowings()`). */
+export type SowingRuleId = 'SOWING_WINDOW' | 'SOWING_DIRECT' | 'OVERPLANNED' | 'TRANSPLANT_FROST';
 
 /** `WARNING` (red), `POSITIVE` (green, good neighbours) or `HINT` (subtle, e.g. bed edge). */
 export type Severity = 'WARNING' | 'POSITIVE' | 'HINT';
@@ -21,6 +27,15 @@ export interface Finding {
   plantingIds: string[];
   /** When the finding applies, e.g. the time two plantings share. */
   period: Interval;
+  /** German text for the UI. */
+  message: string;
+}
+
+/** One result about a sowing batch, shown on the sowing page. Never stored either. */
+export interface SowingFinding {
+  rule: SowingRuleId;
+  severity: Exclude<Severity, 'POSITIVE'>;
+  sowingId: string;
   /** German text for the UI. */
   message: string;
 }

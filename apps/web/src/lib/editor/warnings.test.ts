@@ -88,6 +88,28 @@ describe('season', () => {
     ]);
     expect(frost('04-20')).toEqual([]);
   });
+
+  it('checks planted out seedlings against their sowing batch', () => {
+    // Kopfsalat needs 3–4 weeks of raising; planted out 2 weeks after sowing.
+    const lettuce = planting('salat', 'Kopfsalat', { origin: 'TRANSPLANT', sowingId: 'batch' });
+    const batch = {
+      sowing: {
+        id: 'batch',
+        plantId: plant('Kopfsalat').id,
+        sowDate: '2026-04-20',
+        sownCount: 12,
+        aliveCount: 10,
+        stage: 'HARDENING' as const,
+      },
+      plantings: [{ id: 'salat', bedId: bed.id, kind: 'SINGLE' as const, startDate: '2026-05-04' }],
+    };
+    const early = (sowings?: (typeof batch)[]) =>
+      seasonFindings(bed, [lettuce], seedPlants, '2026-05-04', undefined, sowings)
+        .filter((f) => f.rule === 'TRANSPLANT_EARLY')
+        .map((f) => f.plantingIds);
+    expect(early([batch])).toEqual([['salat']]);
+    expect(early()).toEqual([]);
+  });
 });
 
 describe('status per planting', () => {

@@ -58,7 +58,7 @@ Der Browser meldet sich bei Cognito an und erreicht SPA, beide APIs und den Assi
 | Baustein | Code | Kurz | Details |
 | --- | --- | --- | --- |
 | Domänenmodell | `packages/contracts` | Beet, Pflanzung, Sorte, Standfläche; Wochen nach ISO-8601, Saisongrenze je Beet | [domain.md](./architecture/domain.md) |
-| Regel-Engine | `packages/garden-rules` | Reines TypeScript, berechnet alle Warnungen in App und Tools; `evaluateBed()` ist der einzige Einstieg | [rules.md](./architecture/rules.md) |
+| Regel-Engine | `packages/garden-rules` | Reines TypeScript, berechnet alle Warnungen in App und Tools; `evaluateBed()` ist der Einstieg für Beete, `evaluateSowings()` für Anzucht-Chargen | [rules.md](./architecture/rules.md) |
 | Pflanzenkatalog | `services/catalog`, `packages/catalog-seed`, `packages/plant-icons` | Globale, angepasste und eigene Sorten, Veröffentlichung über den Admin, Startkatalog, Icons | [catalog.md](./architecture/catalog.md) |
 | Garden-Service | `services/garden` | Beete und Pflanzungen je User, Übernahme aus dem Gastmodus | [garden.md](./architecture/garden.md) |
 | Backend allgemein | `packages/service-kit` | HTTP API + Lambdalith (Hono), Auth aus dem JWT, Logging, deutsche Fehler | [backend.md](./architecture/backend.md) |

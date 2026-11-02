@@ -1,7 +1,9 @@
 import type { CatalogPlant, SowingBatchFields, SowingWithPlantings } from '@hochbeet/contracts';
+import type { SowingFinding } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import {
   CalendarClock,
+  Info,
   Check,
   ChevronRight,
   MapPin,
@@ -9,6 +11,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react';
 import { useState } from 'react';
 import { FormMessage } from '@/components/FormField';
@@ -39,9 +42,12 @@ import { SowingFormDialog } from './SowingFormDialog';
 export function SowingCard({
   item,
   plants,
+  findings = [],
 }: {
   item: SowingWithPlantings;
   plants: readonly CatalogPlant[];
+  /** Findings of `evaluateSowings()` about this batch. */
+  findings?: readonly SowingFinding[];
 }) {
   const { sowing } = item;
   const plant = plants.find((p) => p.id === sowing.plantId);
@@ -108,6 +114,34 @@ export function SowingCard({
           </p>
         )}
       </div>
+
+      {findings.length > 0 && (
+        <ul aria-label="Hinweise zur Anzucht" className="flex flex-col gap-1 text-sm">
+          {findings.map((finding) => {
+            const Icon = finding.severity === 'WARNING' ? TriangleAlert : Info;
+            return (
+              <li
+                key={finding.rule}
+                data-severity={finding.severity}
+                className={cn(
+                  'flex items-start gap-1.5',
+                  finding.severity === 'WARNING'
+                    ? 'text-red-700 dark:text-red-400'
+                    : 'text-muted-foreground',
+                )}
+              >
+                <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>
+                  <span className="sr-only">
+                    {finding.severity === 'WARNING' ? 'Warnung: ' : 'Hinweis: '}
+                  </span>
+                  {finding.message}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {save.isError && <FormMessage tone="error">{apiErrorMessage(save.error)}</FormMessage>}
 

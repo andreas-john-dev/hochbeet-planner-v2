@@ -1,4 +1,4 @@
-import type { Bed, Plant, Planting } from '@hochbeet/contracts';
+import type { Bed, Plant, Planting, SowingBatch } from '@hochbeet/contracts';
 import { type Footprint, footprint } from './geometry';
 import { type Interval, plantingInterval } from './time';
 
@@ -35,12 +35,21 @@ export function resolvePlantings(
   });
 }
 
+/** A sowing batch with the seedlings planned into beds (all beds), for the rules. */
+export interface SowingInfo {
+  sowing: SowingBatch;
+  /** Plants of all linked plantings; undefined if the batch's plant is unknown. */
+  planned: number | undefined;
+}
+
 /** Everything a rule gets: the bed, its resolved plantings and the user's settings. */
 export interface RuleContext {
   bed: Bed;
   plantings: readonly ResolvedPlanting[];
   /** Last frost as `MM-DD`, every year. */
   lastFrost: string;
+  /** The user's sowing batches by id; empty when the caller passes none. */
+  sowings: ReadonlyMap<string, SowingInfo>;
 }
 
 /** Calls `visit` once for every unordered pair of plantings. */

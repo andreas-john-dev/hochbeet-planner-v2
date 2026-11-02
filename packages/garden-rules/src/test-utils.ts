@@ -1,6 +1,7 @@
 // Builders for rule tests. Ids are short strings; the rules do not validate them.
-import type { Bed, Plant, Planting } from '@hochbeet/contracts';
+import type { Bed, Plant, Planting, SowingBatch, SowingWithPlantings } from '@hochbeet/contracts';
 import { resolvePlantings, type RuleContext } from './context';
+import { sowingInfos } from './sowings';
 
 export function bed(overrides: Partial<Bed> = {}): Bed {
   return {
@@ -77,6 +78,37 @@ export function context(
   plantings: Planting[],
   bedOverrides: Partial<Bed> = {},
   lastFrost = '05-15',
+  sowings: readonly SowingWithPlantings[] = [],
 ): RuleContext {
-  return { bed: bed(bedOverrides), plantings: resolvePlantings(plantings, plants), lastFrost };
+  return {
+    bed: bed(bedOverrides),
+    plantings: resolvePlantings(plantings, plants),
+    lastFrost,
+    sowings: sowingInfos(sowings, plants),
+  };
+}
+
+/** A sowing batch with the plantings linked to it (compact form, as from the API). */
+export function batch(
+  id: string,
+  plantId: string,
+  overrides: Partial<SowingBatch> = {},
+  plantings: readonly Planting[] = [],
+): SowingWithPlantings {
+  return {
+    sowing: {
+      id,
+      plantId,
+      sowDate: '2026-03-09',
+      sownCount: 24,
+      aliveCount: 18,
+      stage: 'PRICKED',
+      ...overrides,
+    },
+    plantings: plantings.map((p) =>
+      p.kind === 'ROW'
+        ? { id: p.id, bedId: p.bedId, startDate: p.startDate, kind: 'ROW', lengthCm: p.lengthCm }
+        : { id: p.id, bedId: p.bedId, startDate: p.startDate, kind: 'SINGLE' },
+    ),
+  };
 }

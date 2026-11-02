@@ -4,15 +4,18 @@ import {
   type IsoDate,
   type Plant,
   type Planting,
+  type SowingWithPlantings,
 } from '@hochbeet/contracts';
 import { resolvePlantings, type RuleContext } from './context';
-import type { Finding, Severity } from './findings';
+import type { Finding, Severity, SowingFinding } from './findings';
 import { bedEdgeRule } from './rules/bed-edge';
 import { cropRotationRule } from './rules/crop-rotation';
 import { frostRule } from './rules/frost';
 import { heavyFeedersRule } from './rules/heavy-feeders';
 import { neighborsRule } from './rules/neighbors';
+import { sowingBatchRules, sowingRule } from './rules/sowing';
 import { spacingRule } from './rules/spacing';
+import { sowingInfos } from './sowings';
 import { isActiveInWeek } from './time';
 
 /** All rules in display order. */
@@ -23,6 +26,7 @@ const rules = [
   cropRotationRule,
   bedEdgeRule,
   frostRule,
+  sowingRule,
 ];
 
 const severityOrder: Record<Severity, number> = { WARNING: 0, HINT: 1, POSITIVE: 2 };
@@ -43,6 +47,11 @@ export interface EvaluateOptions {
   week?: IsoDate | Date;
   /** The user's last frost as `MM-DD` (GardenSettings); missing means 15 May. */
   lastFrost?: string;
+  /**
+   * The user's sowing batches with their plantings from all beds (`GET /garden/sowings`), for
+   * the rules about planted out seedlings; missing means none.
+   */
+  sowings?: readonly SowingWithPlantings[];
 }
 
 /**
@@ -63,10 +72,34 @@ export function evaluateBed(
     bed,
     plantings: resolvePlantings(plantings, plants),
     lastFrost: options.lastFrost ?? DEFAULT_LAST_FROST,
+    sowings: sowingInfos(options.sowings ?? [], plants),
   };
   const findings = rules.flatMap((rule) => rule(context));
   const { week } = options;
   const relevant =
     week === undefined ? findings : findings.filter((f) => isActiveInWeek(f.period, week));
   return relevant.sort(compareFindings);
+}
+
+/**
+ * Second entry point, for the sowing page: findings about the batches themselves (raising
+ * window, plants only sown directly, more planned than alive, planting out before the frost).
+ * Findings at plantings come from `evaluateBed()` with `sowings`; this one has no bed. Sorted
+ * by severity, rule and batch, so the order of `sowings` does not matter.
+ */
+export function evaluateSowings(
+  sowings: readonly SowingWithPlantings[],
+  plants: readonly Plant[],
+  options: Pick<EvaluateOptions, 'lastFrost'> = {},
+): SowingFinding[] {
+  const lastFrost = options.lastFrost ?? DEFAULT_LAST_FROST;
+  const byId = new Map(plants.map((p) => [p.id, p]));
+  return [...sowingInfos(sowings, plants).values()]
+    .flatMap((info) => sowingBatchRules(info, byId.get(info.sowing.plantId), lastFrost))
+    .sort(
+      (a, b) =>
+        severityOrder[a.severity] - severityOrder[b.severity] ||
+        a.rule.localeCompare(b.rule) ||
+        a.sowingId.localeCompare(b.sowingId),
+    );
 }

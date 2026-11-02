@@ -1,6 +1,6 @@
 // 200 plantings over two seasons in a 6 × 3 m bed, for the performance test of the engine.
-import type { Plant, Planting } from '@hochbeet/contracts';
-import { bed as makeBed, plant as makePlant } from './test-utils';
+import type { Plant, Planting, SowingWithPlantings } from '@hochbeet/contracts';
+import { batch, bed as makeBed, plant as makePlant } from './test-utils';
 const families = [
   'Kreuzblütler',
   'Korbblütler',
@@ -20,6 +20,11 @@ export const plants: Plant[] = Array.from({ length: 25 }, (_, i) =>
     lifecycle: { type: 'ANNUAL', cultureWeeks: 6 + (i % 10) },
     goodNeighbors: [`p${String((i + 3) % 25)}`, `p${String((i + 7) % 25)}`],
     badNeighbors: [`p${String((i + 5) % 25)}`],
+    sowing: {
+      method: 'PRESOW',
+      presowWeeks: { from: 8, to: 20 },
+      propagationWeeks: { min: 4, max: 6 },
+    },
   }),
 );
 
@@ -36,6 +41,8 @@ export const plantings: Planting[] = Array.from({ length: 200 }, (_, i): Plantin
     x,
     y,
     origin: 'TRANSPLANT' as const,
+    // Every other planting comes from the batch of its plant (only used with `sowings`).
+    ...(i % 2 === 0 ? { sowingId: `s${String(i % 25)}` } : {}),
     startDate,
     endDate: null,
     removedDate: null,
@@ -46,3 +53,13 @@ export const plantings: Planting[] = Array.from({ length: 200 }, (_, i): Plantin
 });
 
 export const bed = makeBed({ widthCm: 600, depthCm: 300 });
+
+/** One batch per plant, sown on 2 March 2026, with its linked plantings. */
+export const sowings: SowingWithPlantings[] = plants.map((plant, i) =>
+  batch(
+    `s${String(i)}`,
+    plant.id,
+    { sowDate: '2026-03-02', aliveCount: 5 },
+    plantings.filter((p) => p.sowingId === `s${String(i)}`),
+  ),
+);
