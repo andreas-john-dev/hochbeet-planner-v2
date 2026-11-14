@@ -36,6 +36,17 @@ Erster Lauf am 13. Oktober 2026 ([Workflow-Lauf #2](https://github.com/andreas-j
 | `vorschlag-salat`    | ✗ kein Vorschlag                                    | ✗ Warnungen bleiben                                 |
 | `vorschlag-kraeuter` | ✗ kein Vorschlag                                    | ✗ kein Vorschlag                                    |
 
+### Nachtrag: Kosten pro bestandener Frage (T-64)
+
+Seit T-64 zeigt der Bericht auch die Kosten pro bestandener Frage: die Kosten aller gestellten Fragen geteilt durch die bestandenen. Für den ersten Lauf ergibt sich der Wert aus der Tabelle oben (Kosten/Frage × 20 Fragen ÷ bestandene Fragen). Die Kosten/Frage sind dort auf vier Stellen gerundet, deshalb ist der Wert für Nova Lite nur auf etwa ±10 % genau.
+
+| Modell           | Kosten des Laufs | Fragen bestanden | Kosten/Frage | Kosten/bestandene Frage |
+| ---------------- | ---------------- | ---------------- | ------------ | ----------------------- |
+| Claude Haiku 4.5 | ≈ 0,242 $        | 16               | 0,0121 $     | ≈ 0,0151 $              |
+| Amazon Nova Lite | ≈ 0,012 $        | 9                | 0,0006 $     | ≈ 0,0013 $              |
+
+Pro bestandener Frage kostet Haiku also etwa 11- bis 12-mal so viel wie Nova Lite statt 20-mal so viel pro Frage. Am Ergebnis ändert das nichts: Haiku bleibt teurer, aber die Empfehlung unten beruht auf den Regelverstößen von Nova Lite, nicht auf den Kosten. Beim nächsten Lauf steht die Kennzahl direkt im Bericht.
+
 ### Nachläufe Pflanzvorschläge (T-48)
 
 Nur Claude Haiku 4.5 und die drei Vorschlagsfälle, jeweils gegen prod:

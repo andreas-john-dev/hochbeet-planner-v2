@@ -24,7 +24,7 @@ from evaluation.cases import (
 )
 from evaluation.models import BUDGET_USD, MODELS, EvalModel
 from evaluation.report import markdown, summarize
-from evaluation.runner import MAX_CASE_USD, describe, run_model
+from evaluation.runner import MAX_CASE_USD, CaseResult, describe, run_model
 
 TODAY = date(2026, 10, 12)
 HAIKU = MODELS["haiku"]
@@ -237,6 +237,59 @@ async def test_the_report_compares_the_models() -> None:
     assert "| Amazon Nova Lite |" in report
     assert "| x: Hallo? | ✗ nennt Moin | ✗ nennt Moin |" in report
     assert "unter 1 €" in report
+
+
+def result(
+    case: str, cost: float, *, failed: tuple[str, ...] = (), skipped: bool = False
+) -> CaseResult:
+    return CaseResult(
+        model="haiku",
+        case=case,
+        simple=False,
+        passed=["nennt Lauch"],
+        failed=list(failed),
+        input_tokens=1000,
+        output_tokens=100,
+        tool_calls=1,
+        seconds=2.0,
+        first_text_seconds=1.0,
+        cost_usd=cost,
+        answer="Lauch.",
+        skipped=skipped,
+    )
+
+
+def test_failed_questions_raise_the_cost_per_passed_question() -> None:
+    mixed = summarize(
+        HAIKU,
+        [
+            result("a", 0.01),
+            result("b", 0.03, failed=("nennt Lauch",)),
+            result("c", 0.02),
+            # Skipped questions cost nothing and count for neither side.
+            result("d", 0.0, skipped=True),
+        ],
+    )
+    assert (mixed.ok, mixed.asked, mixed.skipped) == (2, 3, 1)
+    assert mixed.cost_per_question_usd == pytest.approx(0.02)
+    assert mixed.cost_per_ok_usd == pytest.approx(0.03)
+    none_passed = summarize(HAIKU, [result("a", 0.01, failed=("nennt Lauch",))])
+    assert none_passed.cost_per_ok_usd is None
+    assert summarize(HAIKU, [result("a", 0.0, skipped=True)]).cost_per_ok_usd is None
+
+
+def test_the_report_shows_the_cost_per_passed_question() -> None:
+    cases = [Case("a", "Lauch?", ()), Case("b", "Porree?", ())]
+    passed = summarize(HAIKU, [result("a", 0.01), result("b", 0.03, failed=("x",))])
+    failed = summarize(
+        MODELS["nova-lite"], [result("a", 0.001, failed=("x",)), result("b", 0.0, skipped=True)]
+    )
+    report = markdown([passed, failed], [], cases, date="2026-11-14")
+    assert "| Kosten/Frage | Kosten/bestandene Frage | Latenz Median (max) |" in report
+    assert "| 0.0200 $ | 0.0400 $ | 2.0 s (2.0 s) |" in report
+    assert "| 0.0010 $ | – | 2.0 s (2.0 s) |" in report
+    header, rule = report.splitlines()[2:4]
+    assert header.count("|") == rule.count("|")
 
 
 def test_costs_follow_the_price_list() -> None:
