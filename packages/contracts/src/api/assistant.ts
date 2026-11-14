@@ -1,6 +1,14 @@
 import { z } from 'zod';
-import { CategorySchema, FeederSchema, LifecycleSchema, PositiveGridCmSchema } from '../domain';
+import {
+  CategorySchema,
+  FeederSchema,
+  LifecycleSchema,
+  PositiveGridCmSchema,
+  SowingMethodSchema,
+  SowingStageSchema,
+} from '../domain';
 import { DirectionSchema, GridCmSchema, IsoDateSchema, UlidSchema } from '../primitives';
+import { MonthDaySchema } from './garden';
 
 // Beet-Assistent on Bedrock AgentCore (docs/architecture/assistant.md). The agent is
 // Python (agents/bed-assistant); its pydantic model mirrors this schema, and infra passes the
@@ -146,10 +154,20 @@ export const FindPlantsToolInputSchema = z.object({
     .describe('Teil des Sortennamens, z. B. "Tomate". Ohne Angabe: alle Sorten.'),
 });
 
+export const ListSowingsToolInputSchema = z.object({
+  query: z
+    .string()
+    .trim()
+    .max(50)
+    .optional()
+    .describe('Teil des Sortennamens, z. B. "Salat". Ohne Angabe: alle Chargen.'),
+});
+
 export type ListBedsToolInput = z.infer<typeof ListBedsToolInputSchema>;
 export type GetBedToolInput = z.infer<typeof GetBedToolInputSchema>;
 export type EvaluateBedToolInput = z.infer<typeof EvaluateBedToolInputSchema>;
 export type FindPlantsToolInput = z.infer<typeof FindPlantsToolInputSchema>;
+export type ListSowingsToolInput = z.infer<typeof ListSowingsToolInputSchema>;
 
 const ToolBedSchema = z.object({
   id: UlidSchema,
@@ -196,6 +214,20 @@ const ToolPlantSchema = z.object({
   goodNeighbors: z.array(z.string()),
   badNeighbors: z.array(z.string()),
   own: z.boolean(),
+  /** Goes outside only after the last frost. */
+  frostSensitive: z.boolean(),
+  /** Sowing and raising, readable: windows with months, durations in weeks. */
+  sowing: z
+    .object({
+      method: SowingMethodSchema,
+      /** E.g. "KW 10–14 (Anfang März bis Anfang April)". */
+      presow: z.string().optional(),
+      /** Weeks from sowing to planting out, e.g. "6–8". */
+      propagationWeeks: z.string().optional(),
+      prickOutWeeks: z.number().int().optional(),
+      directSow: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const FindPlantsToolOutputSchema = z.object({
@@ -220,6 +252,30 @@ export const EvaluateBedToolOutputSchema = z.object({
   unknownCandidates: z.array(z.number().int().min(0)),
 });
 
+/** A sowing batch as the model reads it: plant name, week and what is left of it. */
+const ToolSowingSchema = z.object({
+  plant: z.string(),
+  /** Monday of the week it is (or will be) sown. */
+  sowWeek: IsoDateSchema,
+  stage: SowingStageSchema,
+  /** Seeds planned or sown before germination, seedlings alive afterwards. */
+  stock: z.number().int().min(0),
+  /** Plants of the plantings linked to the batch; missing for unknown plants. */
+  planned: z.number().int().min(0).optional(),
+  /** Stock minus planned; negative when more is planned than there is. */
+  free: z.number().int().optional(),
+  plannedTransplantWeek: IsoDateSchema.optional(),
+  location: z.string().optional(),
+});
+
+export const ListSowingsToolOutputSchema = z.object({
+  /** The user's last frost (`MM-DD`), for when frost sensitive plants may go out. */
+  lastFrost: MonthDaySchema,
+  sowings: z.array(ToolSowingSchema),
+  /** Batches left out because of the limit. */
+  more: z.number().int().min(0),
+});
+
 /** What a tool returns when it cannot answer: a German message the agent passes on. */
 export const ToolErrorSchema = z.object({ error: z.string() });
 
@@ -227,4 +283,5 @@ export type ListBedsToolOutput = z.infer<typeof ListBedsToolOutputSchema>;
 export type GetBedToolOutput = z.infer<typeof GetBedToolOutputSchema>;
 export type FindPlantsToolOutput = z.infer<typeof FindPlantsToolOutputSchema>;
 export type EvaluateBedToolOutput = z.infer<typeof EvaluateBedToolOutputSchema>;
+export type ListSowingsToolOutput = z.infer<typeof ListSowingsToolOutputSchema>;
 export type ToolError = z.infer<typeof ToolErrorSchema>;

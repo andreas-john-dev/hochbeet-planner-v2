@@ -4,6 +4,8 @@ import {
   DEFAULT_GARDEN_SETTINGS,
   type GardenSettings,
   type Planting,
+  type SowingBatch,
+  type SowingWithPlantings,
 } from '@hochbeet/contracts';
 import { seedPlantByName, seedPlants } from '@hochbeet/catalog-seed';
 
@@ -55,9 +57,31 @@ export function planting(
   };
 }
 
+/** A batch of `plant` sown in the week of `sowDate`, without linked plantings. */
+export function sowing(
+  id: string,
+  plant: string,
+  fields: Partial<Omit<SowingBatch, 'id' | 'plantId'>> = {},
+): SowingWithPlantings {
+  return {
+    sowing: {
+      id,
+      plantId: plantId(plant),
+      sowDate: '2026-03-02',
+      sownCount: 12,
+      aliveCount: 0,
+      stage: 'SOWN',
+      ...fields,
+    },
+    plantings: [],
+  };
+}
+
 export interface FakeGarden {
   beds: Bed[];
   plantings: Planting[];
+  /** Sowing batches with their linked plantings; missing means none. */
+  sowings?: SowingWithPlantings[];
   /** Saved garden settings; missing means the defaults, like the service. */
   settings?: GardenSettings;
 }
@@ -77,6 +101,9 @@ export function fakeApi(gardens: Record<string, FakeGarden>) {
     if (!garden) return Promise.resolve(json({ message: 'Bitte melde dich an.' }, 401));
     if (url.pathname === '/api/garden/beds') return Promise.resolve(json({ beds: garden.beds }));
     if (url.pathname === '/api/catalog/plants') return Promise.resolve(json({ plants: catalog }));
+    if (url.pathname === '/api/garden/sowings') {
+      return Promise.resolve(json({ sowings: garden.sowings ?? [] }));
+    }
     if (url.pathname === '/api/garden/settings') {
       return Promise.resolve(json(garden.settings ?? DEFAULT_GARDEN_SETTINGS));
     }

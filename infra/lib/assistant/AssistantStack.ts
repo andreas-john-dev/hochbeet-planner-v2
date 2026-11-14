@@ -144,7 +144,7 @@ export class AssistantStack extends Stack {
     this.gateway = new agentcore.Gateway(this, 'Gateway', {
       gatewayName: `${props.stage.name}-bed-assistant-tools`,
       description: 'Read-only tools of the Beet-Assistent',
-      // Four tools need no semantic tool search, which would add embedding costs.
+      // Five tools need no semantic tool search, which would add embedding costs.
       protocolConfiguration: agentcore.GatewayProtocol.mcp({
         supportedVersions: [
           agentcore.MCPProtocolVersion.MCP_2025_03_26,

@@ -9,15 +9,30 @@ import {
   GetBedToolInputSchema,
   type ListBedsToolOutput,
   ListBedsToolInputSchema,
+  type ListSowingsToolOutput,
+  ListSowingsToolInputSchema,
   type Planting,
+  type Sowing,
   type ToolError,
 } from '@hochbeet/contracts';
-import { bounds, candidatePlanting, evaluateBed, footprint } from '@hochbeet/garden-rules';
+import {
+  batchStock,
+  bounds,
+  candidatePlanting,
+  evaluateBed,
+  footprint,
+  plannedCount,
+  rangeText,
+  windowText,
+} from '@hochbeet/garden-rules';
 import { z } from 'zod';
 import { type GardenReader, ToolFailure } from './api';
 
 /** Most plants find_plants returns; the model can narrow the query for more. */
 export const MAX_PLANTS = 15;
+
+/** Most batches list_sowings returns, the current ones first. */
+export const MAX_SOWINGS = 20;
 
 /**
  * The tools of the gateway target. Descriptions are German, short and tell the model when
@@ -34,8 +49,13 @@ export const TOOL_DEFINITIONS = {
     input: GetBedToolInputSchema,
   },
   find_plants: {
-    description: `Sucht Sorten im Katalog des Users (inkl. eigener Sorten) mit Abständen, Familie, Nährstoffbedarf, Standzeit und Nachbarn. Höchstens ${String(MAX_PLANTS)} Treffer.`,
+    description: `Sucht Sorten im Katalog des Users (inkl. eigener Sorten) mit Abständen, Familie, Nährstoffbedarf, Standzeit, Nachbarn und Anzucht. Höchstens ${String(MAX_PLANTS)} Treffer.`,
     input: FindPlantsToolInputSchema,
+  },
+  list_sowings: {
+    description:
+      'Listet die Anzucht-Chargen des Users (Sorte, Aussaatwoche, Phase, Bestand, verplant, frei) und seinen letzten Frosttermin für frostempfindliche Sorten.',
+    input: ListSowingsToolInputSchema,
   },
   evaluate_bed: {
     description:
@@ -107,6 +127,20 @@ async function getBed(api: GardenReader, bedId: string): Promise<GetBedToolOutpu
   };
 }
 
+/** The raising details of a plant, windows with months so the model need not convert weeks. */
+function sowingOf(sowing: Sowing) {
+  const { method, presowWeeks, propagationWeeks, prickOutWeeks, directSowWeeks } = sowing;
+  return {
+    method,
+    ...(presowWeeks ? { presow: windowText(presowWeeks) } : {}),
+    ...(propagationWeeks
+      ? { propagationWeeks: rangeText(propagationWeeks.min, propagationWeeks.max) }
+      : {}),
+    ...(prickOutWeeks === undefined ? {} : { prickOutWeeks }),
+    ...(directSowWeeks ? { directSow: windowText(directSowWeeks) } : {}),
+  };
+}
+
 async function findPlants(api: GardenReader, query?: string): Promise<FindPlantsToolOutput> {
   const { plants } = await api.listPlants();
   const names = plantNames(plants);
@@ -129,8 +163,58 @@ async function findPlants(api: GardenReader, query?: string): Promise<FindPlants
       goodNeighbors: neighbors(plant.goodNeighbors),
       badNeighbors: neighbors(plant.badNeighbors),
       own: plant.source === 'OWN',
+      frostSensitive: plant.frostSensitive ?? false,
+      ...(plant.sowing ? { sowing: sowingOf(plant.sowing) } : {}),
     })),
     more: Math.max(0, matches.length - MAX_PLANTS),
+  };
+}
+
+/**
+ * The user's batches with what is left of them, counted like the app (`plannedCount()`), and
+ * the last frost. Current batches first by sowing week, finished ones after, newest first.
+ */
+async function listSowings(api: GardenReader, query?: string): Promise<ListSowingsToolOutput> {
+  const [{ sowings }, { plants }, { lastFrost }] = await Promise.all([
+    api.listSowings(),
+    api.listPlants(),
+    api.getSettings(),
+  ]);
+  const names = plantNames(plants);
+  const needle = query?.toLocaleLowerCase('de');
+  const nameOf = (plantId: string) => names.get(plantId) ?? 'Unbekannte Sorte';
+  const done = (stage: string) => (stage === 'DONE' ? 1 : 0);
+  const matches = sowings
+    .filter(
+      ({ sowing }) => !needle || nameOf(sowing.plantId).toLocaleLowerCase('de').includes(needle),
+    )
+    .sort(
+      ({ sowing: a }, { sowing: b }) =>
+        done(a.stage) - done(b.stage) ||
+        (a.stage === 'DONE'
+          ? b.sowDate.localeCompare(a.sowDate)
+          : a.sowDate.localeCompare(b.sowDate)) ||
+        nameOf(a.plantId).localeCompare(nameOf(b.plantId), 'de'),
+    );
+  return {
+    lastFrost,
+    sowings: matches.slice(0, MAX_SOWINGS).map((item) => {
+      const { sowing } = item;
+      const stock = batchStock(sowing);
+      const planned = plannedCount(item, plants);
+      return {
+        plant: nameOf(sowing.plantId),
+        sowWeek: sowing.sowDate,
+        stage: sowing.stage,
+        stock,
+        ...(planned === undefined ? {} : { planned, free: stock - planned }),
+        ...(sowing.plannedTransplantDate
+          ? { plannedTransplantWeek: sowing.plannedTransplantDate }
+          : {}),
+        ...(sowing.location ? { location: sowing.location } : {}),
+      };
+    }),
+    more: Math.max(0, matches.length - MAX_SOWINGS),
   };
 }
 
@@ -178,7 +262,11 @@ async function evaluate(
 }
 
 export type ToolOutput =
-  ListBedsToolOutput | GetBedToolOutput | FindPlantsToolOutput | EvaluateBedToolOutput;
+  | ListBedsToolOutput
+  | GetBedToolOutput
+  | FindPlantsToolOutput
+  | EvaluateBedToolOutput
+  | ListSowingsToolOutput;
 
 /**
  * Runs one tool. Invalid input and failures become `{ error }` with a German message, so the
@@ -215,6 +303,11 @@ export async function runTool(
           };
         }
         return await evaluate(api, input.data.bedId, input.data.week, input.data.candidates);
+      }
+      case 'list_sowings': {
+        const input = ListSowingsToolInputSchema.safeParse(args);
+        if (!input.success) return { error: 'Bitte gib einen kürzeren Suchbegriff an.' };
+        return await listSowings(api, input.data.query);
       }
     }
   } catch (cause) {

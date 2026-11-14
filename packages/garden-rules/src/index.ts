@@ -13,3 +13,4 @@ export { heavyFeedersRule } from './rules/heavy-feeders';
 export { cropRotationRule } from './rules/crop-rotation';
 export { evaluateBed, evaluateSowings, type EvaluateOptions } from './engine';
 export { candidatePlanting, DEFAULT_CANDIDATE_ROW_CM } from './candidates';
+export { rangeText, weekHint, windowText } from './week-window';

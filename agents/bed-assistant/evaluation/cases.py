@@ -224,6 +224,12 @@ CASES: Sequence[Case] = (
         simple=True,
     ),
     Case(
+        "anzucht-paprika",
+        "Wann muss ich Paprika vorziehen?",
+        (uses("find_plants"), mentions("März")),
+        simple=True,
+    ),
+    Case(
         "beete",
         "Welche Beete habe ich?",
         (uses("list_beds"), mentions("Eval")),

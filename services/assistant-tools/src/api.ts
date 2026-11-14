@@ -7,6 +7,8 @@ import {
   ListBedsResponseSchema,
   type ListPlantsResponse,
   ListPlantsResponseSchema,
+  type ListSowingsResponse,
+  ListSowingsResponseSchema,
 } from '@hochbeet/contracts';
 import type { z } from 'zod';
 
@@ -25,6 +27,8 @@ export interface GardenReader {
   listPlants(): Promise<ListPlantsResponse>;
   /** The user's garden settings, e.g. the last frost; the defaults while none are saved. */
   getSettings(): Promise<GardenSettings>;
+  /** The user's sowing batches, each with the plantings linked to it from all beds. */
+  listSowings(): Promise<ListSowingsResponse>;
 }
 
 /**
@@ -62,5 +66,6 @@ export function createApiReader(
     getBed: (bedId) => get(`/api/garden/beds/${bedId}`, BedWithPlantingsResponseSchema),
     listPlants: () => get('/api/catalog/plants', ListPlantsResponseSchema),
     getSettings: () => get('/api/garden/settings', GardenSettingsSchema),
+    listSowings: () => get('/api/garden/sowings', ListSowingsResponseSchema),
   };
 }

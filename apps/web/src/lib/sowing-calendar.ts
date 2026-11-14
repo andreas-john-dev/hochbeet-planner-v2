@@ -1,5 +1,5 @@
 import { DEFAULT_LAST_FROST, type Lifecycle, type Sowing } from '@hochbeet/contracts';
-import { lastFrostDate } from '@hochbeet/garden-rules';
+import { lastFrostDate, weekHint } from '@hochbeet/garden-rules';
 import {
   addDays,
   differenceInCalendarDays,
@@ -10,7 +10,6 @@ import {
   startOfISOWeek,
 } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { weekHint } from './sowing';
 
 export type CalendarRowKind = 'presow' | 'direct' | 'plantOut' | 'inBed';
 

@@ -272,6 +272,7 @@ describe('AssistantStack', () => {
       'list_beds',
       'get_bed',
       'find_plants',
+      'list_sowings',
       'evaluate_bed',
     ]);
     expect(tools.find((t) => t.Name === 'get_bed')?.InputSchema.Required).toEqual(['bedId']);
