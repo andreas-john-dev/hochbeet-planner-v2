@@ -74,13 +74,18 @@ describe('guest data', () => {
   });
 
   it('describes it in German', () => {
-    expect(describeGuestData(garden)).toBe('1 Beet, 2 Pflanzungen, 1 eigene Sorte und 1 Anpassung');
-    expect(describeGuestData({ beds: [bed, bed], plantings: [] })).toBe('2 Beete');
-    expect(describeGuestData({ beds: [bed], plantings: [], sowings: [sowing(SOWING, OWN)] })).toBe(
-      '1 Beet und 1 Anzucht',
+    expect(describeGuestData(garden, 'de')).toBe(
+      '1 Beet, 2 Pflanzungen, 1 eigene Sorte und 1 Anpassung',
     );
+    expect(describeGuestData({ beds: [bed, bed], plantings: [] }, 'de')).toBe('2 Beete');
+    expect(
+      describeGuestData({ beds: [bed], plantings: [], sowings: [sowing(SOWING, OWN)] }, 'de'),
+    ).toBe('1 Beet und 1 Anzucht');
     const two = [sowing(SOWING, OWN), sowing('01J9ZQ3W8D6V2K5M7N8P9R0SW2', OWN)];
-    expect(describeGuestData({ beds: [], plantings: [], sowings: two })).toBe('2 Anzuchten');
+    expect(describeGuestData({ beds: [], plantings: [], sowings: two }, 'de')).toBe('2 Anzuchten');
+    expect(describeGuestData(garden, 'en')).toBe(
+      '1 bed, 2 plantings, 1 own plant and 1 adjustment',
+    );
   });
 });
 

@@ -1,5 +1,6 @@
 import type { CatalogPlant, Feeder, Lifecycle } from '@hochbeet/contracts';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SowingFields } from '@/components/catalog/SowingFields';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -17,18 +18,14 @@ import {
   adjustForm,
   type AdjustErrors,
   type AdjustForm,
-  FEEDER_LABEL,
+  FEEDERS,
   overrideFor,
   parseAdjustForm,
 } from '@/lib/catalog';
 import { useAdjustPlant } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
+import { LIFECYCLE_TYPES } from '@/lib/plant-form';
 import { remainingErrors, type SowingForm } from '@/lib/sowing-form';
-
-const LIFECYCLE_LABEL: Record<Lifecycle['type'], string> = {
-  ANNUAL: 'Wochen',
-  MULTI_YEAR: 'Jahre',
-  PERENNIAL: 'Dauerkultur',
-};
 
 const selectClass =
   'bg-card focus-visible:ring-ring/50 h-11 rounded-md border px-3 text-base outline-none focus-visible:ring-[3px] md:h-9 md:text-sm';
@@ -43,14 +40,13 @@ export function AdjustPlantDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation('catalog');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{plant.name} für mich anpassen</DialogTitle>
-          <DialogDescription>
-            Die Werte gelten nur für dich, auch in deinen Beeten. Abstände in Zentimetern.
-          </DialogDescription>
+          <DialogTitle>{t('adjust.title', { name: plant.name })}</DialogTitle>
+          <DialogDescription>{t('adjust.description')}</DialogDescription>
         </DialogHeader>
         {/* Mounted per opening, so every opening starts with the current values. */}
         <AdjustPlantForm
@@ -65,6 +61,8 @@ export function AdjustPlantDialog({
 }
 
 function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () => void }) {
+  const { t } = useTranslation(['catalog', 'common']);
+  const { language } = useLanguage();
   const adjust = useAdjustPlant(plant.id);
   const [form, setForm] = useState<AdjustForm>(() => adjustForm(plant));
   const [errors, setErrors] = useState<AdjustErrors>({});
@@ -86,7 +84,7 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
   const allowNone = (plant.global ?? plant).sowing === undefined;
 
   const onSubmit = async () => {
-    const parsed = parseAdjustForm(form);
+    const parsed = parseAdjustForm(form, language);
     if ('errors' in parsed) {
       setErrors(parsed.errors);
       return;
@@ -108,7 +106,7 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
       {adjust.isError && <FormMessage tone="error">{apiErrorMessage(adjust.error)}</FormMessage>}
       <div className="grid grid-cols-2 gap-3">
         <FormField
-          label="Abstand in der Reihe"
+          label={t('adjust.spacingInRow')}
           type="number"
           inputMode="numeric"
           min={1}
@@ -120,7 +118,7 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
           }}
         />
         <FormField
-          label="Reihenabstand"
+          label={t('adjust.rowSpacing')}
           type="number"
           inputMode="numeric"
           min={1}
@@ -134,7 +132,7 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={feederId}>Bedarf</Label>
+          <Label htmlFor={feederId}>{t('detail.feeder')}</Label>
           <select
             id={feederId}
             value={form.feeder}
@@ -143,15 +141,15 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
             }}
             className={selectClass}
           >
-            {(Object.keys(FEEDER_LABEL) as Feeder[]).map((feeder) => (
+            {FEEDERS.map((feeder) => (
               <option key={feeder} value={feeder}>
-                {FEEDER_LABEL[feeder]}
+                {t(`feeder.${feeder}`)}
               </option>
             ))}
           </select>
         </div>
         <FormField
-          label="Familie"
+          label={t('detail.family')}
           autoComplete="off"
           value={form.family}
           error={errors.family}
@@ -162,7 +160,7 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={lifecycleId}>Standzeit in</Label>
+          <Label htmlFor={lifecycleId}>{t('adjust.lifecycleIn')}</Label>
           <select
             id={lifecycleId}
             value={form.lifecycleType}
@@ -171,16 +169,20 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
             }}
             className={selectClass}
           >
-            {(Object.keys(LIFECYCLE_LABEL) as Lifecycle['type'][]).map((type) => (
+            {LIFECYCLE_TYPES.map((type) => (
               <option key={type} value={type}>
-                {LIFECYCLE_LABEL[type]}
+                {t(`adjust.lifecycleUnit.${type}`)}
               </option>
             ))}
           </select>
         </div>
         {form.lifecycleType !== 'PERENNIAL' && (
           <FormField
-            label={form.lifecycleType === 'ANNUAL' ? 'Standzeit (Wochen)' : 'Standzeit (Jahre)'}
+            label={
+              form.lifecycleType === 'ANNUAL'
+                ? t('adjust.lifecycleWeeks')
+                : t('adjust.lifecycleYears')
+            }
             type="number"
             inputMode="numeric"
             min={1}
@@ -200,10 +202,10 @@ function AdjustPlantForm({ plant, onDone }: { plant: CatalogPlant; onDone: () =>
       />
       <DialogFooter>
         <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onDone}>
-          Abbrechen
+          {t('common:cancel')}
         </Button>
         <Button type="submit" className="h-11 md:h-9" disabled={adjust.isPending}>
-          Speichern
+          {t('common:save')}
         </Button>
       </DialogFooter>
     </form>

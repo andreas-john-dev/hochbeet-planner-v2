@@ -28,6 +28,11 @@ test('raises tomatoes from sowing to the end and deletes the batch', async ({ pa
   await signInAs(page, 'user');
   await open(page, '/anzucht', 'Anzucht');
   await expect(page.getByRole('heading', { name: 'Noch keine Anzuchten' })).toBeVisible();
+  // The link sits inside the sentence (Trans) and points to the catalogue.
+  await expect(page.getByRole('main').getByRole('link', { name: 'Katalog' })).toHaveAttribute(
+    'href',
+    '/katalog',
+  );
   await page.getByRole('button', { name: 'Erste Anzucht anlegen' }).click();
 
   const dialog = await createSowing(page, 'Tomate', {

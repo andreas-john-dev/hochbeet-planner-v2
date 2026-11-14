@@ -1,6 +1,7 @@
 import type { CatalogPlant } from '@hochbeet/contracts';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, SearchX } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PlantFormFields } from '@/components/catalog/PlantFormFields';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
@@ -10,6 +11,7 @@ import { EMPTY_PLANT_FORM, plantForm } from '@/lib/plant-form';
 
 /** Route component for /katalog/neu and /katalog/$plantId/bearbeiten. */
 export function PlantFormPage() {
+  const { t } = useTranslation('catalog');
   const plantId = plantIdParam(useParams({ strict: false }));
   const plants = usePlants();
   const plant = plantId ? plants.data?.find((p) => p.id === plantId) : undefined;
@@ -22,26 +24,23 @@ export function PlantFormPage() {
         className="text-muted-foreground hover:text-foreground mb-4 inline-flex min-h-11 items-center gap-1 text-sm"
       >
         <ArrowLeft aria-hidden className="size-4" />
-        {plantId ? 'Zurück zur Sorte' : 'Katalog'}
+        {plantId ? t('form.backToPlant') : t('back')}
       </Link>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight md:text-3xl">
-        {plantId ? 'Sorte bearbeiten' : 'Eigene Sorte anlegen'}
+        {plantId ? t('form.editTitle') : t('createOwn')}
       </h1>
       {plants.isError ? (
-        <FormMessage tone="error">
-          Der Katalog konnte nicht geladen werden. Bitte lade die Seite neu.
-        </FormMessage>
+        <FormMessage tone="error">{t('loadError')}</FormMessage>
       ) : plants.isPending ? (
         <SkeletonList
-          label="Katalog wird geladen …"
+          label={t('loading')}
           count={5}
           className="flex max-w-2xl flex-col gap-4"
           itemClassName="h-11"
         />
       ) : plantId && plant?.source !== 'OWN' ? (
-        <EmptyState icon={SearchX} title="Keine eigene Sorte">
-          Bearbeiten lassen sich nur deine eigenen Sorten. Globale Sorten passt du auf ihrer Seite
-          für dich an.
+        <EmptyState icon={SearchX} title={t('form.notOwn')}>
+          {t('form.notOwnText')}
         </EmptyState>
       ) : (
         <OwnPlantForm key={plantId} plant={plant} catalog={plants.data} />
@@ -63,6 +62,7 @@ function OwnPlantForm({
   plant: CatalogPlant | undefined;
   catalog: readonly CatalogPlant[];
 }) {
+  const { t } = useTranslation(['catalog', 'common']);
   const navigate = useNavigate();
   const save = useSaveOwnPlant();
   const toDetails = (plantId: string) => navigate({ to: '/katalog/$plantId', params: { plantId } });
@@ -71,7 +71,7 @@ function OwnPlantForm({
       initial={plant ? plantForm(plant) : EMPTY_PLANT_FORM}
       catalog={catalog}
       neighborCandidates={catalog.filter((p) => p.id !== plant?.id)}
-      submitLabel={plant ? 'Speichern' : 'Sorte anlegen'}
+      submitLabel={plant ? t('common:save') : t('form.submitCreate')}
       pending={save.isPending}
       error={save.error}
       onSubmit={async (fields) => {

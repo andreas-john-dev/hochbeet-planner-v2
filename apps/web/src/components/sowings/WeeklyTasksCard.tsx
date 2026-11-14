@@ -3,6 +3,7 @@ import { weekStart } from '@hochbeet/garden-rules';
 import { Link } from '@tanstack/react-router';
 import { ShoppingBasket, Shovel, Sprout, TriangleAlert } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Card } from '@/components/ui/card';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -14,6 +15,7 @@ import {
   useSaveSowing,
   useSowings,
 } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 import { weekText } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
 import {
@@ -30,14 +32,7 @@ import {
 
 type Shown = 'this' | 'next';
 
-const VIEWS: readonly { value: Shown; label: string }[] = [
-  { value: 'this', label: 'Diese Woche' },
-  { value: 'next', label: 'Nächste Woche' },
-];
-const EMPTY: Record<Shown, string> = {
-  this: 'Diese Woche ist nichts zu tun.',
-  next: 'Nächste Woche kommt nichts Neues dazu.',
-};
+const VIEWS: readonly Shown[] = ['this', 'next'];
 
 /** Tasks the compact card shows before pointing to the raising page. */
 const COMPACT_LIMIT = 4;
@@ -49,6 +44,7 @@ const COMPACT_LIMIT = 4;
  * details and shows the first few tasks, those in the beds first.
  */
 export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation('sowings');
   const garden = useAllPlantings();
   const plants = usePlants();
   const sowings = useSowings();
@@ -90,12 +86,16 @@ export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <h2 id={titleId} className="text-lg font-semibold">
-            Aufgaben
+            {t('tasks.title')}
           </h2>
           <p className="text-muted-foreground text-sm">{weekText(week)}</p>
         </div>
-        <div role="group" aria-label="Woche" className="bg-muted flex w-fit gap-1 rounded-lg p-1">
-          {VIEWS.map(({ value, label }) => (
+        <div
+          role="group"
+          aria-label={t('tasks.week')}
+          className="bg-muted flex w-fit gap-1 rounded-lg p-1"
+        >
+          {VIEWS.map((value) => (
             <button
               key={value}
               type="button"
@@ -110,7 +110,7 @@ export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
               )}
             >
-              {label}
+              {value === 'this' ? t('tasks.thisWeek') : t('tasks.nextWeek')}
             </button>
           ))}
         </div>
@@ -119,13 +119,17 @@ export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
       {error && <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>}
       {!error && !listed && (
         <SkeletonList
-          label="Aufgaben werden geladen …"
+          label={t('tasks.loading')}
           count={2}
           className="grid gap-2"
           itemClassName="h-10 rounded-md"
         />
       )}
-      {listed?.length === 0 && <p className="text-muted-foreground text-sm">{EMPTY[shown]}</p>}
+      {listed?.length === 0 && (
+        <p className="text-muted-foreground text-sm">
+          {shown === 'this' ? t('tasks.emptyThis') : t('tasks.emptyNext')}
+        </p>
+      )}
       {listed && listed.length > 0 && (
         <ul className="flex flex-col divide-y">
           {listed.map((task) =>
@@ -142,7 +146,7 @@ export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
           to="/anzucht"
           className="text-primary w-fit text-sm font-medium underline underline-offset-4"
         >
-          {more === 1 ? 'Eine weitere Aufgabe' : `${String(more)} weitere Aufgaben`} in der Anzucht
+          {t('tasks.more', { count: more })}
         </Link>
       )}
     </Card>
@@ -150,18 +154,20 @@ export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
 }
 
 function Overdue({ id }: { id?: string }) {
+  const { t } = useTranslation('sowings');
   return (
     <span
       id={id}
       className="flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-300"
     >
       <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
-      Überfällig
+      {t('tasks.overdue')}
     </span>
   );
 }
 
 function SowingTaskItem({ task, compact }: { task: SowingTask; compact: boolean }) {
+  const { language } = useLanguage();
   const save = useSaveSowing();
   const done = save.isPending || save.isSuccess;
   const id = useId();
@@ -183,12 +189,12 @@ function SowingTaskItem({ task, compact }: { task: SowingTask; compact: boolean 
         />
         <span className="flex min-w-0 flex-col">
           <span className="flex flex-wrap items-center gap-x-2 font-medium">
-            <span id={`${id}-title`}>{taskTitle(task)}</span>
+            <span id={`${id}-title`}>{taskTitle(task, language)}</span>
             {task.overdue && <Overdue id={`${id}-late`} />}
           </span>
           {!compact && (
             <span id={`${id}-detail`} className="text-muted-foreground text-sm">
-              {taskDetail(task)}
+              {taskDetail(task, language)}
             </span>
           )}
         </span>
@@ -205,6 +211,7 @@ function SowingTaskItem({ task, compact }: { task: SowingTask; compact: boolean 
 const BED_ICON = { PLANT_OUT: Shovel, DIRECT_SOW: Sprout, SET_PLANTS: ShoppingBasket };
 
 function BedTaskItem({ task, compact }: { task: BedTask; compact: boolean }) {
+  const { language } = useLanguage();
   const Icon = BED_ICON[task.kind];
   return (
     <li data-task={task.key} className="flex min-h-11 items-center gap-3 py-1.5">
@@ -216,9 +223,11 @@ function BedTaskItem({ task, compact }: { task: BedTask; compact: boolean }) {
           search={{ woche: task.since }}
           className="font-medium underline-offset-4 hover:underline"
         >
-          {taskTitle(task)}
+          {taskTitle(task, language)}
         </Link>
-        {!compact && <span className="text-muted-foreground text-sm">{taskDetail(task)}</span>}
+        {!compact && (
+          <span className="text-muted-foreground text-sm">{taskDetail(task, language)}</span>
+        )}
       </span>
     </li>
   );

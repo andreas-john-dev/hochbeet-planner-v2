@@ -262,7 +262,8 @@ function SowingOrigin({
   onChange: (before: Planting, after: Planting) => void;
 }) {
   const { t } = useTranslation('editor');
-  const text = originText(planting, sowings, plant);
+  const { language } = useLanguage();
+  const text = originText(planting, sowings, plant, language);
   const choices = sowings.filter((s) => s.sowing.plantId === plant.id);
   if (!text && choices.length === 0) return null;
   // A batch that no longer exists counts as none.

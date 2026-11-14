@@ -1,6 +1,7 @@
 import type { CatalogPlant } from '@hochbeet/contracts';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, SearchX } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PlantFormFields } from '@/components/catalog/PlantFormFields';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
@@ -11,6 +12,7 @@ import { EMPTY_PLANT_FORM, plantForm } from '@/lib/plant-form';
 
 /** Route component for /admin/sorten/neu and /admin/sorten/$plantId. */
 export function GlobalPlantFormPage() {
+  const { t } = useTranslation(['admin', 'catalog']);
   const plantId = plantIdParam(useParams({ strict: false }));
   const plants = usePlants();
   const plant = plantId ? plants.data?.find((p) => p.id === plantId) : undefined;
@@ -22,26 +24,24 @@ export function GlobalPlantFormPage() {
         className="text-muted-foreground hover:text-foreground mb-4 inline-flex min-h-11 items-center gap-1 text-sm"
       >
         <ArrowLeft aria-hidden className="size-4" />
-        Administration
+        {t('title')}
       </Link>
       <h1 className="mb-2 text-2xl font-semibold tracking-tight md:text-3xl">
-        {plantId ? 'Globale Sorte bearbeiten' : 'Globale Sorte anlegen'}
+        {plantId ? t('globals.edit') : t('globals.create')}
       </h1>
-      <p className="text-muted-foreground mb-6">
-        Gilt für alle. Persönliche Anpassungen der Nutzer bleiben bestehen.
-      </p>
+      <p className="text-muted-foreground mb-6">{t('globals.appliesToAll')}</p>
       {plants.isError ? (
-        <FormMessage tone="error">Der Katalog konnte nicht geladen werden.</FormMessage>
+        <FormMessage tone="error">{t('globals.loadError')}</FormMessage>
       ) : plants.isPending ? (
         <SkeletonList
-          label="Katalog wird geladen …"
+          label={t('catalog:loading')}
           count={5}
           className="flex max-w-2xl flex-col gap-4"
           itemClassName="h-11"
         />
       ) : plantId && plant?.source !== 'GLOBAL' ? (
-        <EmptyState icon={SearchX} title="Keine globale Sorte">
-          Diese Sorte gibt es nicht im globalen Katalog.
+        <EmptyState icon={SearchX} title={t('globals.notGlobal')}>
+          {t('globals.notGlobalText')}
         </EmptyState>
       ) : (
         <GlobalPlantForm key={plantId} plant={plant} catalog={plants.data} />
@@ -63,6 +63,7 @@ function GlobalPlantForm({
   plant: CatalogPlant | undefined;
   catalog: readonly CatalogPlant[];
 }) {
+  const { t } = useTranslation(['catalog', 'common']);
   const navigate = useNavigate();
   const save = useSaveGlobalPlant();
   const toAdmin = () => navigate({ to: '/admin' });
@@ -72,7 +73,7 @@ function GlobalPlantForm({
       catalog={catalog}
       // Global plants may only point to global plants.
       neighborCandidates={catalog.filter((p) => p.source === 'GLOBAL' && p.id !== plant?.id)}
-      submitLabel={plant ? 'Speichern' : 'Sorte anlegen'}
+      submitLabel={plant ? t('common:save') : t('form.submitCreate')}
       pending={save.isPending}
       error={save.error}
       onSubmit={async (fields) => {

@@ -3,6 +3,7 @@ import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Pencil, RotateCcw, SearchX, SlidersHorizontal } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AdjustPlantDialog } from '@/components/catalog/AdjustPlantDialog';
 import { PublicationPanel } from '@/components/catalog/PublicationPanel';
 import { SourceBadge } from '@/components/catalog/SourceBadge';
@@ -12,13 +13,15 @@ import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
-import { CATEGORY_LABEL, changedFields, FEEDER_LABEL, lifecycleText } from '@/lib/catalog';
+import { changedFields, lifecycleText } from '@/lib/catalog';
 import { useAdjustPlant, usePlants } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 import { sowingLines } from '@/lib/sowing';
 import { cn } from '@/lib/utils';
 
 /** Route component for /katalog/$plantId. */
 export function PlantDetailPage() {
+  const { t } = useTranslation('catalog');
   const plantId = plantIdParam(useParams({ strict: false }));
   const plants = usePlants();
   const plant = plants.data?.find((p) => p.id === plantId);
@@ -30,19 +33,17 @@ export function PlantDetailPage() {
         className="text-muted-foreground hover:text-foreground mb-4 inline-flex min-h-11 items-center gap-1 text-sm"
       >
         <ArrowLeft aria-hidden className="size-4" />
-        Katalog
+        {t('back')}
       </Link>
       {plants.isError ? (
-        <FormMessage tone="error">
-          Der Katalog konnte nicht geladen werden. Bitte lade die Seite neu.
-        </FormMessage>
+        <FormMessage tone="error">{t('loadError')}</FormMessage>
       ) : plants.isPending ? (
         <PlantDetailSkeleton />
       ) : plant ? (
         <PlantDetails plant={plant} catalog={plants.data} />
       ) : (
-        <EmptyState icon={SearchX} title="Sorte nicht gefunden">
-          Diese Sorte gibt es nicht oder nicht mehr in deinem Katalog.
+        <EmptyState icon={SearchX} title={t('detail.notFound')}>
+          {t('detail.notFoundText')}
         </EmptyState>
       )}
     </>
@@ -51,9 +52,10 @@ export function PlantDetailPage() {
 
 /** Shape of the detail page while the catalogue loads. */
 function PlantDetailSkeleton() {
+  const { t } = useTranslation('catalog');
   return (
     <div className="flex flex-col gap-6" aria-busy="true" role="status">
-      <span className="sr-only">Sorte wird geladen …</span>
+      <span className="sr-only">{t('detail.loading')}</span>
       <div className="flex items-center gap-4">
         <Skeleton className="size-16 rounded-full" />
         <div className="flex flex-col gap-2">
@@ -83,6 +85,8 @@ function PlantDetails({
   plant: CatalogPlant;
   catalog: readonly CatalogPlant[];
 }) {
+  const { t } = useTranslation('catalog');
+  const { language } = useLanguage();
   const [adjusting, setAdjusting] = useState(false);
   const reset = useAdjustPlant(plant.id);
   const changed = changedFields(plant);
@@ -105,7 +109,7 @@ function PlantDetails({
           {value}
           {isChanged && standard !== undefined && (
             <span className="ml-2 text-xs font-normal text-amber-900 dark:text-amber-200">
-              angepasst (Standard: {standard})
+              {t('detail.adjusted', { value: standard })}
             </span>
           )}
         </dd>
@@ -121,7 +125,7 @@ function PlantDetails({
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{plant.name}</h1>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground text-sm">
-              {CATEGORY_LABEL[plant.category]} · {plant.family}
+              {t(`category.${plant.category}`)} · {plant.family}
             </span>
             <SourceBadge plant={plant} />
           </div>
@@ -136,7 +140,7 @@ function PlantDetails({
               }}
             >
               <SlidersHorizontal aria-hidden />
-              Für mich anpassen
+              {t('detail.adjust')}
             </Button>
             {plant.overridden && (
               <Button
@@ -148,7 +152,7 @@ function PlantDetails({
                 }}
               >
                 <RotateCcw aria-hidden />
-                Zurücksetzen
+                {t('detail.reset')}
               </Button>
             )}
           </div>
@@ -157,7 +161,7 @@ function PlantDetails({
           <Button asChild variant="outline" className="h-11 basis-full sm:basis-auto md:h-9">
             <Link to="/katalog/$plantId/bearbeiten" params={{ plantId: plant.id }}>
               <Pencil aria-hidden />
-              Bearbeiten
+              {t('detail.edit')}
             </Link>
           </Button>
         )}
@@ -168,63 +172,66 @@ function PlantDetails({
 
       <section aria-labelledby="plant-values" className="flex flex-col gap-2">
         <h2 id="plant-values" className="text-lg font-semibold">
-          Werte
+          {t('detail.values')}
         </h2>
         <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {row(
             'category',
-            'Kategorie',
-            CATEGORY_LABEL[plant.category],
-            global && CATEGORY_LABEL[global.category],
+            t('detail.category'),
+            t(`category.${plant.category}`),
+            global && t(`category.${global.category}`),
           )}
-          {row('family', 'Familie', plant.family, global?.family)}
+          {row('family', t('detail.family'), plant.family, global?.family)}
           {row(
             'feeder',
-            'Bedarf',
-            FEEDER_LABEL[plant.feeder],
-            global && FEEDER_LABEL[global.feeder],
+            t('detail.feeder'),
+            t(`feeder.${plant.feeder}`),
+            global && t(`feeder.${global.feeder}`),
           )}
           {row(
             'spacingInRowCm',
-            'Abstand in der Reihe',
-            `${String(plant.spacingInRowCm)} cm`,
-            global && `${String(global.spacingInRowCm)} cm`,
+            t('detail.spacingInRow'),
+            t('detail.cm', { value: plant.spacingInRowCm }),
+            global && t('detail.cm', { value: global.spacingInRowCm }),
           )}
           {row(
             'rowSpacingCm',
-            'Reihenabstand',
-            `${String(plant.rowSpacingCm)} cm`,
-            global && `${String(global.rowSpacingCm)} cm`,
+            t('detail.rowSpacing'),
+            t('detail.cm', { value: plant.rowSpacingCm }),
+            global && t('detail.cm', { value: global.rowSpacingCm }),
           )}
           {row(
             'lifecycle',
-            'Standzeit',
-            lifecycleText(plant.lifecycle),
-            global && lifecycleText(global.lifecycle),
+            t('detail.lifecycle'),
+            lifecycleText(plant.lifecycle, language),
+            global && lifecycleText(global.lifecycle, language),
           )}
           {row(
             'frostSensitive',
-            'Frostempfindlich',
-            plant.frostSensitive ? 'Ja' : 'Nein',
-            global && (global.frostSensitive ? 'Ja' : 'Nein'),
+            t('detail.frostSensitive'),
+            plant.frostSensitive ? t('detail.yes') : t('detail.no'),
+            global && (global.frostSensitive ? t('detail.yes') : t('detail.no')),
           )}
           {row(
             'sowing',
-            'Aussaat & Anzucht',
+            t('detail.sowing'),
             plant.sowing ? (
               <ul className="flex flex-col gap-0.5">
-                {sowingLines(plant.sowing).map((line) => (
+                {sowingLines(plant.sowing, language).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
             ) : (
-              'Keine Angaben'
+              t('detail.noDetails')
             ),
-            global && (global.sowing ? sowingLines(global.sowing).join(', ') : 'keine Angaben'),
+            global &&
+              (global.sowing
+                ? sowingLines(global.sowing, language).join(', ')
+                : t('detail.noDetailsStandard')),
           )}
           {row(
             'color',
-            'Farbe im Beet',
+            t('detail.color'),
             <span className="inline-flex items-center gap-2">
               <span
                 aria-hidden
@@ -241,18 +248,18 @@ function PlantDetails({
       <SowingCalendar plant={plant} />
 
       <Neighbors
-        title="Gute Nachbarn"
+        title={t('detail.goodNeighbors')}
         ids={plant.goodNeighbors}
         catalog={catalog}
         tone="good"
-        empty="Keine bekannten guten Nachbarn."
+        empty={t('detail.noGoodNeighbors')}
       />
       <Neighbors
-        title="Schlechte Nachbarn"
+        title={t('detail.badNeighbors')}
         ids={plant.badNeighbors}
         catalog={catalog}
         tone="bad"
-        empty="Keine bekannten schlechten Nachbarn."
+        empty={t('detail.noBadNeighbors')}
       />
 
       <AdjustPlantDialog plant={plant} open={adjusting} onOpenChange={setAdjusting} />

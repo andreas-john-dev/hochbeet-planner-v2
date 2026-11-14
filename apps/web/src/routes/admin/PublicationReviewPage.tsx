@@ -2,9 +2,10 @@ import type { CatalogPlant, Plant } from '@hochbeet/contracts';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { format, parseISO } from 'date-fns';
-import { de } from 'date-fns/locale';
+import type { TFunction } from 'i18next';
 import { ArrowLeft, Inbox } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PlantFormFields } from '@/components/catalog/PlantFormFields';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
@@ -13,13 +14,16 @@ import { Label } from '@/components/ui/label';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { correctionsFor, similarPlants } from '@/lib/admin';
 import { apiErrorMessage } from '@/lib/api';
-import { CATEGORY_LABEL, FEEDER_LABEL, lifecycleText } from '@/lib/catalog';
+import { lifecycleText } from '@/lib/catalog';
 import { useDecidePublication, usePlants, usePublicationQueue } from '@/lib/garden';
+import { useDateLocale, useLanguage } from '@/lib/i18n';
+import type { Language } from '@/lib/language';
 import { plantForm } from '@/lib/plant-form';
 import { sowingLines } from '@/lib/sowing';
 
 /** Route component for /admin/anfragen/$plantId: compare, correct, approve or reject. */
 export function PublicationReviewPage() {
+  const { t } = useTranslation('admin');
   const plantId = plantIdParam(useParams({ strict: false }));
   const queue = usePublicationQueue();
   const plants = usePlants();
@@ -32,14 +36,16 @@ export function PublicationReviewPage() {
         className="text-muted-foreground hover:text-foreground mb-4 inline-flex min-h-11 items-center gap-1 text-sm"
       >
         <ArrowLeft aria-hidden className="size-4" />
-        Administration
+        {t('title')}
       </Link>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight md:text-3xl">Anfrage prüfen</h1>
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight md:text-3xl">
+        {t('review.title')}
+      </h1>
       {queue.isError || plants.isError ? (
-        <FormMessage tone="error">Die Anfrage konnte nicht geladen werden.</FormMessage>
+        <FormMessage tone="error">{t('review.loadError')}</FormMessage>
       ) : queue.isPending || plants.isPending ? (
         <SkeletonList
-          label="Anfrage wird geladen …"
+          label={t('review.loading')}
           count={5}
           className="flex max-w-2xl flex-col gap-4"
           itemClassName="h-11"
@@ -47,8 +53,8 @@ export function PublicationReviewPage() {
       ) : request ? (
         <Review plant={request.plant} requestedAt={request.requestedAt} catalog={plants.data} />
       ) : (
-        <EmptyState icon={Inbox} title="Keine offene Anfrage">
-          Diese Anfrage gibt es nicht oder sie wurde schon bearbeitet.
+        <EmptyState icon={Inbox} title={t('review.none')}>
+          {t('review.noneText')}
         </EmptyState>
       )}
     </>
@@ -70,6 +76,8 @@ function Review({
   requestedAt: string;
   catalog: readonly CatalogPlant[];
 }) {
+  const { t } = useTranslation(['admin', 'catalog']);
+  const locale = useDateLocale();
   const navigate = useNavigate();
   const decide = useDecidePublication(plant.id);
   const globals = catalog.filter((p) => p.source === 'GLOBAL');
@@ -82,9 +90,9 @@ function Review({
         <div className="flex flex-col gap-0.5">
           <p className="text-xl font-semibold">{plant.name}</p>
           <p className="text-muted-foreground text-sm">
-            {CATEGORY_LABEL[plant.category]} · {plant.family}
+            {t(`catalog:category.${plant.category}`)} · {plant.family}
             {requestedAt &&
-              ` · angefragt am ${format(parseISO(requestedAt), 'd. MMMM yyyy', { locale: de })}`}
+              t('review.requestedOn', { date: format(parseISO(requestedAt), 'PPP', { locale }) })}
           </p>
         </div>
       </header>
@@ -93,17 +101,14 @@ function Review({
 
       <section aria-labelledby="approve" className="flex flex-col gap-3">
         <h2 id="approve" className="text-lg font-semibold">
-          Prüfen und freigeben
+          {t('review.approveTitle')}
         </h2>
-        <p className="text-muted-foreground text-sm">
-          Korrigiere die Werte bei Bedarf. Die Sorte behält ihre ID, bestehende Pflanzungen bleiben
-          erhalten.
-        </p>
+        <p className="text-muted-foreground text-sm">{t('review.approveText')}</p>
         <PlantFormFields
           initial={plantForm({ ...plant, source: 'OWN', overridden: false })}
           catalog={catalog}
           neighborCandidates={globals.filter((p) => p.id !== plant.id)}
-          submitLabel="Freigeben"
+          submitLabel={t('review.approve')}
           pending={decide.isPending}
           error={decide.error}
           onSubmit={async (fields) => {
@@ -127,27 +132,41 @@ function Review({
   );
 }
 
-const ROWS: { label: string; value: (plant: Plant, nameOf: (id: string) => string) => string }[] = [
-  { label: 'Kategorie', value: (p) => CATEGORY_LABEL[p.category] },
-  { label: 'Familie', value: (p) => p.family },
-  { label: 'Bedarf', value: (p) => FEEDER_LABEL[p.feeder] },
-  { label: 'Abstand in der Reihe', value: (p) => `${String(p.spacingInRowCm)} cm` },
-  { label: 'Reihenabstand', value: (p) => `${String(p.rowSpacingCm)} cm` },
-  { label: 'Standzeit', value: (p) => lifecycleText(p.lifecycle) },
-  { label: 'Frostempfindlich', value: (p) => (p.frostSensitive ? 'Ja' : 'Nein') },
-  {
-    label: 'Aussaat & Anzucht',
-    value: (p) => (p.sowing ? sowingLines(p.sowing).join(', ') : '–'),
-  },
-  {
-    label: 'Gute Nachbarn',
-    value: (p, nameOf) => p.goodNeighbors.map(nameOf).join(', ') || '–',
-  },
-  {
-    label: 'Schlechte Nachbarn',
-    value: (p, nameOf) => p.badNeighbors.map(nameOf).join(', ') || '–',
-  },
-];
+interface Row {
+  label: string;
+  value: (plant: Plant, nameOf: (id: string) => string) => string;
+}
+
+/** The compared values, labelled like on the plant page. */
+function rows(t: TFunction<'catalog'>, language: Language): Row[] {
+  return [
+    { label: t('detail.category'), value: (p) => t(`category.${p.category}`) },
+    { label: t('detail.family'), value: (p) => p.family },
+    { label: t('detail.feeder'), value: (p) => t(`feeder.${p.feeder}`) },
+    {
+      label: t('detail.spacingInRow'),
+      value: (p) => t('detail.cm', { value: p.spacingInRowCm }),
+    },
+    { label: t('detail.rowSpacing'), value: (p) => t('detail.cm', { value: p.rowSpacingCm }) },
+    { label: t('detail.lifecycle'), value: (p) => lifecycleText(p.lifecycle, language) },
+    {
+      label: t('detail.frostSensitive'),
+      value: (p) => (p.frostSensitive ? t('detail.yes') : t('detail.no')),
+    },
+    {
+      label: t('detail.sowing'),
+      value: (p) => (p.sowing ? sowingLines(p.sowing, language).join(', ') : '–'),
+    },
+    {
+      label: t('detail.goodNeighbors'),
+      value: (p, nameOf) => p.goodNeighbors.map(nameOf).join(', ') || '–',
+    },
+    {
+      label: t('detail.badNeighbors'),
+      value: (p, nameOf) => p.badNeighbors.map(nameOf).join(', ') || '–',
+    },
+  ];
+}
 
 /** The request next to similar global plants, to spot duplicates and odd values. */
 function Comparison({
@@ -159,26 +178,28 @@ function Comparison({
   similar: readonly Plant[];
   catalog: readonly CatalogPlant[];
 }) {
-  const nameOf = (id: string) => catalog.find((p) => p.id === id)?.name ?? 'Unbekannt';
+  const { t } = useTranslation('admin');
+  const { t: catalogT } = useTranslation('catalog');
+  const { language } = useLanguage();
+  const nameOf = (id: string) => catalog.find((p) => p.id === id)?.name ?? t('review.unknown');
   return (
     <section aria-labelledby="similar" className="flex flex-col gap-3">
       <h2 id="similar" className="text-lg font-semibold">
-        Vergleich mit ähnlichen Sorten
+        {t('review.compare')}
       </h2>
       {similar.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Keine ähnliche globale Sorte gefunden, weder nach Name noch nach Familie.
-        </p>
+        <p className="text-muted-foreground text-sm">{t('review.noSimilar')}</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border">
           <table className="w-full min-w-[32rem] text-left text-sm">
             <thead className="bg-muted/50">
               <tr>
                 <th scope="col" className="p-2 font-medium">
-                  <span className="sr-only">Wert</span>
+                  <span className="sr-only">{t('review.value')}</span>
                 </th>
                 <th scope="col" className="p-2 font-semibold">
-                  {plant.name} <span className="text-muted-foreground font-normal">(Anfrage)</span>
+                  {plant.name}{' '}
+                  <span className="text-muted-foreground font-normal">{t('review.request')}</span>
                 </th>
                 {similar.map((other) => (
                   <th key={other.id} scope="col" className="p-2 font-medium">
@@ -194,7 +215,7 @@ function Comparison({
               </tr>
             </thead>
             <tbody>
-              {ROWS.map(({ label, value }) => {
+              {rows(catalogT, language).map(({ label, value }) => {
                 const requested = value(plant, nameOf);
                 return (
                   <tr key={label} className="border-t align-top">
@@ -231,6 +252,7 @@ function Reject({
   pending: boolean;
   onReject: (comment: string) => Promise<void>;
 }) {
+  const { t } = useTranslation('admin');
   const id = useId();
   const [comment, setComment] = useState('');
   const [error, setError] = useState<string | undefined>();
@@ -239,11 +261,11 @@ function Reject({
   return (
     <section aria-labelledby="reject" className="flex max-w-2xl flex-col gap-3 border-t pt-6">
       <h2 id="reject" className="text-lg font-semibold">
-        Ablehnen
+        {t('review.reject')}
       </h2>
       {failed != null && <FormMessage tone="error">{apiErrorMessage(failed)}</FormMessage>}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={id}>Begründung für die Ablehnung</Label>
+        <Label htmlFor={id}>{t('review.rejectReason')}</Label>
         <textarea
           id={id}
           rows={3}
@@ -263,7 +285,7 @@ function Reject({
           </p>
         ) : (
           <p id={`${id}-hint`} className="text-muted-foreground text-xs">
-            Die Person sieht den Kommentar bei ihrer Sorte und kann sie danach erneut vorschlagen.
+            {t('review.rejectHint')}
           </p>
         )}
       </div>
@@ -274,7 +296,7 @@ function Reject({
         disabled={pending}
         onClick={() => {
           if (comment.trim() === '') {
-            setError('Bitte begründe die Ablehnung.');
+            setError(t('review.rejectRequired'));
             return;
           }
           setFailed(null);
@@ -283,7 +305,7 @@ function Reject({
           });
         }}
       >
-        Ablehnen
+        {t('review.reject')}
       </Button>
     </section>
   );

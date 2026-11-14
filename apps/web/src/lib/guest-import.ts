@@ -7,6 +7,8 @@ import {
 } from '@hochbeet/contracts';
 import { ulid } from 'ulid';
 import type { ApiFetch } from './api';
+import { i18n } from './i18n';
+import { intlLocale, type Language } from './language';
 import { GUEST_IMPORT_ID_KEY } from './local-api/keys';
 import type { LocalGarden } from './local-api/store';
 
@@ -27,21 +29,14 @@ export function hasGuestData(garden: LocalGarden): boolean {
 }
 
 /** „2 Beete, 5 Pflanzungen, 1 Anzucht und 1 eigene Sorte“ */
-export function describeGuestData(garden: LocalGarden): string {
-  const { beds, plantings, ownPlants, overrides, sowings } = guestDataSummary(garden);
-  const parts = [
-    [beds, 'Beet', 'Beete'],
-    [plantings, 'Pflanzung', 'Pflanzungen'],
-    [sowings, 'Anzucht', 'Anzuchten'],
-    [ownPlants, 'eigene Sorte', 'eigene Sorten'],
-    [overrides, 'Anpassung', 'Anpassungen'],
-  ] as const;
-  const named = parts
-    .filter(([n]) => n > 0)
-    .map(([n, one, many]) => `${String(n)} ${n === 1 ? one : many}`);
-  return named.length > 1
-    ? `${named.slice(0, -1).join(', ')} und ${named.at(-1) ?? ''}`
-    : (named[0] ?? '');
+export function describeGuestData(garden: LocalGarden, language: Language): string {
+  const t = i18n.getFixedT(language, 'guestImport');
+  const summary = guestDataSummary(garden);
+  const kinds = ['beds', 'plantings', 'sowings', 'ownPlants', 'overrides'] as const;
+  const named = kinds
+    .filter((kind) => summary[kind] > 0)
+    .map((kind) => t(`data.${kind}`, { count: summary[kind] }));
+  return new Intl.ListFormat(intlLocale(language), { type: 'conjunction' }).format(named);
 }
 
 /** Own plants (archived ones too: plantings may use them) and adjustments. */

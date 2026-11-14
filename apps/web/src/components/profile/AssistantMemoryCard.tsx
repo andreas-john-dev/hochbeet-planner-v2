@@ -1,6 +1,7 @@
 import { ASSISTANT_CONVERSATION_DAYS } from '@hochbeet/contracts';
 import { Trash2 } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import { useAssistantMemories, useForgetAssistantMemories } from '@/lib/assistan
  * with the option to delete all of it, including the stored conversations.
  */
 export function AssistantMemoryCard() {
+  const { t } = useTranslation(['profile', 'common']);
   const memories = useAssistantMemories(true);
   const forget = useForgetAssistantMemories();
   const [confirming, setConfirming] = useState(false);
@@ -31,20 +33,18 @@ export function AssistantMemoryCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Beet-Assistent</CardTitle>
+        <CardTitle>{t('assistant.title')}</CardTitle>
         <CardDescription>
-          Der Assistent merkt sich Vorlieben aus euren Gesprächen, etwa was du nicht magst, wo du
-          gärtnerst oder wie sonnig dein Beet steht. Die Gespräche selbst bleiben{' '}
-          {ASSISTANT_CONVERSATION_DAYS} Tage gespeichert.
+          {t('assistant.description', { count: ASSISTANT_CONVERSATION_DAYS })}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <h3 id={listId} className="text-sm font-semibold">
-          Gemerkte Vorlieben
+          {t('assistant.memories')}
         </h3>
         {memories.isPending ? (
           <SkeletonList
-            label="Vorlieben werden geladen"
+            label={t('assistant.loading')}
             count={2}
             className="flex flex-col gap-2"
             itemClassName="h-6 rounded-md"
@@ -53,7 +53,7 @@ export function AssistantMemoryCard() {
           <FormMessage tone="error">{apiErrorMessage(memories.error)}</FormMessage>
         ) : items.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            {forgotten ? 'Der Assistent hat alles vergessen.' : 'Noch keine Vorlieben gemerkt.'}
+            {forgotten ? t('assistant.forgotten') : t('assistant.empty')}
           </p>
         ) : (
           <ul aria-labelledby={listId} className="flex flex-col gap-1 text-sm">
@@ -74,18 +74,15 @@ export function AssistantMemoryCard() {
             }}
           >
             <Trash2 aria-hidden />
-            Alles löschen
+            {t('assistant.forget')}
           </Button>
         </div>
       </CardContent>
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent role="alertdialog">
           <DialogHeader>
-            <DialogTitle>Alles löschen, was der Assistent weiß?</DialogTitle>
-            <DialogDescription>
-              Gelöscht werden alle gemerkten Vorlieben und die gespeicherten Gespräche. Das lässt
-              sich nicht rückgängig machen.
-            </DialogDescription>
+            <DialogTitle>{t('assistant.confirmTitle')}</DialogTitle>
+            <DialogDescription>{t('assistant.confirmText')}</DialogDescription>
           </DialogHeader>
           {forget.isError && (
             <FormMessage tone="error">{apiErrorMessage(forget.error)}</FormMessage>
@@ -97,7 +94,7 @@ export function AssistantMemoryCard() {
                 setConfirming(false);
               }}
             >
-              Abbrechen
+              {t('common:cancel')}
             </Button>
             <Button
               className="bg-red-700 text-white hover:bg-red-800 dark:bg-red-600 dark:hover:bg-red-700"
@@ -112,7 +109,7 @@ export function AssistantMemoryCard() {
                   .catch(() => undefined);
               }}
             >
-              Alles löschen
+              {t('assistant.forget')}
             </Button>
           </DialogFooter>
         </DialogContent>

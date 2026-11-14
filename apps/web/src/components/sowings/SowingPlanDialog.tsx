@@ -4,6 +4,7 @@ import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,15 +35,13 @@ export function SowingPlanDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation('sowings');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Anzuchtplan</DialogTitle>
-          <DialogDescription>
-            Was du für deine Beete vorziehen musst: aus allen geplanten Pflanzungen ohne Anzucht,
-            mit 30 % Reserve für Keimausfälle.
-          </DialogDescription>
+          <DialogTitle>{t('planDialog.title')}</DialogTitle>
+          <DialogDescription>{t('planDialog.description')}</DialogDescription>
         </DialogHeader>
         {open && (
           <SowingPlan
@@ -64,6 +63,7 @@ const countOf = (text: string) => {
 };
 
 function SowingPlan({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation(['sowings', 'common']);
   const api = useApi();
   const queryClient = useQueryClient();
   const garden = useAllPlantings();
@@ -87,18 +87,14 @@ function SowingPlan({ onDone }: { onDone: () => void }) {
 
   const error = garden.error ?? plants.error ?? sowings.error;
   if (error) return <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>;
-  if (!rows) return <SkeletonList label="Anzuchtplan wird berechnet …" count={3} />;
+  if (!rows) return <SkeletonList label={t('planDialog.loading')} count={3} />;
   if (rows.length === 0) {
     return (
       <>
-        <p className="text-muted-foreground text-sm">
-          Nichts vorzuziehen: Alle geplanten Pflanzungen ab dieser Woche, die sich vorziehen lassen,
-          stammen schon aus einer Anzucht. Setze im Beet Sorten wie Tomaten oder Salat, dann
-          erscheinen sie hier.
-        </p>
+        <p className="text-muted-foreground text-sm">{t('planDialog.nothing')}</p>
         <DialogFooter>
           <Button type="button" variant="outline" className="h-11 md:h-10" onClick={onDone}>
-            Schließen
+            {t('common:close')}
           </Button>
         </DialogFooter>
       </>
@@ -137,26 +133,24 @@ function SowingPlan({ onDone }: { onDone: () => void }) {
       }}
     >
       {failed.size > 0 && (
-        <FormMessage tone="error">
-          {`${failed.size === 1 ? 'Eine Zeile wurde' : `${String(failed.size)} Zeilen wurden`} nicht gespeichert. Was gespeichert ist, bleibt erhalten; versuch es noch einmal.`}
-        </FormMessage>
+        <FormMessage tone="error">{t('planDialog.failed', { count: failed.size })}</FormMessage>
       )}
       <div className="-mx-1 overflow-x-auto px-1">
         <table className="w-full text-sm">
-          <caption className="sr-only">Was du wann vorziehst</caption>
+          <caption className="sr-only">{t('planDialog.caption')}</caption>
           <thead>
             <tr className="text-muted-foreground border-b text-left text-xs">
               <th scope="col" className="w-8 py-2 font-medium">
-                <span className="sr-only">Anlegen</span>
+                <span className="sr-only">{t('planDialog.choose')}</span>
               </th>
               <th scope="col" className="py-2 pr-2 font-medium">
-                Sorte und Aussaat
+                {t('planDialog.plantAndSowing')}
               </th>
               <th scope="col" className="py-2 pr-2 text-right font-medium">
-                Benötigt
+                {t('planDialog.needed')}
               </th>
               <th scope="col" className="w-24 py-2 text-right font-medium">
-                Mit Reserve
+                {t('planDialog.withReserve')}
               </th>
             </tr>
           </thead>
@@ -182,18 +176,14 @@ function SowingPlan({ onDone }: { onDone: () => void }) {
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" className="h-11 md:h-10" onClick={onDone}>
-          Abbrechen
+          {t('common:cancel')}
         </Button>
         <Button
           type="submit"
           className="h-11 md:h-10"
           disabled={saving || !valid || selected.length === 0}
         >
-          {saving
-            ? 'Wird angelegt …'
-            : selected.length === 1
-              ? '1 Charge anlegen'
-              : `${String(selected.length)} Chargen anlegen`}
+          {saving ? t('planDialog.saving') : t('planDialog.submit', { count: selected.length })}
         </Button>
       </DialogFooter>
     </form>
@@ -217,10 +207,11 @@ function PlanRow({
   onChoose: (chosen: boolean) => void;
   onCount: (text: string) => void;
 }) {
+  const { t } = useTranslation('sowings');
   const { week, range } = formatWeek(row.sowDate);
-  const name = `${row.plant.name}, ${week}`;
+  const name = t('planDialog.rowName', { plant: row.plant.name, week });
   const invalid = chosen && countOf(countText) === undefined;
-  const beds = row.beds.map((bed) => `„${bed.name}“`).join(', ');
+  const beds = row.beds.map((bed) => t('quoted', { name: bed.name })).join(', ');
 
   return (
     <tr
@@ -233,7 +224,7 @@ function PlanRow({
           <input
             type="checkbox"
             className="accent-primary size-4"
-            aria-label={`${name} anlegen`}
+            aria-label={t('planDialog.chooseRow', { name })}
             checked={chosen}
             disabled={disabled}
             onChange={(event) => {
@@ -247,16 +238,14 @@ function PlanRow({
           <PlantIcon plant={row.plant} size={32} decorative className="hidden shrink-0 sm:block" />
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-foreground font-medium">{row.plant.name}</span>
-            <span>
-              Aussaat {week} · {range}
-            </span>
+            <span>{t('planDialog.sowing', { week, range })}</span>
             <span className="text-muted-foreground text-xs">
-              Auspflanzen ab {formatWeek(row.transplantDate).week} in {beds}
+              {t('planDialog.transplant', { week: formatWeek(row.transplantDate).week, beds })}
             </span>
             {row.tooLate && (
               <span className="flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300">
                 <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
-                Zu spät zum Vorziehen – Jungpflanzen kaufen?
+                {t('planDialog.tooLate')}
               </span>
             )}
             {error !== undefined && (
@@ -276,7 +265,7 @@ function PlanRow({
           max={MAX_SOWING_COUNT}
           step={1}
           className="ml-auto w-20 text-right"
-          aria-label={`Mit Reserve: ${name}`}
+          aria-label={t('planDialog.countLabel', { name })}
           aria-invalid={invalid}
           value={countText}
           disabled={disabled || !chosen}

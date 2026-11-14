@@ -21,20 +21,22 @@ const both: Sowing = {
 
 describe('sowing form', () => {
   it('round-trips frost sensitivity and all sowing details', () => {
-    expect(parseSowingForm(sowingForm({ frostSensitive: true, sowing: both }))).toEqual({
+    expect(parseSowingForm(sowingForm({ frostSensitive: true, sowing: both }), 'de')).toEqual({
       fields: { frostSensitive: true, sowing: both },
     });
   });
 
   it('returns no details when no method is chosen, but keeps the frost flag', () => {
     const form = { ...sowingForm({ sowing: both }), method: null, frostSensitive: true };
-    expect(parseSowingForm(form)).toEqual({ fields: { frostSensitive: true, sowing: undefined } });
+    expect(parseSowingForm(form, 'de')).toEqual({
+      fields: { frostSensitive: true, sowing: undefined },
+    });
     expect(sowingForm({})).toEqual(EMPTY_SOWING_FORM);
   });
 
   it('drops the details of the other method', () => {
     const form = { ...sowingForm({ sowing: both }), method: 'DIRECT' as const };
-    expect(parseSowingForm(form)).toEqual({
+    expect(parseSowingForm(form, 'de')).toEqual({
       fields: {
         frostSensitive: false,
         sowing: {
@@ -53,7 +55,7 @@ describe('sowing form', () => {
   });
 
   it('asks for the windows of the chosen method', () => {
-    expect(parseSowingForm({ ...EMPTY_SOWING_FORM, method: 'PRESOW' })).toEqual({
+    expect(parseSowingForm({ ...EMPTY_SOWING_FORM, method: 'PRESOW' }, 'de')).toEqual({
       errors: {
         presowFrom: 'Bitte die Wochen für die Vorkultur angeben.',
         propagationMin: 'Bitte die Dauer der Vorkultur angeben.',
@@ -70,13 +72,20 @@ describe('sowing form', () => {
       directFrom: '54',
       germinationTempMax: '45',
     };
-    expect(parseSowingForm(form)).toEqual({
+    expect(parseSowingForm(form, 'de')).toEqual({
       errors: {
         presowTo: 'Bitte beide Werte angeben.',
         propagationMax: 'Bis-Wert muss mindestens so groß sein wie der Von-Wert.',
         prickOutWeeks: 'Bitte eine ganze Zahl angeben.',
         directFrom: 'Kalenderwoche 1 bis 53 angeben.',
         germinationTempMax: '0 bis 40 °C angeben.',
+      },
+    });
+    // Own messages in English; those of the schema follow in T-70.
+    expect(parseSowingForm(form, 'en')).toMatchObject({
+      errors: {
+        presowTo: 'Please enter both values.',
+        prickOutWeeks: 'Please enter a whole number.',
       },
     });
   });
@@ -88,7 +97,7 @@ describe('sowing form', () => {
       directFrom: '40',
       directTo: '8',
     };
-    expect(parseSowingForm(form)).toEqual({
+    expect(parseSowingForm(form, 'de')).toEqual({
       fields: {
         frostSensitive: false,
         sowing: { method: 'DIRECT', directSowWeeks: { from: 40, to: 8 } },

@@ -9,16 +9,14 @@ import {
   parseISO,
   startOfISOWeek,
 } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { monthDayText } from './garden-settings';
+import { i18n } from './i18n';
+import { dateLocale, type Language } from './language';
 
 export type CalendarRowKind = 'presow' | 'direct' | 'plantOut' | 'inBed';
 
-export const CALENDAR_ROW_LABEL: Record<CalendarRowKind, string> = {
-  presow: 'Vorkultur',
-  direct: 'Direktsaat',
-  plantOut: 'Auspflanzen',
-  inBed: 'Im Beet / Ernte',
-};
+type CalendarT = ReturnType<typeof calendarT>;
+const calendarT = (language: Language) => i18n.getFixedT(language, 'catalog', 'calendar');
 
 /** Weeks `from` to `to` of one year, both inclusive, never across the turn of the year. */
 export interface WeekSegment {
@@ -99,19 +97,19 @@ function rangesOf(segments: readonly WeekSegment[], weeks: number): Span[] {
   return segments.map((s) => ({ ...s }));
 }
 
-function rangeText(range: Span, weeks: number, year: number): string {
+/** The weeks of a range with where they lie in the year; the hints stay German until T-69. */
+function rangeText(range: Span, weeks: number, year: number, t: CalendarT): string {
   const from = inYear(range.from, weeks);
   const to = inYear(range.to, weeks);
   const start = weekHint(from, { year });
-  if (from === to) return `KW ${String(from)} · ${start}`;
-  return `KW ${String(from)}–${String(to)} · ${start} bis ${weekHint(to, { year, end: true })}`;
+  if (from === to) return t('single', { week: from, start });
+  return t('range', { from, to, start, end: weekHint(to, { year, end: true }) });
 }
 
 function row(
   kind: CalendarRowKind,
   spans: readonly Span[],
-  weeks: number,
-  year: number,
+  { weeks, year, t }: { weeks: number; year: number; t: CalendarT },
   text?: string,
 ): CalendarRow {
   const segments = segmentsOf(cover(spans, weeks));
@@ -122,10 +120,10 @@ function row(
     text:
       text ??
       (full
-        ? 'ganzjährig'
+        ? t('yearRound')
         : rangesOf(segments, weeks)
-            .map((range) => rangeText(range, weeks, year))
-            .join(' und ')),
+            .map((range) => rangeText(range, weeks, year, t))
+            .join(t('and'))),
   };
 }
 
@@ -150,17 +148,23 @@ export function sowingCalendar(
     frostSensitive?: boolean | undefined;
     lifecycle: Lifecycle;
   },
-  { year, lastFrost = DEFAULT_LAST_FROST }: { year: number; lastFrost?: string },
+  {
+    year,
+    lastFrost = DEFAULT_LAST_FROST,
+    language,
+  }: { year: number; lastFrost?: string; language: Language },
 ): SowingCalendar | null {
   const { sowing, lifecycle } = plant;
   if (!sowing) return null;
   const weeks = getISOWeeksInYear(new Date(year, 6, 1));
+  const t = calendarT(language);
+  const band = { weeks, year, t };
   const rows: CalendarRow[] = [];
   const bed: Span[] = [];
 
   if (sowing.presowWeeks && sowing.propagationWeeks) {
     const presow = spanOf(sowing.presowWeeks, weeks);
-    rows.push(row('presow', [presow], weeks, year));
+    rows.push(row('presow', [presow], band));
     const out = {
       from: presow.from + sowing.propagationWeeks.min,
       to: presow.to + sowing.propagationWeeks.max,
@@ -177,12 +181,12 @@ export function sowingCalendar(
     // Late windows plant out next year; draw them from the start of the year.
     const offset = out.from - inYear(out.from, weeks);
     const plantOut = { from: out.from - offset, to: out.to - offset };
-    rows.push(row('plantOut', [plantOut], weeks, year));
+    rows.push(row('plantOut', [plantOut], band));
     bed.push(inBed(plantOut, lifecycle, weeks));
   }
   if (sowing.directSowWeeks) {
     const direct = spanOf(sowing.directSowWeeks, weeks);
-    rows.push(row('direct', [direct], weeks, year));
+    rows.push(row('direct', [direct], band));
     bed.push(inBed(direct, lifecycle, weeks, sowing.directSowExtraWeeks));
   }
   // Plants with years or without end stay: the bar runs from the earliest start to the end.
@@ -191,11 +195,10 @@ export function sowingCalendar(
     row(
       'inBed',
       bed,
-      weeks,
-      year,
+      band,
       lifecycle.type === 'ANNUAL'
         ? undefined
-        : `ab KW ${String(first)} · ${weekHint(first, { year })}, mehrjährig`,
+        : t('multiYear', { week: first, start: weekHint(first, { year }) }),
     ),
   );
 
@@ -213,12 +216,15 @@ export function segmentPosition(segment: WeekSegment, weeks: number) {
 }
 
 /** Where each month starts on the band, in percent, aligned with the ISO weeks of `year`. */
-export function monthTicks(year: number): { label: string; short: string; left: number }[] {
+export function monthTicks(
+  year: number,
+  language: Language,
+): { label: string; short: string; left: number }[] {
   const start = startOfISOWeek(new Date(year, 0, 4));
   const days = getISOWeeksInYear(new Date(year, 6, 1)) * 7;
   return Array.from({ length: 12 }, (_, month) => {
     const first = new Date(year, month, 1);
-    const label = format(first, 'LLL', { locale: de }).replace('.', '');
+    const label = format(first, 'LLL', { locale: dateLocale(language) }).replace('.', '');
     return {
       label,
       short: label.charAt(0),
@@ -227,8 +233,7 @@ export function monthTicks(year: number): { label: string; short: string; left: 
   });
 }
 
-/** "frostempfindlich, erst nach dem 15. Mai ins Freie" for the frost date `MM-DD`. */
-export function frostText(lastFrost = DEFAULT_LAST_FROST): string {
-  const date = new Date(`2000-${lastFrost}T12:00:00`);
-  return `Frostempfindlich, erst nach dem ${format(date, 'd. MMMM', { locale: de })} ins Freie`;
+/** "Frostempfindlich, erst nach dem 15. Mai ins Freie" for the frost date `MM-DD`. */
+export function frostText(language: Language, lastFrost = DEFAULT_LAST_FROST): string {
+  return calendarT(language)('frost', { date: monthDayText(lastFrost, language) });
 }

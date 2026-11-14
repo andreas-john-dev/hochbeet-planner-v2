@@ -1,6 +1,7 @@
 import { DEFAULT_LAST_FROST } from '@hochbeet/contracts';
 import { RotateCcw } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,13 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
 import { useGardenSettings, useSaveGardenSettings } from '@/lib/garden';
-import {
-  daysInMonth,
-  MONTH_NAMES,
-  monthDay,
-  monthDayText,
-  toMonthDay,
-} from '@/lib/garden-settings';
+import { daysInMonth, monthDay, monthDayText, monthNames, toMonthDay } from '@/lib/garden-settings';
+import { useLanguage } from '@/lib/i18n';
 
 const selectClass =
   'bg-card focus-visible:ring-ring/50 h-11 rounded-md border px-3 text-base outline-none focus-visible:ring-[3px] md:h-9 md:text-sm';
@@ -24,17 +20,16 @@ const selectClass =
  * sensitive plants go outside only after it; without a saved day it is 15 May.
  */
 export function GardenSettingsCard() {
+  const { t } = useTranslation('profile');
+  const { language } = useLanguage();
   const settings = useGardenSettings();
   const save = useSaveGardenSettings();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Garten</CardTitle>
-        <CardDescription>
-          Dein letzter Frosttermin gilt jedes Jahr. Frostempfindliche Sorten kommen erst danach ins
-          Freie, zum Beispiel im Aussaatkalender.
-        </CardDescription>
+        <CardTitle>{t('garden.title')}</CardTitle>
+        <CardDescription>{t('garden.description')}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {settings.isPending ? (
@@ -55,7 +50,7 @@ export function GardenSettingsCard() {
         {save.isError && <FormMessage tone="error">{apiErrorMessage(save.error)}</FormMessage>}
         {save.isSuccess && (
           <p role="status" className="text-muted-foreground text-sm">
-            Gespeichert: letzter Frost am {monthDayText(save.data.lastFrost)}.
+            {t('garden.saved', { date: monthDayText(save.data.lastFrost, language) })}
           </p>
         )}
       </CardContent>
@@ -72,6 +67,8 @@ function LastFrostForm({
   saving: boolean;
   onSave: (lastFrost: string) => void;
 }) {
+  const { t } = useTranslation(['profile', 'common']);
+  const { language } = useLanguage();
   const ids = { day: useId(), month: useId() };
   const [value, setValue] = useState(() => monthDay(saved));
   const current = toMonthDay(value.month, value.day);
@@ -85,10 +82,10 @@ function LastFrostForm({
       }}
     >
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Letzter Frost</legend>
+        <legend className="mb-1 text-sm font-medium">{t('garden.lastFrost')}</legend>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={ids.day}>Tag</Label>
+            <Label htmlFor={ids.day}>{t('garden.day')}</Label>
             <select
               id={ids.day}
               className={selectClass}
@@ -99,13 +96,13 @@ function LastFrostForm({
             >
               {Array.from({ length: daysInMonth(value.month) }, (_, i) => (
                 <option key={i + 1} value={i + 1}>
-                  {i + 1}.
+                  {t('garden.dayOption', { day: i + 1 })}
                 </option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={ids.month}>Monat</Label>
+            <Label htmlFor={ids.month}>{t('garden.month')}</Label>
             <select
               id={ids.month}
               className={selectClass}
@@ -116,7 +113,7 @@ function LastFrostForm({
                 setValue({ month, day: Math.min(value.day, daysInMonth(month)) });
               }}
             >
-              {MONTH_NAMES.map((name, i) => (
+              {monthNames(language).map((name, i) => (
                 <option key={name} value={i + 1}>
                   {name}
                 </option>
@@ -124,7 +121,7 @@ function LastFrostForm({
             </select>
           </div>
           <Button type="submit" className="h-11 md:h-9" disabled={saving || current === saved}>
-            Speichern
+            {t('common:save')}
           </Button>
         </div>
       </fieldset>
@@ -139,7 +136,7 @@ function LastFrostForm({
           }}
         >
           <RotateCcw aria-hidden />
-          Auf {monthDayText(DEFAULT_LAST_FROST)} zurücksetzen
+          {t('garden.reset', { date: monthDayText(DEFAULT_LAST_FROST, language) })}
         </Button>
       </div>
     </form>

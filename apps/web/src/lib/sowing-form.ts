@@ -4,6 +4,8 @@ import {
   type SowingMethod,
   SowingSchema,
 } from '@hochbeet/contracts';
+import { i18n } from './i18n';
+import type { Language } from './language';
 
 /** Form values of "Aussaat & Anzucht"; numbers as typed, `method: null` = no details. */
 export interface SowingForm {
@@ -97,16 +99,19 @@ export function usesField(method: SowingMethod | null, key: NumberKey): boolean 
 }
 
 /**
- * Checks the form; returns frost sensitivity and sowing details or German messages per field.
+ * Checks the form; returns frost sensitivity and sowing details or messages per field in
+ * `language` (those of the schema in the language Zod speaks).
  * Both keys are always set: `frostSensitive` as boolean so that an adjustment can switch it
  * off again, `sowing` as undefined when there are no details.
  */
 export function parseSowingForm(
   form: SowingForm,
+  language: Language,
 ): { fields: { frostSensitive: boolean; sowing: Sowing | undefined } } | { errors: SowingErrors } {
   if (form.method === null) {
     return { fields: { frostSensitive: form.frostSensitive, sowing: undefined } };
   }
+  const t = i18n.getFixedT(language, 'catalog');
   const method = form.method;
   const errors: SowingErrors = {};
   const numbers: Partial<Record<NumberKey, number>> = {};
@@ -116,7 +121,7 @@ export function parseSowingForm(
     if (value === '') continue;
     const number = Number(value);
     if (Number.isInteger(number)) numbers[key] = number;
-    else errors[key] = 'Bitte eine ganze Zahl angeben.';
+    else errors[key] = t('errors.wholeNumber');
   }
 
   const sowing: Record<string, unknown> = { method };
@@ -124,8 +129,8 @@ export function parseSowingForm(
     const from = numbers[fromKey];
     const to = numbers[toKey];
     if (from !== undefined && to !== undefined) sowing[field] = { [fromName]: from, [toName]: to };
-    else if (from !== undefined && !errors[toKey]) errors[toKey] = 'Bitte beide Werte angeben.';
-    else if (to !== undefined && !errors[fromKey]) errors[fromKey] = 'Bitte beide Werte angeben.';
+    else if (from !== undefined && !errors[toKey]) errors[toKey] = t('errors.bothValues');
+    else if (to !== undefined && !errors[fromKey]) errors[fromKey] = t('errors.bothValues');
   }
   for (const key of SINGLES) {
     if (numbers[key] !== undefined) sowing[key] = numbers[key];

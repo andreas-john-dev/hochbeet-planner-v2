@@ -17,8 +17,13 @@ const seed = (name: string) => {
 };
 
 /** The rows as `kind: segments | text` for compact expectations. */
-const rows = (plant: Parameters<typeof sowingCalendar>[0], year = 2026, lastFrost?: string) =>
-  sowingCalendar(plant, { year, ...(lastFrost ? { lastFrost } : {}) })?.rows.map(
+const rows = (
+  plant: Parameters<typeof sowingCalendar>[0],
+  year = 2026,
+  lastFrost?: string,
+  language: 'de' | 'en' = 'de',
+) =>
+  sowingCalendar(plant, { year, language, ...(lastFrost ? { lastFrost } : {}) })?.rows.map(
     (row) =>
       `${row.kind}: ${row.segments.map((s) => `${String(s.from)}-${String(s.to)}`).join(',')} | ${row.text}`,
   );
@@ -104,7 +109,24 @@ describe('sowing calendar', () => {
   });
 
   it('has nothing to draw without sowing details', () => {
-    expect(sowingCalendar(seed('Erdbeere'), { year: 2026 })).toBeNull();
+    expect(sowingCalendar(seed('Erdbeere'), { year: 2026, language: 'de' })).toBeNull();
+  });
+
+  it('names the weeks in English; the hints stay German until T-69', () => {
+    expect(rows(seed('Tomate'), 2026, undefined, 'en')).toEqual([
+      'presow: 11-16 | Weeks 11–16 · Anfang März to Mitte April',
+      'plantOut: 21-29 | Weeks 21–29 · Mitte Mai to Mitte Juli',
+      'inBed: 21-50 | Weeks 21–50 · Mitte Mai to Mitte Dezember',
+    ]);
+    expect(rows(seed('Kürbis'), 2026, undefined, 'en')).toContain(
+      'plantOut: 21-21 | Week 21 · Mitte Mai',
+    );
+    expect(rows(seed('Oregano'), 2026, undefined, 'en')?.at(-1)).toBe(
+      'inBed: 14-53 | from week 14 · Ende März, for several years',
+    );
+    expect(rows({ ...seed('Möhre'), lifecycle: annual(60) }, 2026, undefined, 'en')?.at(-1)).toBe(
+      'inBed: 1-53 | all year',
+    );
   });
 });
 
@@ -113,12 +135,13 @@ describe('calendar helpers', () => {
     expect(frostWeek(2026)).toBe(21); // Fri 15 May → Mon 18 May
     expect(frostWeek(2027)).toBe(20); // Sat 15 May → Mon 17 May
     expect(frostWeek(2022)).toBe(20); // Sun 15 May → Mon 16 May
-    expect(frostText()).toBe('Frostempfindlich, erst nach dem 15. Mai ins Freie');
+    expect(frostText('de')).toBe('Frostempfindlich, erst nach dem 15. Mai ins Freie');
+    expect(frostText('en', '05-20')).toBe('Frost-sensitive, only outside after 20 May');
   });
 
   it('places segments and months on the band', () => {
     expect(segmentPosition({ from: 1, to: 53 }, 53)).toEqual({ left: 0, width: 100 });
-    const ticks = monthTicks(2026);
+    const ticks = monthTicks(2026, 'de');
     expect(ticks.map((t) => t.label)).toEqual([
       'Jan',
       'Feb',
@@ -133,6 +156,7 @@ describe('calendar helpers', () => {
       'Nov',
       'Dez',
     ]);
+    expect(monthTicks(2026, 'en').map((t) => t.short)).toEqual('JFMAMJJASOND'.split(''));
     // ISO week 1 of 2026 starts on Monday 29 December 2025.
     expect(ticks[0]?.left).toBeCloseTo((3 / 371) * 100);
     expect(ticks.every((t, i) => i === 0 || t.left > (ticks[i - 1]?.left ?? 0))).toBe(true);
@@ -141,7 +165,7 @@ describe('calendar helpers', () => {
   it('lists the facts the bars do not show', () => {
     const lettuce = seed('Kopfsalat').sowing;
     if (!lettuce) throw new Error('no sowing');
-    expect(sowingFacts(lettuce)).toEqual([
+    expect(sowingFacts(lettuce, 'de')).toEqual([
       '3–4 Wochen bis zum Auspflanzen',
       'Bei Direktsaat 3 Wochen länger im Beet',
       expect.stringMatching(/^Keimt in \d+–\d+ Tagen$/),

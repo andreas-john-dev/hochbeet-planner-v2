@@ -8,6 +8,8 @@ import type {
 } from '@hochbeet/contracts';
 import { formatWeek, plantCount } from '@hochbeet/garden-rules';
 import { addWeeks, formatISO, parseISO } from 'date-fns';
+import { i18n } from './i18n';
+import type { Language } from './language';
 import { defaultTransplantDate, fieldsOf, hasSeedlings } from './sowings';
 
 /** Tasks at a batch, checked off on the card. */
@@ -193,40 +195,39 @@ export function taskDone(task: SowingTask): SowingBatchFields {
   }
 }
 
-const count = (items: BedTask['items']) =>
-  items.map(({ plant, count: n }) => `${String(n)} × ${plant.name}`).join(', ');
+const count = (items: BedTask['items'], language: Language) => {
+  const t = i18n.getFixedT(language, 'sowings');
+  return items
+    .map(({ plant, count: n }) => t('tasks.item', { count: n, plant: plant.name }))
+    .join(', ');
+};
 
 /** The task in a few words, e.g. „Tomate aussäen“ or „Auspflanzen in „Hochbeet Süd““. */
-export function taskTitle(task: WeeklyTask): string {
-  if (isSowingTask(task)) {
-    const verb = { SOW: 'aussäen', PRICK_OUT: 'pikieren', HARDEN: 'abhärten' }[task.kind];
-    return `${task.plant.name} ${verb}`;
-  }
-  const what = {
-    PLANT_OUT: 'Auspflanzen',
-    DIRECT_SOW: 'Direkt säen',
-    SET_PLANTS: 'Pflanzen setzen',
-  };
-  return `${what[task.kind]} in „${task.bed.name}“`;
+export function taskTitle(task: WeeklyTask, language: Language): string {
+  const t = i18n.getFixedT(language, 'sowings');
+  if (isSowingTask(task)) return t(`tasks.${task.kind}`, { plant: task.plant.name });
+  return t(`tasks.${task.kind}`, { bed: t('quoted', { name: task.bed.name }) });
 }
 
 /** What the task is about: the amount and week of a batch, the plants of a bed. */
-export function taskDetail(task: WeeklyTask): string {
+export function taskDetail(task: WeeklyTask, language: Language): string {
+  const t = i18n.getFixedT(language, 'sowings');
   if (!isSowingTask(task)) {
     return task.kind === 'SET_PLANTS'
-      ? `Jungpflanzen besorgen: ${count(task.items)}`
-      : count(task.items);
+      ? t('tasks.buySeedlings', { items: count(task.items, language) })
+      : count(task.items, language);
   }
   const { sowing, plant } = task;
   const week = formatWeek(task.date).week;
   switch (task.kind) {
     case 'SOW':
-      return `${String(sowing.sownCount)} Samen, geplant für ${week}`;
+      return t('tasks.sowDetail', { count: sowing.sownCount, week });
     case 'PRICK_OUT':
-      return `Gesät in ${formatWeek(sowing.sowDate).week}, pikieren nach ${String(
-        plant.sowing?.prickOutWeeks ?? 0,
-      )} Wochen`;
+      return t('tasks.prickOutDetail', {
+        week: formatWeek(sowing.sowDate).week,
+        count: plant.sowing?.prickOutWeeks ?? 0,
+      });
     case 'HARDEN':
-      return `Auspflanzen ab ${week}`;
+      return t('tasks.hardenDetail', { week });
   }
 }

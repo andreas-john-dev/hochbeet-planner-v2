@@ -2,6 +2,7 @@ import type { CatalogPlant } from '@hochbeet/contracts';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Plus, X } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { filterCatalog, NO_FILTER } from '@/lib/catalog';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ export function NeighborPicker({
   candidates: readonly CatalogPlant[];
   onChange: (ids: string[]) => void;
 }) {
+  const { t } = useTranslation('catalog');
   const searchId = useId();
   const [query, setQuery] = useState('');
   const chosen = value.flatMap((id) => candidates.find((p) => p.id === id) ?? []);
@@ -42,7 +44,7 @@ export function NeighborPicker({
             <li key={plant.id}>
               <button
                 type="button"
-                aria-label={`${plant.name} entfernen`}
+                aria-label={t('form.neighborRemove', { name: plant.name })}
                 onClick={() => {
                   onChange(value.filter((id) => id !== plant.id));
                 }}
@@ -62,12 +64,12 @@ export function NeighborPicker({
         </ul>
       )}
       <label htmlFor={searchId} className="sr-only">
-        {label} suchen
+        {t('form.neighborSearch', { label })}
       </label>
       <Input
         id={searchId}
         type="search"
-        placeholder="Sorte suchen und hinzufügen"
+        placeholder={t('form.neighborPlaceholder')}
         autoComplete="off"
         value={query}
         onChange={(event) => {
@@ -75,7 +77,7 @@ export function NeighborPicker({
         }}
       />
       {matches.length > 0 && (
-        <ul className="flex flex-col" aria-label={`Treffer für ${label}`}>
+        <ul className="flex flex-col" aria-label={t('form.neighborMatches', { label })}>
           {matches.map((plant) => (
             <li key={plant.id}>
               <button
@@ -89,7 +91,7 @@ export function NeighborPicker({
                 <PlantIcon plant={plant} size={24} decorative />
                 <span className="flex-1">{plant.name}</span>
                 <Plus aria-hidden className="text-muted-foreground size-4" />
-                <span className="sr-only">hinzufügen</span>
+                <span className="sr-only">{t('form.neighborAdd')}</span>
               </button>
             </li>
           ))}

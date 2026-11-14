@@ -59,9 +59,13 @@ describe('catalogue list', () => {
   });
 
   it('describes the lifecycle in German', () => {
-    expect(lifecycleText({ type: 'ANNUAL', cultureWeeks: 8 })).toBe('8 Wochen');
-    expect(lifecycleText({ type: 'MULTI_YEAR', years: 3 })).toBe('3 Jahre');
-    expect(lifecycleText({ type: 'PERENNIAL' })).toBe('Dauerkultur, ohne Ende');
+    expect(lifecycleText({ type: 'ANNUAL', cultureWeeks: 8 }, 'de')).toBe('8 Wochen');
+    expect(lifecycleText({ type: 'MULTI_YEAR', years: 3 }, 'de')).toBe('3 Jahre');
+    expect(lifecycleText({ type: 'PERENNIAL' }, 'de')).toBe('Dauerkultur, ohne Ende');
+    expect(lifecycleText({ type: 'ANNUAL', cultureWeeks: 1 }, 'de')).toBe('1 Woche');
+    expect(lifecycleText({ type: 'ANNUAL', cultureWeeks: 8 }, 'en')).toBe('8 weeks');
+    expect(lifecycleText({ type: 'MULTI_YEAR', years: 1 }, 'en')).toBe('1 year');
+    expect(lifecycleText({ type: 'PERENNIAL' }, 'en')).toBe('Perennial, no end');
   });
 });
 
@@ -143,7 +147,7 @@ describe('adjustments of sowing and frost', () => {
 describe('adjust form', () => {
   it('round-trips the plant values', () => {
     const salat = plant('Kopfsalat');
-    const parsed = parseAdjustForm(adjustForm(salat));
+    const parsed = parseAdjustForm(adjustForm(salat), 'de');
     expect(parsed).toEqual({
       fields: {
         family: salat.family,
@@ -165,29 +169,37 @@ describe('adjust form', () => {
       directSowExtraWeeks: 2,
     };
     const lettuce = adjusted('Kopfsalat', { frostSensitive: true, sowing });
-    const parsed = parseAdjustForm(adjustForm(lettuce));
+    const parsed = parseAdjustForm(adjustForm(lettuce), 'de');
     expect('fields' in parsed && parsed.fields).toMatchObject({ frostSensitive: true, sowing });
 
     const form = adjustForm(lettuce);
     const invalid = { ...form, sowing: { ...form.sowing, directTo: '' } };
-    expect(parseAdjustForm(invalid)).toEqual({
+    expect(parseAdjustForm(invalid, 'de')).toEqual({
       errors: { sowing: { directTo: 'Bitte beide Werte angeben.' } },
     });
   });
 
   it('reports invalid values per field', () => {
     const form = { ...adjustForm(plant('Kopfsalat')), spacingInRowCm: '0', lifecycleValue: '2,5' };
-    expect(parseAdjustForm(form)).toEqual({
+    expect(parseAdjustForm(form, 'de')).toEqual({
       errors: {
         spacingInRowCm: 'Bitte 1 bis 300 cm angeben.',
         lifecycleValue: 'Bitte 1 bis 104 Wochen angeben.',
+      },
+    });
+    const years = { ...form, lifecycleType: 'MULTI_YEAR' as const, family: ' ' };
+    expect(parseAdjustForm(years, 'en')).toEqual({
+      errors: {
+        family: 'Please enter a family.',
+        spacingInRowCm: 'Please enter 1 to 300 cm.',
+        lifecycleValue: 'Please enter 1 to 20 years.',
       },
     });
   });
 
   it('needs no value for perennials', () => {
     const form = { ...adjustForm(plant('Kopfsalat')), lifecycleType: 'PERENNIAL' as const };
-    const parsed = parseAdjustForm(form);
+    const parsed = parseAdjustForm(form, 'de');
     expect('fields' in parsed && parsed.fields.lifecycle).toEqual({ type: 'PERENNIAL' });
   });
 });

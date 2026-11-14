@@ -101,12 +101,12 @@ describe('stock', () => {
     ]);
     const stock = stockOf(linked, seedPlants);
     expect(stock).toEqual({ alive: 18, planned: 9, free: 9 });
-    expect(stockText(linked.sowing, stock)).toBe('lebend 18 · verplant 9 · frei 9');
+    expect(stockText(linked.sowing, stock, 'de')).toBe('lebend 18 · verplant 9 · frei 9');
   });
 
   it('shows more planned than alive as a negative free amount', () => {
     const tight = item(batch('a', '2026-03-09', { aliveCount: 4 }), [row('r1', 100)]);
-    expect(stockText(tight.sowing, stockOf(tight, seedPlants))).toBe(
+    expect(stockText(tight.sowing, stockOf(tight, seedPlants), 'de')).toBe(
       'lebend 4 · verplant 5 · frei −1',
     );
   });
@@ -115,20 +115,35 @@ describe('stock', () => {
     const unknown = item(batch('a', '2026-03-09', { plantId: 'gone' }), [row('r1', 100)]);
     const stock = stockOf(unknown, seedPlants);
     expect(stock).toEqual({ alive: 18, planned: undefined, free: undefined });
-    expect(stockText(unknown.sowing, stock)).toBe('lebend 18 · verplant – · frei –');
+    expect(stockText(unknown.sowing, stock, 'de')).toBe('lebend 18 · verplant – · frei –');
   });
 
   it('names seeds before germination and the germination rate after it', () => {
     const sown = batch('a', '2026-03-09', { stage: 'SOWN', aliveCount: 0 });
-    expect(stockText(sown, stockOf(item(sown), seedPlants))).toBe('24 gesät');
+    expect(stockText(sown, stockOf(item(sown), seedPlants), 'de')).toBe('24 gesät');
     const planned = { ...sown, stage: 'PLANNED' as const };
-    expect(stockText(planned, stockOf(item(planned, [row('r1', 50)]), seedPlants))).toBe(
+    expect(stockText(planned, stockOf(item(planned, [row('r1', 50)]), seedPlants), 'de')).toBe(
       '24 geplant · verplant 3',
     );
-    expect(germinationText({ ...sown, stage: 'GERMINATED', aliveCount: 18 })).toBe(
+    expect(germinationText({ ...sown, stage: 'GERMINATED', aliveCount: 18 }, 'de')).toBe(
       '18 von 24 gekeimt',
     );
-    expect(germinationText(batch('a', '2026-03-09'))).toBeUndefined();
+    expect(germinationText(batch('a', '2026-03-09'), 'de')).toBeUndefined();
+  });
+
+  it('names stock and germination in English', () => {
+    const linked = item(batch('a', '2026-03-09', { aliveCount: 4 }), [row('r1', 100)]);
+    expect(stockText(linked.sowing, stockOf(linked, seedPlants), 'en')).toBe(
+      'alive 4 · allocated 5 · free −1',
+    );
+    const planned = batch('a', '2026-03-09', { stage: 'PLANNED', aliveCount: 0 });
+    expect(stockText(planned, stockOf(item(planned), seedPlants), 'en')).toBe('24 planned');
+    expect(stockText(planned, stockOf(item(planned, [row('r1', 50)]), seedPlants), 'en')).toBe(
+      '24 planned · allocated 3',
+    );
+    expect(germinationText({ ...planned, stage: 'GERMINATED', aliveCount: 18 }, 'en')).toBe(
+      '18 of 24 germinated',
+    );
   });
 });
 
@@ -171,15 +186,24 @@ describe('linked plantings', () => {
     ({ id, bedId, kind: 'SINGLE', startDate: '2026-05-04' }) as const;
 
   it('names how many plantings come from the batch and where', () => {
-    expect(linkedPlantingsText([], bedName)).toBeUndefined();
-    expect(linkedPlantingsText([single('1', 'a')], bedName)).toBe(
+    expect(linkedPlantingsText([], bedName, 'de')).toBeUndefined();
+    expect(linkedPlantingsText([single('1', 'a')], bedName, 'de')).toBe(
       '1 Pflanzung in „Hochbeet Süd“ stammt aus dieser Anzucht. Sie bleibt im Beet, nur die Verbindung zur Anzucht geht verloren.',
     );
     expect(
-      linkedPlantingsText([single('1', 'a'), single('2', 'b'), single('3', 'a')], bedName),
+      linkedPlantingsText([single('1', 'a'), single('2', 'b'), single('3', 'a')], bedName, 'de'),
     ).toMatch(
       /^3 Pflanzungen in „Hochbeet Süd“ und „Balkon“ stammen aus dieser Anzucht\. Sie bleiben/,
     );
+  });
+
+  it('names them in English', () => {
+    expect(linkedPlantingsText([single('1', 'a')], bedName, 'en')).toBe(
+      '1 planting in “Hochbeet Süd” comes from this batch. It stays in the bed; only the link to the batch is lost.',
+    );
+    expect(
+      linkedPlantingsText([single('1', 'a'), single('2', 'b'), single('3', 'a')], bedName, 'en'),
+    ).toMatch(/^3 plantings in “Hochbeet Süd” and “Balkon” come from this batch\. They stay/);
   });
 });
 
@@ -223,16 +247,22 @@ describe('planting out in the editor', () => {
       removedDate: null,
       sowingId: 'a',
     } as const;
-    expect(originText(planting, sowings, lettuce)).toBe(
+    expect(originText(planting, sowings, lettuce, 'de')).toBe(
       'Aus der Anzucht vom 14. – 20. September 2026, 6 von 18',
     );
-    expect(originText({ ...planting, sowingId: 'deleted' }, sowings, lettuce)).toBeUndefined();
+    expect(
+      originText({ ...planting, sowingId: 'deleted' }, sowings, lettuce, 'de'),
+    ).toBeUndefined();
     // Before germination the planned seeds count.
     const planned = [
       item(batch('a', '2026-09-14', { stage: 'PLANNED', sownCount: 8, aliveCount: 0 })),
     ];
-    expect(originText(planting, planned, lettuce)).toBe(
+    expect(originText(planting, planned, lettuce, 'de')).toBe(
       'Aus der Anzucht vom 14. – 20. September 2026, 6 von 8',
+    );
+    // The week stays German until the week labels are translated.
+    expect(originText(planting, sowings, lettuce, 'en')).toBe(
+      'From the batch of 14. – 20. September 2026, 6 of 18',
     );
   });
 });
