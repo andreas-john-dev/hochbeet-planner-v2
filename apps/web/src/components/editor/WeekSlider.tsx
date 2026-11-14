@@ -30,7 +30,7 @@ export function WeekSlider({
   const sliderId = useId();
   const weeks = sliderWeeks(week);
   const index = Math.max(0, weeks.indexOf(week));
-  const { label } = formatWeek(week);
+  const { label } = formatWeek(week, language);
   const isCurrent = week === weekStart(today);
   const marks = renewals.flatMap((date) => {
     const at = weeks.indexOf(weekStart(date));

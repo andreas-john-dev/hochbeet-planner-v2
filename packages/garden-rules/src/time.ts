@@ -20,7 +20,8 @@ import {
   parseISO,
   startOfISOWeek,
 } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { DEFAULT_RULES_LOCALE, type RulesLocale } from './locale';
+import { messagesFor } from './messages';
 
 // All dates are calendar dates (`YYYY-MM-DD`). ISO strings compare correctly as strings.
 
@@ -158,25 +159,31 @@ export function lastFrostDate(settings: Pick<GardenSettings, 'lastFrost'>, year:
 }
 
 export interface WeekLabel {
-  /** Date range of the ISO week, e.g. "30. März – 5. April 2026". */
+  /** Date range of the ISO week, e.g. "30. März – 5. April 2026" or "30 March – 5 April 2026". */
   range: string;
-  /** ISO week number, e.g. "KW 14". */
+  /** ISO week number, e.g. "KW 14" or "Week 14". */
   week: string;
   /** Both together: "30. März – 5. April 2026 · KW 14". */
   label: string;
 }
 
-/** Labels the ISO week (Monday to Sunday) that contains `date`, in German. */
-export function formatWeek(date: IsoDate | Date): WeekLabel {
+/** Labels the ISO week (Monday to Sunday) that contains `date`; German by default. */
+export function formatWeek(
+  date: IsoDate | Date,
+  locale: RulesLocale = DEFAULT_RULES_LOCALE,
+): WeekLabel {
+  const texts = messagesFor(locale);
+  const patterns = texts.weekRangePatterns;
   const day = typeof date === 'string' ? toDate(date) : date;
   const start = startOfISOWeek(day);
   const end = endOfISOWeek(day);
   const startPattern = isSameYear(start, end)
     ? isSameMonth(start, end)
-      ? 'd.'
-      : 'd. MMMM'
-    : 'd. MMMM yyyy';
-  const range = `${format(start, startPattern, { locale: de })} – ${format(end, 'd. MMMM yyyy', { locale: de })}`;
-  const week = `KW ${String(getISOWeek(day))}`;
+      ? patterns.sameMonth
+      : patterns.sameYear
+    : patterns.otherYear;
+  const options = { locale: texts.dateLocale };
+  const range = `${format(start, startPattern, options)} – ${format(end, patterns.end, options)}`;
+  const week = texts.weekLabel(getISOWeek(day));
   return { range, week, label: `${range} · ${week}` };
 }

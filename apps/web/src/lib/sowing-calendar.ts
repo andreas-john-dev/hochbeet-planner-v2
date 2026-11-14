@@ -97,21 +97,30 @@ function rangesOf(segments: readonly WeekSegment[], weeks: number): Span[] {
   return segments.map((s) => ({ ...s }));
 }
 
-/** The weeks of a range with where they lie in the year; the hints stay German until T-69. */
-function rangeText(range: Span, weeks: number, year: number, t: CalendarT): string {
+interface Band {
+  weeks: number;
+  year: number;
+  language: Language;
+  t: CalendarT;
+}
+
+/** The weeks of a range with where they lie in the year ("Anfang März", "early March"). */
+function rangeText(range: Span, { weeks, year, language, t }: Band): string {
   const from = inYear(range.from, weeks);
   const to = inYear(range.to, weeks);
-  const start = weekHint(from, { year });
+  const start = weekHint(from, { year, locale: language });
   if (from === to) return t('single', { week: from, start });
-  return t('range', { from, to, start, end: weekHint(to, { year, end: true }) });
+  const end = weekHint(to, { year, end: true, locale: language });
+  return t('range', { from, to, start, end });
 }
 
 function row(
   kind: CalendarRowKind,
   spans: readonly Span[],
-  { weeks, year, t }: { weeks: number; year: number; t: CalendarT },
+  band: Band,
   text?: string,
 ): CalendarRow {
+  const { weeks, t } = band;
   const segments = segmentsOf(cover(spans, weeks));
   const full = segments.length === 1 && segments[0]?.from === 1 && segments[0].to === weeks;
   return {
@@ -122,7 +131,7 @@ function row(
       (full
         ? t('yearRound')
         : rangesOf(segments, weeks)
-            .map((range) => rangeText(range, weeks, year, t))
+            .map((range) => rangeText(range, band))
             .join(t('and'))),
   };
 }
@@ -158,7 +167,7 @@ export function sowingCalendar(
   if (!sowing) return null;
   const weeks = getISOWeeksInYear(new Date(year, 6, 1));
   const t = calendarT(language);
-  const band = { weeks, year, t };
+  const band: Band = { weeks, year, language, t };
   const rows: CalendarRow[] = [];
   const bed: Span[] = [];
 
@@ -198,7 +207,7 @@ export function sowingCalendar(
       band,
       lifecycle.type === 'ANNUAL'
         ? undefined
-        : t('multiYear', { week: first, start: weekHint(first, { year }) }),
+        : t('multiYear', { week: first, start: weekHint(first, { year, locale: language }) }),
     ),
   );
 

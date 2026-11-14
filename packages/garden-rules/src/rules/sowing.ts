@@ -1,6 +1,5 @@
 import { isWeekInWindow, type Plant } from '@hochbeet/contracts';
-import { format, getISOWeek, parseISO } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { getISOWeek, parseISO } from 'date-fns';
 import type { ResolvedPlanting, RuleContext, SowingInfo } from '../context';
 import type { Finding, SowingFinding } from '../findings';
 import { batchStock } from '../sowings';
@@ -15,16 +14,8 @@ const WEEK_MS = 7 * 86_400_000;
 const weeksBetween = (from: string, to: string) =>
   Math.round((Date.parse(to) - Date.parse(from)) / WEEK_MS);
 
-const weeks = (n: number) => `${String(n)} ${n === 1 ? 'Woche' : 'Wochen'}`;
-
-/** "KW 38" of a sowing week. */
-const weekName = (date: string) => `KW ${String(getISOWeek(parseISO(date)))}`;
-
-/** "15. Mai" for `MM-DD`. */
-function dayText(lastFrost: string): string {
-  const [month = 1, day = 1] = lastFrost.split('-').map(Number);
-  return format(new Date(2001, month - 1, day), 'd. MMMM', { locale: de });
-}
+/** ISO week of a sowing date. */
+const isoWeek = (date: string) => getISOWeek(parseISO(date));
 
 /**
  * Planned more than the batch has (seeds before germination, seedlings after); done batches
@@ -33,13 +24,12 @@ function dayText(lastFrost: string): string {
 const overplanned = ({ sowing, planned }: SowingInfo) =>
   sowing.stage !== 'DONE' && planned !== undefined && planned > batchStock(sowing);
 
-const STOCK_WORD = { PLANNED: 'geplant', SOWN: 'gesät' } as const;
-
-const overplannedText = ({ sowing, planned }: SowingInfo) => {
-  const word =
-    sowing.stage === 'PLANNED' || sowing.stage === 'SOWN' ? STOCK_WORD[sowing.stage] : 'vorhanden';
-  return `${String(planned ?? 0)} verplant, aber nur ${String(batchStock(sowing))} ${word}`;
-};
+/** Planned, stock and stage of an overplanned batch, for the texts. */
+const stockParams = ({ sowing, planned }: SowingInfo) => ({
+  planned: planned ?? 0,
+  stock: batchStock(sowing),
+  stage: sowing.stage,
+});
 
 /** From the earliest start to the latest end; open as soon as one planting is. */
 function span(intervals: readonly Interval[]): Interval {
@@ -55,7 +45,7 @@ function span(intervals: readonly Interval[]): Interval {
  * (hint), and more seedlings planned over all beds than the batch has alive (warning on all
  * linked plantings of this bed). Plantings of an unknown or deleted batch get nothing.
  */
-export function sowingRule({ plantings, sowings }: RuleContext): Finding[] {
+export function sowingRule({ plantings, sowings, texts, plantName }: RuleContext): Finding[] {
   if (sowings.size === 0) return [];
   const findings: Finding[] = [];
   const linked = new Map<string, ResolvedPlanting[]>();
@@ -68,21 +58,31 @@ export function sowingRule({ plantings, sowings }: RuleContext): Finding[] {
     const raising = plant.sowing?.propagationWeeks;
     if (!raising) continue;
     const raised = weeksBetween(info.sowing.sowDate, planting.startDate);
+    const name = plantName(plant);
     if (raised < raising.min) {
+      const params = { plant: name, weeks: raised, minWeeks: raising.min };
       findings.push({
         rule: 'TRANSPLANT_EARLY',
         severity: 'WARNING',
         plantingIds: [planting.id],
         period: interval,
-        message: `${plant.name} wurde nach ${weeks(raised)} Anzucht ausgepflanzt, braucht aber mindestens ${weeks(raising.min)}.`,
+        params,
+        message: texts.findings.TRANSPLANT_EARLY(params),
       });
     } else if (raised > raising.max + LATE_TRANSPLANT_GRACE_WEEKS) {
+      const params = {
+        plant: name,
+        weeks: raised,
+        minWeeks: raising.min,
+        maxWeeks: raising.max,
+      };
       findings.push({
         rule: 'TRANSPLANT_LATE',
         severity: 'HINT',
         plantingIds: [planting.id],
         period: interval,
-        message: `${plant.name} stand ${weeks(raised)} in der Anzucht, üblich sind ${String(raising.min)}–${weeks(raising.max)}.`,
+        params,
+        message: texts.findings.TRANSPLANT_LATE(params),
       });
     }
   }
@@ -91,12 +91,18 @@ export function sowingRule({ plantings, sowings }: RuleContext): Finding[] {
     const info = sowings.get(sowingId);
     const first = list[0];
     if (!info || !first || !overplanned(info)) continue;
+    const params = {
+      plant: plantName(first.plant),
+      sowWeek: isoWeek(info.sowing.sowDate),
+      ...stockParams(info),
+    };
     findings.push({
       rule: 'OVERPLANNED',
       severity: 'WARNING',
       plantingIds: list.map((r) => r.planting.id).sort(),
       period: span(list.map((r) => r.interval)),
-      message: `Aus der Anzucht ${first.plant.name} (${weekName(info.sowing.sowDate)}) sind ${overplannedText(info)}.`,
+      params,
+      message: texts.findings.OVERPLANNED(params),
     });
   }
   return findings;
@@ -110,45 +116,56 @@ export function sowingRule({ plantings, sowings }: RuleContext): Finding[] {
 export function sowingBatchRules(
   info: SowingInfo,
   plant: Plant | undefined,
-  lastFrost: string,
+  { lastFrost, texts, plantName }: Pick<RuleContext, 'lastFrost' | 'texts' | 'plantName'>,
 ): SowingFinding[] {
   const { sowing } = info;
   if (sowing.stage === 'DONE') return [];
   const findings: SowingFinding[] = [];
-  const of = (rule: SowingFinding['rule'], severity: SowingFinding['severity'], message: string) =>
-    findings.push({ rule, severity, sowingId: sowing.id, message });
-
+  const base = { sowingId: sowing.id } as const;
   const method = plant?.sowing?.method;
   const window = plant?.sowing?.presowWeeks;
+  const sowWeek = isoWeek(sowing.sowDate);
   if (plant && method === 'DIRECT') {
-    of(
-      'SOWING_DIRECT',
-      'HINT',
-      `${plant.name} wird direkt gesät und verträgt Umpflanzen schlecht.`,
-    );
-  } else if (plant && window && !isWeekInWindow(getISOWeek(parseISO(sowing.sowDate)), window)) {
-    of(
-      'SOWING_WINDOW',
-      'HINT',
-      `${plant.name} wird üblicherweise in KW ${String(window.from)}–${String(window.to)} vorgezogen, gesät ist in ${weekName(sowing.sowDate)}.`,
-    );
+    const params = { plant: plantName(plant) };
+    findings.push({
+      rule: 'SOWING_DIRECT',
+      severity: 'HINT',
+      ...base,
+      params,
+      message: texts.sowingFindings.SOWING_DIRECT(params),
+    });
+  } else if (plant && window && !isWeekInWindow(sowWeek, window)) {
+    const params = { plant: plantName(plant), from: window.from, to: window.to, sowWeek };
+    findings.push({
+      rule: 'SOWING_WINDOW',
+      severity: 'HINT',
+      ...base,
+      params,
+      message: texts.sowingFindings.SOWING_WINDOW(params),
+    });
   }
   if (overplanned(info)) {
-    of(
-      'OVERPLANNED',
-      'WARNING',
-      `Mehr in Beeten verplant als vorhanden: ${overplannedText(info)}.`,
-    );
+    const params = stockParams(info);
+    findings.push({
+      rule: 'OVERPLANNED',
+      severity: 'WARNING',
+      ...base,
+      params,
+      message: texts.sowingFindings.OVERPLANNED(params),
+    });
   }
   const out = sowing.plannedTransplantDate;
   if (plant?.frostSensitive && out) {
     const frost = lastFrostDate({ lastFrost }, Number(out.slice(0, 4)));
     if (out <= frost) {
-      of(
-        'TRANSPLANT_FROST',
-        'HINT',
-        `${plant.name} ist frostempfindlich: Auspflanzen erst nach dem ${dayText(lastFrost)} planen.`,
-      );
+      const params = { plant: plantName(plant), lastFrost };
+      findings.push({
+        rule: 'TRANSPLANT_FROST',
+        severity: 'HINT',
+        ...base,
+        params,
+        message: texts.sowingFindings.TRANSPLANT_FROST(params),
+      });
     }
   }
   return findings;

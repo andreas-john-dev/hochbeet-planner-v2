@@ -40,6 +40,7 @@ describe('heavy feeder rule', () => {
         severity: 'WARNING',
         plantingIds: ['b', 's'],
         period: { start: '2026-05-04', end: '2026-07-27' },
+        params: { plants: ['Brokkoli', 'Staudensellerie'], gapCm: 20, minGapCm: 30 },
         message:
           'Brokkoli und Staudensellerie sind Starkzehrer und stehen mit 20 cm Lücke nebeneinander (mindestens 30 cm empfohlen).',
       },
@@ -130,5 +131,14 @@ describe('heavy feeder rule', () => {
 
   it('is independent of the order of the plantings', () => {
     expect(run([celeryRowAt(20), broccoliRow])).toEqual(run([broccoliRow, celeryRowAt(20)]));
+  });
+});
+
+describe('heavy feeder rule in English', () => {
+  it('writes the warning in English', () => {
+    const ctx = context(plants, [broccoliRow, celeryRowAt(20)], bed, '05-15', [], 'en');
+    expect(heavyFeedersRule(ctx).map((f) => f.message)).toEqual([
+      'Brokkoli and Staudensellerie are heavy feeders and stand side by side with a 20 cm gap (at least 30 cm recommended).',
+    ]);
   });
 });

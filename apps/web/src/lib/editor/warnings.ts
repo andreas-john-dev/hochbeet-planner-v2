@@ -25,21 +25,29 @@ export function seasonOf(bed: Pick<Bed, 'soilRenewals'>, date: IsoDate): Interva
   return { start, end };
 }
 
-/**
- * Findings that touch the season of `date`, with all plantings of the bed evaluated.
- * `lastFrost` is the user's last frost (`MM-DD`); missing means 15 May. `sowings` are the
- * user's sowing batches, for the rules about planted out seedlings.
- */
+export interface SeasonOptions {
+  /** Language of the texts. */
+  language: Language;
+  /** The user's last frost (`MM-DD`); missing means 15 May. */
+  lastFrost?: string | undefined;
+  /** The user's sowing batches, for the rules about planted out seedlings. */
+  sowings?: readonly SowingWithPlantings[] | undefined;
+}
+
+/** Findings that touch the season of `date`, with all plantings of the bed evaluated. */
 export function seasonFindings(
   bed: Bed,
   plantings: readonly Planting[],
   plants: readonly Plant[],
   date: IsoDate,
-  lastFrost?: string,
-  sowings?: readonly SowingWithPlantings[],
+  { language, lastFrost, sowings }: SeasonOptions,
 ): Finding[] {
   const season = seasonOf(bed, date);
-  const options = { ...(lastFrost ? { lastFrost } : {}), ...(sowings ? { sowings } : {}) };
+  const options = {
+    locale: language,
+    ...(lastFrost ? { lastFrost } : {}),
+    ...(sowings ? { sowings } : {}),
+  };
   return evaluateBed(bed, plantings, plants, options).filter((f) => overlaps(f.period, season));
 }
 

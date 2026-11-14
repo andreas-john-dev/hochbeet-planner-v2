@@ -262,15 +262,15 @@ describe('in English', () => {
 
   it('names the tasks at batches', () => {
     expect(english('2027-03-15', { sowings: [item(batch('s', tomato.id))] })).toEqual([
-      ['Sow Tomate', '8 seeds, planned for KW 11'],
+      ['Sow Tomate', '8 seeds, planned for Week 11'],
     ]);
     const germinated = item(batch('s', tomato.id, { stage: 'GERMINATED', aliveCount: 6 }));
     expect(english('2027-03-29', { sowings: [germinated] })).toEqual([
-      ['Prick out Tomate', 'Sown in KW 11, prick out after 2 weeks'],
+      ['Prick out Tomate', 'Sown in Week 11, prick out after 2 weeks'],
     ]);
     const sown = item(batch('s', tomato.id, { stage: 'SOWN' }), [linked('2027-05-24')]);
     expect(english('2027-05-10', { sowings: [sown] })).toEqual([
-      ['Harden off Tomate', 'Plant out from KW 21'],
+      ['Harden off Tomate', 'Plant out from Week 21'],
     ]);
   });
 

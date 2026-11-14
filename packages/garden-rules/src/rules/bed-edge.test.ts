@@ -13,6 +13,7 @@ describe('bed edge rule', () => {
         severity: 'HINT',
         plantingIds: ['k'],
         period: { start: '2026-05-04', end: '2026-07-27' },
+        params: { plant: 'Kohlrabi' },
         message: 'Kohlrabi ragt über den Beetrand.',
       },
     ]);
@@ -56,5 +57,14 @@ describe('bed edge rule', () => {
     expect(bedEdgeRule(context([kohlrabi], [single('k', 'kohlrabi', 150, 25)], bed))).toHaveLength(
       1,
     );
+  });
+});
+
+describe('bed edge rule in English', () => {
+  it('writes the hint in English', () => {
+    const ctx = context([kohlrabi], [single('k', 'kohlrabi', 5, 25)], bed, '05-15', [], 'en');
+    expect(bedEdgeRule(ctx).map((f) => f.message)).toEqual([
+      'Kohlrabi reaches beyond the edge of the bed.',
+    ]);
   });
 });

@@ -68,7 +68,7 @@ export function PlantingDetails({
   }
   const extraWeeks = plant.sowing?.directSowExtraWeeks ?? 0;
   const removal = removalDate(planting, week);
-  const weekLabel = formatWeek(week).week;
+  const weekLabel = formatWeek(week, language).week;
 
   const description =
     planting.kind === 'ROW'
@@ -296,7 +296,7 @@ function SowingOrigin({
         <option value="">{t('details.noSowing')}</option>
         {choices.map(({ sowing }) => (
           <option key={sowing.id} value={sowing.id}>
-            {weekText(sowing.sowDate)}
+            {weekText(sowing.sowDate, language)}
           </option>
         ))}
       </select>

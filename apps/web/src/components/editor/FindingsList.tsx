@@ -16,9 +16,9 @@ const STYLE: Record<Severity, { icon: LucideIcon; className: string }> = {
 const keyOf = (f: Finding) => `${f.rule}:${f.plantingIds.join(',')}:${f.period.start}`;
 
 /**
- * Findings of the season with text and period. The text still comes German from the rule
- * engine; it follows the language with T-69. A click highlights the plantings
- * and jumps to the week; findings outside the shown week are greyed out.
+ * Findings of the season with text and period; the rule engine writes the text in the user's
+ * language. A click highlights the plantings and jumps to the week; findings outside the
+ * shown week are greyed out.
  */
 export function FindingsList({
   findings,

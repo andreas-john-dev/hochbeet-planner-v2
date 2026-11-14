@@ -132,7 +132,7 @@ Umsetzung in `packages/garden-rules` (`time.ts`):
 - **Effektives Ende:** `removedDate` vor `endDate` vor dem Lebenszyklus (`plannedEnd()`; `ANNUAL`: Start + Kulturwochen, bei `origin: 'DIRECT_SOW'` plus `sowing.directSowExtraWeeks`; `MULTI_YEAR`: Start + Jahre; `PERENNIAL`: kein Ende). `removedDate` gewinnt auch, wenn es nach dem geplanten Ende liegt.
 - **Vorbelegung neuer Pflanzungen:** `defaultOrigin()` (Direktsaat nur bei `method: 'DIRECT'`) und `endDate = plannedEnd()`; gilt für Pflanzungen aus der Palette (`newPlanting()`) und für Vorschläge des Assistenten (`candidatePlanting()`).
 - **Woche:** ISO-8601, Montag bis Sonntag. Eine Pflanzung ist in einer Woche sichtbar, wenn sie an mindestens einem Tag der Woche im Beet steht.
-- **Anzeige:** `formatWeek()` liefert „30. März – 5. April 2026 · KW 14“; Frontend und Regeln nutzen dieselbe Funktion.
+- **Anzeige:** `formatWeek()` liefert „30. März – 5. April 2026 · KW 14“, mit `locale: 'en'` „30 March – 5 April 2026 · Week 14“; Frontend und Regeln nutzen dieselbe Funktion.
 
 ### Saisongrenze
 

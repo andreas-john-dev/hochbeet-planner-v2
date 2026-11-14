@@ -44,6 +44,7 @@ describe('sowing rule at plantings', () => {
         plantingIds: ['a'],
         // The planting stays 12 weeks.
         period: { start: '2026-03-23', end: '2026-06-15' },
+        params: { plant: 'Kopfsalat', weeks: 2, minWeeks: 3 },
         message:
           'Kopfsalat wurde nach 2 Wochen Anzucht ausgepflanzt, braucht aber mindestens 3 Wochen.',
       },
@@ -83,6 +84,7 @@ describe('sowing rule at plantings', () => {
         plantingIds: ['b', 'r'],
         // From the row's start to the single plant's end.
         period: { start: '2026-04-06', end: '2026-07-06' },
+        params: { plant: 'Kopfsalat', sowWeek: 11, planned: 19, stock: 18, stage: 'PRICKED' },
         message: 'Aus der Anzucht Kopfsalat (KW 11) sind 19 verplant, aber nur 18 vorhanden.',
       },
     ]);
@@ -116,6 +118,7 @@ describe('findings at sowing batches', () => {
         rule: 'SOWING_WINDOW',
         severity: 'HINT',
         sowingId: 's',
+        params: { plant: 'Kopfsalat', from: 10, to: 30, sowWeek: 37 },
         message: 'Kopfsalat wird üblicherweise in KW 10–30 vorgezogen, gesät ist in KW 37.',
       },
     ]);
@@ -127,6 +130,7 @@ describe('findings at sowing batches', () => {
         rule: 'SOWING_DIRECT',
         severity: 'HINT',
         sowingId: 'm',
+        params: { plant: 'Möhre' },
         message: 'Möhre wird direkt gesät und verträgt Umpflanzen schlecht.',
       },
     ]);
@@ -140,6 +144,7 @@ describe('findings at sowing batches', () => {
         rule: 'OVERPLANNED',
         severity: 'WARNING',
         sowingId: 's',
+        params: { planned: 6, stock: 5, stage: 'PRICKED' },
         message: 'Mehr in Beeten verplant als vorhanden: 6 verplant, aber nur 5 vorhanden.',
       },
     ]);
@@ -177,6 +182,7 @@ describe('findings at sowing batches', () => {
         rule: 'TRANSPLANT_FROST',
         severity: 'HINT',
         sowingId: 't',
+        params: { plant: 'Tomate', lastFrost: '05-15' },
         message: 'Tomate ist frostempfindlich: Auspflanzen erst nach dem 15. Mai planen.',
       },
     ]);
@@ -202,5 +208,54 @@ describe('findings at sowing batches', () => {
       ['HINT', 'SOWING_DIRECT', 'm'],
       ['HINT', 'SOWING_WINDOW', 'b'],
     ]);
+  });
+});
+
+describe('sowing texts in English', () => {
+  const en = (...plantings: ReturnType<typeof out>[]) =>
+    sowingRule(
+      context(plants, plantings, {}, '05-15', [batch('s', 'lettuce', {}, plantings)], 'en'),
+    ).map((f) => f.message);
+  const ofEn = (...items: ReturnType<typeof batch>[]) =>
+    evaluateSowings(items, plants, { locale: 'en' }).map((f) => f.message);
+
+  it('writes the findings at plantings in English', () => {
+    expect(en(out('a', '2026-03-23'))).toEqual([
+      'Kopfsalat was planted out after 2 weeks indoors but needs at least 3 weeks.',
+    ]);
+    expect(en(out('a', '2026-04-27'))).toEqual([
+      'Kopfsalat stayed indoors for 7 weeks; 3–4 weeks are usual.',
+    ]);
+    const six = row('r', 'lettuce', 0, 0, 'H', 125, { startDate: '2026-04-06', sowingId: 's' });
+    const few = batch('s', 'lettuce', { aliveCount: 5 }, [six]);
+    expect(
+      sowingRule(context(plants, [six], {}, '05-15', [few], 'en')).map((f) => f.message),
+    ).toEqual(['Seedlings of Kopfsalat (week 11): 6 planned, but only 5 available.']);
+  });
+
+  it('writes the findings at batches in English', () => {
+    expect(ofEn(batch('s', 'lettuce', { sowDate: '2026-09-07' }))).toEqual([
+      'Kopfsalat is usually started indoors in weeks 10–30; this was sown in week 37.',
+    ]);
+    expect(ofEn(batch('m', 'carrot'))).toEqual([
+      'Möhre is sown directly and does not transplant well.',
+    ]);
+    const six = row('r', 'lettuce', 0, 0, 'H', 125, { sowingId: 's' });
+    expect(
+      ofEn(batch('s', 'lettuce', { sownCount: 5, aliveCount: 0, stage: 'PLANNED' }, [six])),
+    ).toEqual(['More planned in beds than available: 6 planned, but only 5 to be sown.']);
+    expect(
+      ofEn(batch('s', 'lettuce', { sownCount: 5, aliveCount: 0, stage: 'SOWN' }, [six])),
+    ).toEqual(['More planned in beds than available: 6 planned, but only 5 sown.']);
+    expect(
+      ofEn(batch('t', 'tomato', { sowDate: '2026-03-16', plannedTransplantDate: '2026-05-11' })),
+    ).toEqual(['Tomate is frost-sensitive: plan to plant out only after 15 May.']);
+  });
+
+  it('keeps the params of a finding in every language', () => {
+    const items = [batch('s', 'lettuce', { sowDate: '2026-09-07' }), batch('m', 'carrot')];
+    const params = (locale: 'de' | 'en') =>
+      evaluateSowings(items, plants, { locale }).map((f) => f.params);
+    expect(params('en')).toEqual(params('de'));
   });
 });

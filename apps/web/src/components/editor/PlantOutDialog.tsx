@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { type PlantingKind, rowLengthFor } from '@/lib/editor/placement';
 import type { PreviewSowing } from '@/lib/editor/store';
+import { useLanguage } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export interface PlantOutRequest {
@@ -49,6 +50,7 @@ export function PlantOutDialog({
   onCancel: () => void;
 }) {
   const { t } = useTranslation('editor');
+  const { language } = useLanguage();
   const open = request !== null;
   const onOpenChange = (next: boolean) => {
     if (!next) onCancel();
@@ -56,7 +58,7 @@ export function PlantOutDialog({
   const title = request ? t('plantOut.title', { plant: request.plant.name }) : '';
   const description = request
     ? t('plantOut.description', {
-        range: formatWeek(request.sowing.sowDate).range,
+        range: formatWeek(request.sowing.sowDate, language).range,
         count: request.sowing.free,
       })
     : '';

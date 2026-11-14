@@ -112,17 +112,17 @@ describe('sowing calendar', () => {
     expect(sowingCalendar(seed('Erdbeere'), { year: 2026, language: 'de' })).toBeNull();
   });
 
-  it('names the weeks in English; the hints stay German until T-69', () => {
+  it('names the weeks in English', () => {
     expect(rows(seed('Tomate'), 2026, undefined, 'en')).toEqual([
-      'presow: 11-16 | Weeks 11–16 · Anfang März to Mitte April',
-      'plantOut: 21-29 | Weeks 21–29 · Mitte Mai to Mitte Juli',
-      'inBed: 21-50 | Weeks 21–50 · Mitte Mai to Mitte Dezember',
+      'presow: 11-16 | Weeks 11–16 · early March to mid April',
+      'plantOut: 21-29 | Weeks 21–29 · mid May to mid July',
+      'inBed: 21-50 | Weeks 21–50 · mid May to mid December',
     ]);
     expect(rows(seed('Kürbis'), 2026, undefined, 'en')).toContain(
-      'plantOut: 21-21 | Week 21 · Mitte Mai',
+      'plantOut: 21-21 | Week 21 · mid May',
     );
     expect(rows(seed('Oregano'), 2026, undefined, 'en')?.at(-1)).toBe(
-      'inBed: 14-53 | from week 14 · Ende März, for several years',
+      'inBed: 14-53 | from week 14 · late March, for several years',
     );
     expect(rows({ ...seed('Möhre'), lifecycle: annual(60) }, 2026, undefined, 'en')?.at(-1)).toBe(
       'inBed: 1-53 | all year',

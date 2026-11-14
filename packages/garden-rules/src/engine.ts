@@ -7,6 +7,8 @@ import {
   type SowingWithPlantings,
 } from '@hochbeet/contracts';
 import { resolvePlantings, type RuleContext } from './context';
+import type { RulesLocale } from './locale';
+import { messagesFor } from './messages';
 import type { Finding, Severity, SowingFinding } from './findings';
 import { bedEdgeRule } from './rules/bed-edge';
 import { cropRotationRule } from './rules/crop-rotation';
@@ -52,7 +54,19 @@ export interface EvaluateOptions {
    * the rules about planted out seedlings; missing means none.
    */
   sowings?: readonly SowingWithPlantings[];
+  /** Language of `message` (German by default); `params` are the same in every language. */
+  locale?: RulesLocale;
+  /** Name of a plant in the texts; the stored name by default (display names: T-71). */
+  plantName?: (plant: Plant) => string;
 }
+
+const storedName = (plant: Plant) => plant.name;
+
+/** Texts and names for the rules, from the options. */
+const textOptions = (options: Pick<EvaluateOptions, 'locale' | 'plantName'>) => ({
+  texts: messagesFor(options.locale),
+  plantName: options.plantName ?? storedName,
+});
 
 /**
  * Entry point of the rule engine: evaluates all rules for one bed and returns the findings in
@@ -73,6 +87,7 @@ export function evaluateBed(
     plantings: resolvePlantings(plantings, plants),
     lastFrost: options.lastFrost ?? DEFAULT_LAST_FROST,
     sowings: sowingInfos(options.sowings ?? [], plants),
+    ...textOptions(options),
   };
   const findings = rules.flatMap((rule) => rule(context));
   const { week } = options;
@@ -90,12 +105,12 @@ export function evaluateBed(
 export function evaluateSowings(
   sowings: readonly SowingWithPlantings[],
   plants: readonly Plant[],
-  options: Pick<EvaluateOptions, 'lastFrost'> = {},
+  options: Pick<EvaluateOptions, 'lastFrost' | 'locale' | 'plantName'> = {},
 ): SowingFinding[] {
-  const lastFrost = options.lastFrost ?? DEFAULT_LAST_FROST;
+  const context = { lastFrost: options.lastFrost ?? DEFAULT_LAST_FROST, ...textOptions(options) };
   const byId = new Map(plants.map((p) => [p.id, p]));
   return [...sowingInfos(sowings, plants).values()]
-    .flatMap((info) => sowingBatchRules(info, byId.get(info.sowing.plantId), lastFrost))
+    .flatMap((info) => sowingBatchRules(info, byId.get(info.sowing.plantId), context))
     .sort(
       (a, b) =>
         severityOrder[a.severity] - severityOrder[b.severity] ||

@@ -45,6 +45,7 @@ const finding = (severity: Finding['severity'], ids: string[]): Finding => ({
   severity,
   plantingIds: ids,
   period: { start: '2026-05-04', end: '2026-06-01' },
+  params: { plants: ['A', 'B'], overlapCm: 5 },
   message: '',
 });
 
@@ -70,7 +71,7 @@ describe('season', () => {
     ];
     const plants = seedPlants;
     const bad = (date: string) =>
-      seasonFindings(bed, plantings, plants, date)
+      seasonFindings(bed, plantings, plants, date, { language: 'de' })
         .filter((f) => f.rule === 'BAD_NEIGHBOR')
         .map((f) => f.plantingIds);
     expect(bad('2026-10-05')).toEqual([['kartoffel', 'tomate']]);
@@ -79,14 +80,21 @@ describe('season', () => {
 
   it('hints at frost sensitive plants before the user’s last frost', () => {
     // Tomate from Monday 4 May 2026: before 15 May, but after a last frost on 20 April.
-    const frost = (lastFrost?: string) =>
-      seasonFindings(bed, [planting('tomate', 'Tomate')], seedPlants, '2026-05-04', lastFrost)
+    const frost = (lastFrost?: string, language: 'de' | 'en' = 'de') =>
+      seasonFindings(bed, [planting('tomate', 'Tomate')], seedPlants, '2026-05-04', {
+        language,
+        lastFrost,
+      })
         .filter((f) => f.rule === 'FROST')
         .map((f) => f.message);
     expect(frost()).toEqual([
       'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
     ]);
     expect(frost('04-20')).toEqual([]);
+    // The rule engine writes the text in the user's language.
+    expect(frost('05-20', 'en')).toEqual([
+      'Tomate is frost-sensitive and should only go into the bed after 20 May.',
+    ]);
   });
 
   it('checks planted out seedlings against their sowing batch', () => {
@@ -104,7 +112,7 @@ describe('season', () => {
       plantings: [{ id: 'salat', bedId: bed.id, kind: 'SINGLE' as const, startDate: '2026-05-04' }],
     };
     const early = (sowings?: (typeof batch)[]) =>
-      seasonFindings(bed, [lettuce], seedPlants, '2026-05-04', undefined, sowings)
+      seasonFindings(bed, [lettuce], seedPlants, '2026-05-04', { language: 'de', sowings })
         .filter((f) => f.rule === 'TRANSPLANT_EARLY')
         .map((f) => f.plantingIds);
     expect(early([batch])).toEqual([['salat']]);

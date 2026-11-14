@@ -172,7 +172,7 @@ function SowingForm({
     form.plannedTransplantDate && plant?.sowing?.propagationWeeks && !transplantSet
       ? t('form.transplantHint', { count: plant.sowing.propagationWeeks.max, frost: frostHint })
       : form.plannedTransplantDate
-        ? weekText(form.plannedTransplantDate)
+        ? weekText(form.plannedTransplantDate, language)
         : t('form.optional');
 
   return (
@@ -198,7 +198,7 @@ function SowingForm({
         type="date"
         required
         value={form.sowDate}
-        hint={form.sowDate ? weekText(form.sowDate) : undefined}
+        hint={form.sowDate ? weekText(form.sowDate, language) : undefined}
         error={errors.sowDate}
         onChange={(event) => {
           // Sown in a week: the date becomes its Monday.

@@ -55,8 +55,9 @@ function sideBySideGap(
  * Each planting is seen along its own row direction (rows: orientation, single plants: the
  * bed's main direction); when the two differ, either view can trigger the warning.
  */
-export function heavyFeedersRule({ bed, plantings }: RuleContext): Finding[] {
-  const heavy = plantings.filter((item) => item.plant.feeder === 'STARK');
+export function heavyFeedersRule(ctx: RuleContext): Finding[] {
+  const { bed } = ctx;
+  const heavy = ctx.plantings.filter((item) => item.plant.feeder === 'STARK');
   const findings: Finding[] = [];
   forEachPair(heavy, (a, b) => {
     const period = intersect(a.interval, b.interval);
@@ -68,13 +69,18 @@ export function heavyFeedersRule({ bed, plantings }: RuleContext): Finding[] {
       .filter((value) => value !== null);
     if (gaps.length === 0) return;
 
-    const gapCm = Math.round(Math.min(...gaps));
+    const params = {
+      plants: pairNames(ctx, a, b),
+      gapCm: Math.round(Math.min(...gaps)),
+      minGapCm: INFLUENCE_RADIUS_CM,
+    };
     findings.push({
       rule: 'HEAVY_FEEDER',
       severity: 'WARNING',
       plantingIds: sortedIds(a, b),
       period,
-      message: `${pairNames(a, b)} sind Starkzehrer und stehen mit ${String(gapCm)} cm Lücke nebeneinander (mindestens ${String(INFLUENCE_RADIUS_CM)} cm empfohlen).`,
+      params,
+      message: ctx.texts.findings.HEAVY_FEEDER(params),
     });
   });
   return findings;

@@ -11,6 +11,7 @@ import { CATEGORIES, filterPlants } from '@/lib/editor/palette';
 import type { PlantingKind } from '@/lib/editor/placement';
 import type { EditorStore, PreviewSowing } from '@/lib/editor/store';
 import { type AvailableSowing, previewSowing } from '@/lib/sowings';
+import { useLanguage } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 const KINDS = [
@@ -66,6 +67,7 @@ const itemClass = (active: boolean, tall = false) =>
 /** Name and, for a sowing batch, its week and free seedlings. */
 function ItemLabel({ plant, sowing }: { plant: Plant; sowing: PreviewSowing | undefined }) {
   const { t } = useTranslation('editor');
+  const { language } = useLanguage();
   return (
     <>
       <PlantIcon plant={plant} size={28} decorative />
@@ -73,7 +75,10 @@ function ItemLabel({ plant, sowing }: { plant: Plant; sowing: PreviewSowing | un
         <span className="truncate">{plant.name}</span>
         {sowing && (
           <span className="text-muted-foreground truncate text-xs">
-            {t('palette.free', { week: formatWeek(sowing.sowDate).week, count: sowing.free })}
+            {t('palette.free', {
+              week: formatWeek(sowing.sowDate, language).week,
+              count: sowing.free,
+            })}
           </span>
         )}
       </span>

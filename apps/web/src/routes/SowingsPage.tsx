@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
 import { useGardenSettings, usePlants, useSowings } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 import { filterSowings, groupByYear, SOWING_FILTERS, type SowingFilter } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
 
@@ -32,16 +33,20 @@ export function SowingsPage() {
     setCreating(true);
   };
   const lastFrost = useGardenSettings().data?.lastFrost;
+  const { language } = useLanguage();
   const all = useMemo(() => sowings.data ?? [], [sowings.data]);
   // Findings about the batches, never stored: raising window, direct sowing, stock, frost.
   const findings = useMemo(() => {
     const byBatch = new Map<string, SowingFinding[]>();
-    const list = evaluateSowings(all, plants.data ?? [], lastFrost ? { lastFrost } : {});
+    const list = evaluateSowings(all, plants.data ?? [], {
+      locale: language,
+      ...(lastFrost ? { lastFrost } : {}),
+    });
     for (const finding of list) {
       byBatch.set(finding.sowingId, [...(byBatch.get(finding.sowingId) ?? []), finding]);
     }
     return byBatch;
-  }, [all, plants.data, lastFrost]);
+  }, [all, plants.data, lastFrost, language]);
   const groups = groupByYear(filterSowings(all, filter));
   const pending = sowings.isPending || plants.isPending;
   const error = sowings.error ?? plants.error;

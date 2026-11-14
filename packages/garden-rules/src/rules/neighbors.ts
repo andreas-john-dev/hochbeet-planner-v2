@@ -20,9 +20,9 @@ function listed(a: ResolvedPlanting, b: ResolvedPlanting, list: 'goodNeighbors' 
  * positive hint. "Warnung sticht": once either side marks the pair as bad, there is no
  * positive hint, even if the other side lists it as good.
  */
-export function neighborsRule({ plantings }: RuleContext): Finding[] {
+export function neighborsRule(ctx: RuleContext): Finding[] {
   const findings: Finding[] = [];
-  forEachPair(plantings, (a, b) => {
+  forEachPair(ctx.plantings, (a, b) => {
     const bad = listed(a, b, 'badNeighbors');
     const good = !bad && listed(a, b, 'goodNeighbors');
     if (!bad && !good) return;
@@ -30,7 +30,7 @@ export function neighborsRule({ plantings }: RuleContext): Finding[] {
     const period = intersect(a.interval, b.interval);
     if (!period || gap(a.footprint, b.footprint) >= INFLUENCE_RADIUS_CM) return;
 
-    const names = pairNames(a, b);
+    const params = { plants: pairNames(ctx, a, b) };
     findings.push(
       bad
         ? {
@@ -38,14 +38,16 @@ export function neighborsRule({ plantings }: RuleContext): Finding[] {
             severity: 'WARNING',
             plantingIds: sortedIds(a, b),
             period,
-            message: `${names} sind schlechte Nachbarn.`,
+            params,
+            message: ctx.texts.findings.BAD_NEIGHBOR(params),
           }
         : {
             rule: 'GOOD_NEIGHBOR',
             severity: 'POSITIVE',
             plantingIds: sortedIds(a, b),
             period,
-            message: `${names} sind gute Nachbarn.`,
+            params,
+            message: ctx.texts.findings.GOOD_NEIGHBOR(params),
           },
     );
   });

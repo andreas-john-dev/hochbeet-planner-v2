@@ -144,9 +144,9 @@ export function germinationText(sowing: SowingBatch, language: Language): string
     : undefined;
 }
 
-/** „KW 11 · 9. – 15. März 2026“ */
-export function weekText(date: string): string {
-  const { week, range } = formatWeek(date);
+/** „KW 11 · 9. – 15. März 2026“ or "Week 11 · 9 – 15 March 2026". */
+export function weekText(date: string, language: Language): string {
+  const { week, range } = formatWeek(date, language);
   return `${week} · ${range}`;
 }
 
@@ -250,7 +250,7 @@ export function originText(
   const item = sowings.find((s) => s.sowing.id === planting.sowingId);
   if (!item) return undefined;
   return i18n.getFixedT(language, 'sowings')('origin', {
-    range: formatWeek(item.sowing.sowDate).range,
+    range: formatWeek(item.sowing.sowDate, language).range,
     planted: plantCount(planting, plant),
     stock: batchStock(item.sowing),
   });
