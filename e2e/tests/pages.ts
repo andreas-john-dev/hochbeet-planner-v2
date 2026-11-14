@@ -8,6 +8,7 @@ import {
   pendingRequest,
   sowingPlanGarden,
   sowingsGarden,
+  weeklyTasksGarden,
 } from './garden';
 
 /**
@@ -81,6 +82,22 @@ export const appPages: readonly AppPage[] = [
     access: 'user',
     navLabel: 'Anzucht',
     seed: sowingsGarden,
+  },
+  {
+    // Tasks of the week from batches and a bed, one of them overdue.
+    id: 'anzucht-aufgaben',
+    path: '/anzucht',
+    heading: 'Anzucht',
+    access: 'user',
+    seed: weeklyTasksGarden,
+  },
+  {
+    // The same tasks compact in the bed overview, with a link to the rest.
+    id: 'beete-aufgaben',
+    path: '/beete',
+    heading: 'Meine Beete',
+    access: 'user',
+    seed: weeklyTasksGarden,
   },
   {
     // The raising plan from the beds: tomatoes and lettuce for May 2027.

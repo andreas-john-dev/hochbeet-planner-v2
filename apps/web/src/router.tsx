@@ -15,6 +15,7 @@ import { PublicationReviewPage } from '@/routes/admin/PublicationReviewPage';
 import { AuthLayout } from '@/routes/auth/AuthLayout';
 import { ForgotPasswordPage } from '@/routes/auth/ForgotPasswordPage';
 import { parseSignInSearch, parseSignUpSearch } from '@/routes/auth/search';
+import { parseBedEditorSearch } from '@/lib/editor/search';
 import { SignInPage } from '@/routes/auth/SignInPage';
 import { SignUpPage } from '@/routes/auth/SignUpPage';
 import { BedEditorPage } from '@/routes/BedEditorPage';
@@ -134,6 +135,7 @@ const bedEditorRoute = createRoute({
   getParentRoute: () => appLayout,
   path: '/beete/$bedId',
   component: BedEditorPage,
+  validateSearch: parseBedEditorSearch,
 });
 
 // Developer pages: public, no data.
