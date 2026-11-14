@@ -9,7 +9,7 @@ export const sowings: typeof de = {
   loading: 'Loading batches …',
   empty: {
     title: 'No batches yet',
-    text: 'Keep track of what you raise on the windowsill: plant, sowing week, amount and stock. The sowing calendar in the <link>catalogue</link> shows when a plant can be raised indoors.',
+    text: 'Keep track of what you raise on the windowsill: plant, sowing week, amount and stock. The sowing calendar in the <catalog>catalogue</catalog> shows when a plant can be raised indoors.',
   },
   filter: {
     label: 'Show batches',

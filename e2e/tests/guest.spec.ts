@@ -113,6 +113,10 @@ test('guests reach neither profile nor admin area and cannot propose plants', as
   const publication = page.getByTestId('publication');
   await expect(publication.getByRole('button', { name: 'Für alle vorschlagen' })).toHaveCount(0);
   await expect(publication).toContainText('um die Sorte für alle vorzuschlagen');
+  await expect(publication.getByRole('link', { name: 'Melde dich an' })).toHaveAttribute(
+    'href',
+    '/anmelden',
+  );
 });
 
 test('ending guest mode keeps or deletes the data, as chosen', async ({ page }) => {

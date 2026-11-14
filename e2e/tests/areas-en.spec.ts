@@ -8,6 +8,10 @@ test('creates a batch and moves it on to the next stage', async ({ page }) => {
   await signInAs(page, 'user');
   await open(page, '/anzucht', 'Seedlings');
   await expect(page.getByRole('heading', { name: 'No batches yet' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('link', { name: 'catalogue' })).toHaveAttribute(
+    'href',
+    '/katalog',
+  );
 
   await page.getByRole('button', { name: 'Create your first batch' }).click();
   const dialog = page.getByRole('dialog', { name: 'New batch' });

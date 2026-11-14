@@ -210,7 +210,7 @@ export const catalog = {
     comment: 'Kommentar der Admins: ',
     ownNeighbors:
       'Vorschlagen geht nur mit Nachbarn aus dem gemeinsamen Katalog. Entferne dafür zuerst {{names}} aus den Nachbarn.',
-    signIn: '<link>Melde dich an</link>, um die Sorte für alle vorzuschlagen.',
+    signIn: '<signin>Melde dich an</signin>, um die Sorte für alle vorzuschlagen.',
     request: 'Für alle vorschlagen',
     requestAgain: 'Erneut vorschlagen',
   },

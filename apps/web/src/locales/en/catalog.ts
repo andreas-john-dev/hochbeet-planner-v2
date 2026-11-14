@@ -211,7 +211,7 @@ export const catalog: typeof de = {
     comment: 'Comment from the admins: ',
     ownNeighbors:
       'Only plants whose neighbours are all in the shared catalogue can be suggested. First remove {{names}} from the neighbours.',
-    signIn: '<link>Sign in</link> to suggest the plant to everyone.',
+    signIn: '<signin>Sign in</signin> to suggest the plant to everyone.',
     request: 'Suggest to everyone',
     requestAgain: 'Suggest again',
   },

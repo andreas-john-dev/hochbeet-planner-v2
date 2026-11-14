@@ -76,7 +76,7 @@ export function PublicationPanel({
             t={t}
             i18nKey="publication.signIn"
             components={{
-              link: <Link to="/anmelden" className="text-primary font-medium hover:underline" />,
+              signin: <Link to="/anmelden" className="text-primary font-medium hover:underline" />,
             }}
           />
         </p>

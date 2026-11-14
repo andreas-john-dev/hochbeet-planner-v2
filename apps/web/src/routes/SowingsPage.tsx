@@ -82,7 +82,7 @@ export function SowingsPage() {
               t={t}
               i18nKey="empty.text"
               components={{
-                link: (
+                catalog: (
                   <Link
                     to="/katalog"
                     className="text-foreground font-medium underline underline-offset-4"

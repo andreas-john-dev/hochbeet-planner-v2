@@ -8,7 +8,7 @@ export const sowings = {
   loading: 'Anzuchten werden geladen …',
   empty: {
     title: 'Noch keine Anzuchten',
-    text: 'Halte fest, was du auf der Fensterbank vorziehst: Sorte, Aussaatwoche, Menge und Bestand. Wann sich eine Sorte vorziehen lässt, zeigt ihr Aussaatkalender im <link>Katalog</link>.',
+    text: 'Halte fest, was du auf der Fensterbank vorziehst: Sorte, Aussaatwoche, Menge und Bestand. Wann sich eine Sorte vorziehen lässt, zeigt ihr Aussaatkalender im <catalog>Katalog</catalog>.',
   },
   filter: {
     label: 'Anzuchten zeigen',
