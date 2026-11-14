@@ -4,6 +4,7 @@ import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Link } from '@tanstack/react-router';
 import { CalendarX, Trash2, Undo2, X } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,18 +19,12 @@ import {
 import { plantPositions } from '@/lib/editor/plantings';
 import { originText, weekText } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 
-const END_HINT = {
-  removed: 'manuell entfernt',
-  manual: 'angepasst',
-  lifecycle: 'aus der Standzeit',
-  none: 'mehrjährig, ohne Ende',
-} as const;
-
-const ORIGINS: { origin: PlantingOrigin; label: string }[] = [
-  { origin: 'DIRECT_SOW', label: 'Direktsaat' },
-  { origin: 'TRANSPLANT', label: 'Gepflanzt' },
-];
+const ORIGINS = [
+  { origin: 'DIRECT_SOW', label: 'details.directSow' },
+  { origin: 'TRANSPLANT', label: 'details.transplant' },
+] as const satisfies readonly { origin: PlantingOrigin; label: string }[];
 
 /**
  * Side panel for the selected planting: plant, position, direct sown or planted out, real
@@ -57,6 +52,9 @@ export function PlantingDetails({
   onClose: () => void;
   className?: string;
 }) {
+  const { t } = useTranslation('editor');
+  const { language } = useLanguage();
+  const date = (iso: string) => formatDate(iso, language);
   const ids = { end: useId(), origin: useId(), originHint: useId(), sowing: useId() };
   const { end, source, lifecycleEnd } = plantingEnd(planting, plant);
   const [endValue, setEndValue] = useState(planting.endDate ?? '');
@@ -74,12 +72,15 @@ export function PlantingDetails({
 
   const description =
     planting.kind === 'ROW'
-      ? `Reihe, ${String(planting.lengthCm)} cm mit ${String(plantPositions(planting, plant).length)} Pflanzen`
-      : 'Einzelpflanze';
+      ? t('details.row', {
+          length: planting.lengthCm,
+          count: plantPositions(planting, plant).length,
+        })
+      : t('details.single');
 
   const saveEnd = (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const result = checkEnd(planting, endValue);
+    const result = checkEnd(planting, endValue, language);
     if ('error' in result) {
       setEndError(result.error);
       return;
@@ -92,7 +93,7 @@ export function PlantingDetails({
 
   return (
     <aside
-      aria-label={`Pflanzung ${plant.name}`}
+      aria-label={t('details.label', { plant: plant.name })}
       className={cn(
         'bg-card flex min-h-0 flex-col gap-4 overflow-y-auto rounded-xl border p-3',
         className,
@@ -104,13 +105,13 @@ export function PlantingDetails({
           <h2 className="truncate font-semibold">{plant.name}</h2>
           <p className="text-muted-foreground text-sm">{description}</p>
         </div>
-        <Button variant="ghost" size="icon" aria-label="Auswahl aufheben" onClick={onClose}>
+        <Button variant="ghost" size="icon" aria-label={t('details.deselect')} onClick={onClose}>
           <X />
         </Button>
       </div>
 
       <fieldset className="flex flex-col gap-2" aria-describedby={ids.originHint}>
-        <legend className="mb-1 text-sm font-medium">Ins Beet gekommen als</legend>
+        <legend className="mb-1 text-sm font-medium">{t('details.originLegend')}</legend>
         <div className="grid grid-cols-2 gap-2">
           {ORIGINS.map(({ origin, label }) => (
             <label
@@ -129,14 +130,14 @@ export function PlantingDetails({
                   onChange(planting, withOrigin(planting, plant, origin));
                 }}
               />
-              {label}
+              {t(label)}
             </label>
           ))}
         </div>
         <p id={ids.originHint} className="text-muted-foreground text-xs">
           {extraWeeks > 0 && plant.lifecycle.type === 'ANNUAL'
-            ? `Bei Direktsaat ${String(extraWeeks)} Wochen länger im Beet.`
-            : 'Die Standzeit ist bei beiden gleich.'}
+            ? t('details.extraWeeks', { count: extraWeeks })
+            : t('details.sameLifecycle')}
         </p>
       </fieldset>
 
@@ -151,24 +152,24 @@ export function PlantingDetails({
       )}
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">Position</dt>
-        <dd>
-          {String(planting.x)} × {String(planting.y)} cm
-        </dd>
+        <dt className="text-muted-foreground">{t('details.position')}</dt>
+        <dd>{t('details.positionValue', { x: planting.x, y: planting.y })}</dd>
         <dt className="text-muted-foreground">
-          {planting.origin === 'DIRECT_SOW' ? 'Gesät' : 'Gepflanzt'}
+          {planting.origin === 'DIRECT_SOW' ? t('details.sown') : t('details.planted')}
         </dt>
-        <dd>{formatDate(planting.startDate)}</dd>
-        <dt className="text-muted-foreground">Ende</dt>
+        <dd>{date(planting.startDate)}</dd>
+        <dt className="text-muted-foreground">{t('details.end')}</dt>
         <dd>
-          {end ? formatDate(end) : 'unbegrenzt'}
-          <span className="text-muted-foreground block text-xs">{END_HINT[source]}</span>
+          {end ? date(end) : t('details.unlimited')}
+          <span className="text-muted-foreground block text-xs">
+            {t(`details.endSource.${source}`)}
+          </span>
         </dd>
       </dl>
 
       <form onSubmit={saveEnd} className="flex flex-col gap-2" noValidate>
         <label htmlFor={ids.end} className="text-sm font-medium">
-          Ende anpassen
+          {t('details.adjustEnd')}
         </label>
         <div className="flex gap-2">
           <Input
@@ -182,13 +183,13 @@ export function PlantingDetails({
             }}
           />
           <Button type="submit" variant="outline" className="h-11">
-            Übernehmen
+            {t('details.apply')}
           </Button>
         </div>
         <p className="text-muted-foreground text-xs">
           {lifecycleEnd
-            ? `Leer lassen für das Ende aus der Standzeit (${formatDate(lifecycleEnd)}).`
-            : 'Leer lassen für eine Dauerkultur ohne Ende.'}
+            ? t('details.emptyForLifecycle', { date: date(lifecycleEnd) })
+            : t('details.emptyForPerennial')}
         </p>
         {endError && <FormMessage tone="error">{endError}</FormMessage>}
       </form>
@@ -196,7 +197,9 @@ export function PlantingDetails({
       <div className="flex flex-col gap-2">
         {planting.removedDate ? (
           <>
-            <p className="text-sm">Entfernt ab {formatDate(planting.removedDate)}.</p>
+            <p className="text-sm">
+              {t('details.removedFrom', { date: date(planting.removedDate) })}
+            </p>
             <Button
               variant="outline"
               className="h-11 md:h-10"
@@ -205,7 +208,7 @@ export function PlantingDetails({
               }}
             >
               <Undo2 aria-hidden />
-              Wieder ins Beet nehmen
+              {t('details.restore')}
             </Button>
           </>
         ) : (
@@ -219,12 +222,10 @@ export function PlantingDetails({
               }}
             >
               <CalendarX aria-hidden />
-              Entfernen ab {weekLabel}
+              {t('details.removeFrom', { week: weekLabel })}
             </Button>
             <p className="text-muted-foreground text-xs">
-              {removal
-                ? `Die Pflanzung bleibt in der Historie und zählt für die Fruchtfolge.`
-                : `Die Pflanzung beginnt erst nach ${weekLabel}.`}
+              {removal ? t('details.removeHint') : t('details.startsLater', { week: weekLabel })}
             </p>
           </>
         )}
@@ -236,7 +237,7 @@ export function PlantingDetails({
           }}
         >
           <Trash2 aria-hidden />
-          Pflanzung löschen
+          {t('details.delete')}
         </Button>
       </div>
     </aside>
@@ -260,6 +261,7 @@ function SowingOrigin({
   selectId: string;
   onChange: (before: Planting, after: Planting) => void;
 }) {
+  const { t } = useTranslation('editor');
   const text = originText(planting, sowings, plant);
   const choices = sowings.filter((s) => s.sowing.plantId === plant.id);
   if (!text && choices.length === 0) return null;
@@ -275,12 +277,12 @@ function SowingOrigin({
             hash={`sowing-${planting.sowingId ?? ''}`}
             className="text-foreground font-medium underline underline-offset-4"
           >
-            Zur Anzucht
+            {t('details.toSowing')}
           </Link>
         </p>
       )}
       <label htmlFor={selectId} className="font-medium">
-        Aus der Anzucht
+        {t('details.fromSowing')}
       </label>
       <select
         id={selectId}
@@ -290,7 +292,7 @@ function SowingOrigin({
         }}
         className="bg-card focus-visible:ring-ring/50 h-11 rounded-md border px-3 text-base outline-none focus-visible:ring-[3px] md:h-10 md:text-sm"
       >
-        <option value="">Keine (z. B. gekauft)</option>
+        <option value="">{t('details.noSowing')}</option>
         {choices.map(({ sowing }) => (
           <option key={sowing.id} value={sowing.id}>
             {weekText(sowing.sowDate)}

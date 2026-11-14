@@ -2,13 +2,8 @@ import type { Plant, Planting } from '@hochbeet/contracts';
 import { bounds, footprint, type Severity } from '@hochbeet/garden-rules';
 import { IconSvg } from '@hochbeet/plant-icons/react';
 import { resolveIconKey } from '@hochbeet/plant-icons';
+import { useTranslation } from 'react-i18next';
 import { iconSizeCm, plantPositions } from '@/lib/editor/plantings';
-
-const STATUS_LABEL: Record<Severity, string> = {
-  WARNING: 'Warnung',
-  HINT: 'Hinweis',
-  POSITIVE: 'gute Nachbarn',
-};
 
 /** Colour and symbol per status; colour is never the only signal. */
 const BADGE: Record<Severity, { fill: string; symbol: string }> = {
@@ -82,6 +77,7 @@ export function PlantingShape({
   scale?: number;
   onFocus?: () => void;
 }) {
+  const { t } = useTranslation('editor');
   const fp = footprint(planting, plant);
   const icon = resolveIconKey(plant);
   const size = iconSizeCm(plant);
@@ -107,7 +103,7 @@ export function PlantingShape({
   };
   const label =
     planting.kind === 'ROW'
-      ? `${plant.name}, Reihe mit ${String(positions.length)} Pflanzen`
+      ? t('canvas.rowLabel', { plant: plant.name, count: positions.length })
       : plant.name;
   return (
     <g
@@ -132,7 +128,13 @@ export function PlantingShape({
       data-selected={selected || undefined}
       role={inert ? undefined : 'button'}
       tabIndex={inert ? undefined : 0}
-      aria-label={inert ? undefined : status ? `${label} (${STATUS_LABEL[status]})` : label}
+      aria-label={
+        inert
+          ? undefined
+          : status
+            ? t('canvas.withStatus', { label, status: t(`status.${status}`) })
+            : label
+      }
       aria-pressed={inert ? undefined : selected}
       aria-hidden={inert || undefined}
       opacity={preview ? 0.75 : ghost ? 0.3 : suggestion ? 0.7 : undefined}

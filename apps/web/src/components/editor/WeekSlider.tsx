@@ -1,11 +1,13 @@
 import type { IsoDate } from '@hochbeet/contracts';
 import { formatWeek, weekStart } from '@hochbeet/garden-rules';
 import { addWeeks, format, parseISO } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { monthMarks, sliderWeeks } from '@/lib/editor/timeline';
+import { useLanguage } from '@/lib/i18n';
+import { dateLocale } from '@/lib/language';
 
 /**
  * Chooses the week the bed shows: a slider over the weeks of the year with month names,
@@ -23,6 +25,8 @@ export function WeekSlider({
   renewals?: readonly IsoDate[];
   onChange: (week: IsoDate) => void;
 }) {
+  const { t } = useTranslation('editor');
+  const { language } = useLanguage();
   const sliderId = useId();
   const weeks = sliderWeeks(week);
   const index = Math.max(0, weeks.indexOf(week));
@@ -39,12 +43,12 @@ export function WeekSlider({
   };
 
   return (
-    <div className="flex flex-col gap-2" role="group" aria-label="Woche">
+    <div className="flex flex-col gap-2" role="group" aria-label={t('week.group')}>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           size="icon"
-          aria-label="Vorherige Woche"
+          aria-label={t('week.previous')}
           onClick={() => {
             step(-1);
           }}
@@ -54,7 +58,7 @@ export function WeekSlider({
         <Button
           variant="outline"
           size="icon"
-          aria-label="Nächste Woche"
+          aria-label={t('week.next')}
           onClick={() => {
             step(1);
           }}
@@ -69,7 +73,7 @@ export function WeekSlider({
             onChange(weekStart(today));
           }}
         >
-          Heute
+          {t('week.today')}
         </Button>
         <p className="text-sm font-medium" aria-live="polite" data-testid="week-label">
           {label}
@@ -77,7 +81,7 @@ export function WeekSlider({
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor={sliderId} className="sr-only">
-          Woche wählen
+          {t('week.choose')}
         </label>
         <input
           id={sliderId}
@@ -95,7 +99,9 @@ export function WeekSlider({
         />
         <div className="relative h-2" data-testid="renewal-marks">
           {marks.map(({ date, at }) => {
-            const text = `Erde erneuert am ${format(parseISO(date), 'd. MMMM yyyy', { locale: de })}`;
+            const text = t('week.renewed', {
+              date: format(parseISO(date), 'PPP', { locale: dateLocale(language) }),
+            });
             return (
               <span
                 key={date}
@@ -110,7 +116,7 @@ export function WeekSlider({
           })}
         </div>
         <div aria-hidden className="text-muted-foreground relative h-4 text-[11px]">
-          {monthMarks(weeks).map((mark) => (
+          {monthMarks(weeks, language).map((mark) => (
             <span
               key={mark.label}
               className="absolute -translate-x-1/2"

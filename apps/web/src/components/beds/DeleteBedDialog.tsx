@@ -1,4 +1,5 @@
 import type { Bed } from '@hochbeet/contracts';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +23,7 @@ export function DeleteBedDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation(['beds', 'common']);
   const remove = useDeleteBed();
   return (
     <Dialog
@@ -33,11 +35,8 @@ export function DeleteBedDialog({
     >
       <DialogContent role="alertdialog">
         <DialogHeader>
-          <DialogTitle>Beet „{bed.name}“ löschen?</DialogTitle>
-          <DialogDescription>
-            Alle Pflanzungen dieses Beets werden ebenfalls gelöscht. Das lässt sich nicht rückgängig
-            machen.
-          </DialogDescription>
+          <DialogTitle>{t('deleteDialog.title', { name: bed.name })}</DialogTitle>
+          <DialogDescription>{t('deleteDialog.text')}</DialogDescription>
         </DialogHeader>
         {remove.isError && <FormMessage tone="error">{apiErrorMessage(remove.error)}</FormMessage>}
         <DialogFooter>
@@ -47,7 +46,7 @@ export function DeleteBedDialog({
               onOpenChange(false);
             }}
           >
-            Abbrechen
+            {t('common:cancel')}
           </Button>
           <Button
             className="bg-red-700 text-white hover:bg-red-800 dark:bg-red-600 dark:hover:bg-red-700"
@@ -61,7 +60,7 @@ export function DeleteBedDialog({
                 .catch(() => undefined);
             }}
           >
-            Beet löschen
+            {t('deleteDialog.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

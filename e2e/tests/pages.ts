@@ -192,6 +192,22 @@ export const appPages: readonly AppPage[] = [
   // English: pages whose texts are translated (more follow with the other areas).
   { id: 'en-anmelden', path: '/anmelden', heading: 'Sign in', access: 'public', language: 'en' },
   { id: 'en-profil', path: '/profil', heading: 'Profile', access: 'user', language: 'en' },
+  {
+    id: 'en-beete',
+    path: '/beete',
+    heading: 'My beds',
+    access: 'user',
+    seed: exampleGarden,
+    language: 'en',
+  },
+  {
+    id: 'en-beet-editor',
+    path: `/beete/${EXAMPLE_BED_ID}`,
+    heading: 'Hochbeet Süd',
+    access: 'user',
+    seed: exampleGarden,
+    language: 'en',
+  },
   // Guest mode: same pages, with the guest banner and the local API.
   {
     id: 'gast-beete',

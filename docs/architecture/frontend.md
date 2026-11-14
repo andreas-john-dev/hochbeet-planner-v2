@@ -136,10 +136,11 @@ Umsetzung (Stand T-35):
 
 ## Mehrsprachigkeit
 
-Umsetzung (Stand T-66, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404- und 403-Seite. Die übrigen Bereiche folgen in T-67 bis T-72.
+Umsetzung (Stand T-67, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404- und 403-Seite (T-66), Beetübersicht und Beet-Editor mit der Oberfläche des Assistenten (T-67). Die übrigen Bereiche folgen in T-68 bis T-72.
+Bis dahin bleiben im Editor deutsch: Wochenlabels aus `formatWeek()` (T-69), Befundtexte der Regel-Engine (T-69), Herkunftstexte aus `src/lib/sowings.ts` (T-68), Sortennamen (T-71), Validierungsmeldungen aus `packages/contracts` (T-70) und die Antworten des Assistenten (T-72).
 
 - **Setup:** `src/lib/i18n.ts` initialisiert i18next synchron mit den gebündelten Texten, sodass schon der erste Render übersetzt ist. Deutsch ist Fallback und Quelle.
-  - Die Texte liegen als TS-Objekte unter `src/locales/{de,en}/<bereich>.ts`, ein Namespace je Bereich: `common`, `layout`, `auth`, `profile`.
+  - Die Texte liegen als TS-Objekte unter `src/locales/{de,en}/<bereich>.ts`, ein Namespace je Bereich: `common`, `layout`, `auth`, `profile`, `beds`, `editor`.
   - Jede englische Datei hat den Typ ihrer deutschen (`typeof de`). Ein fehlender oder zusätzlicher Schlüssel ist damit ein Typfehler.
   - Über `CustomTypeOptions` sind auch die Schlüssel in `t()` typisiert.
   - `src/locales/locales.test.ts` prüft zusätzlich, dass beide Sprachen dieselben Schlüssel haben und kein Text leer ist.
@@ -150,7 +151,8 @@ Umsetzung (Stand T-66, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404
 - **Sprachwahl:** Karte „Sprache“ im Profil (`LanguageButtons`). Auf den Anmeldeseiten, also auch für Gäste, ein kleiner Umschalter neben dem Farbschema (`LanguageToggle`). Er nennt die jeweils andere Sprache in ihr selbst („English“ bzw. „Deutsch“, mit passendem `lang`). Bei mehr als zwei Sprachen wird daraus ein Menü.
 - **Englisch = en-GB:** Datumsformate über `useDateLocale()` (date-fns `de` bzw. `enGB`, Woche ab Montag). Die Komponenten stellen in ihren Tasks darauf um.
 - **Texte außerhalb von Komponenten:** Zod-Schemas mit eigenen Meldungen (`lib/auth/schemas.ts`), `authErrorMessage()` und `apiErrorMessage()` formulieren über `i18n.t()` erst beim Prüfen bzw. Aufrufen. So bleiben die Schemas Modulkonstanten und folgen trotzdem der aktuellen Sprache.
-  - Reine Funktionen, die ohne React testbar bleiben sollen, bekommen in späteren Tasks `t` oder die Sprache als Parameter oder liefern Schlüssel.
+  - Reine Funktionen, die Texte liefern, bekommen die Sprache als Parameter (`language: Language`) und holen sich `i18n.getFixedT(language, '<bereich>')` bzw. `dateLocale(language)`. So bleiben sie ohne React in beiden Sprachen testbar, z. B. `formatPeriod()`, `findingsSummary()`, `formatDate()`, `checkEnd()` und `monthMarks()` in `src/lib/editor/` oder `checkRenewals()`. Komponenten reichen `useLanguage().language` durch.
+  - Datumsformate: wo möglich die Muster der Locale (`PPP` für „1. März 2026“ bzw. „1 March 2026“). Eigene Muster stehen als Text in den Locales (z. B. `editor:details.datePattern`).
 - **API:** `createApiClient()` und `createApiStream()` senden die Sprache als `Accept-Language` (`currentLanguage()`). Die Services werten den Header ab T-70 aus.
 - **URLs** bleiben deutsch (`/beete`, `/anmelden`, …).
 - **Tests:**

@@ -7,6 +7,7 @@ import type { EditorStore } from '@/lib/editor/store';
 import type { ShownSuggestion } from '@/lib/editor/suggestions';
 import type { Ghost } from '@/lib/editor/timeline';
 import type { Severity } from '@hochbeet/garden-rules';
+import { useTranslation } from 'react-i18next';
 import { toCm, viewBox } from '@/lib/editor/viewport';
 import { BedGrid } from './BedGrid';
 import { PlantingShape } from './PlantingShape';
@@ -74,6 +75,7 @@ export function BedCanvas({
   onChange: (before: Planting, after: Planting) => void;
   onDelete: (planting: Planting) => void;
 }) {
+  const { t } = useTranslation('editor');
   const pointers = useRef(new Map<number, Pointer>());
   const pressedAt = useRef<Pointer | null>(null);
   // Planting under the pointer at press time; with pointer capture, later events target the SVG.
@@ -349,7 +351,7 @@ export function BedCanvas({
       className={`bg-card focus-visible:ring-ring block h-full w-full touch-none outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-inset ${cursorPreview ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
       role="group"
       tabIndex={0}
-      aria-label={`Beet ${bed.name}, ${String(bed.widthCm)} × ${String(bed.depthCm)} cm`}
+      aria-label={t('canvas.label', { name: bed.name, width: bed.widthCm, depth: bed.depthCm })}
       aria-describedby={describedBy}
       data-testid="bed-canvas"
       data-scale={viewport.scale.toFixed(3)}

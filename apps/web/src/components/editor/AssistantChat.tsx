@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Markdown } from '@/components/Markdown';
 import { Button } from '@/components/ui/button';
@@ -24,9 +25,6 @@ interface Message {
 }
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
-
-/** Question sent with „Pflanzvorschläge“ when the field is empty. */
-export const DEFAULT_SUGGESTION_QUESTION = 'Was kann ich in dieses Beet noch pflanzen?';
 
 /**
  * Chat with the Beet-Assistent about the bed on screen. Answers stream in and can be
@@ -49,6 +47,7 @@ export function AssistantChat({
   suggestions?: ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation(['editor', 'common']);
   const stream = useApiStream();
   const [sessionId, setSessionId] = useState(newSessionId);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -81,7 +80,8 @@ export function AssistantChat({
 
   const ask = async (event?: SyntheticEvent, suggest = false) => {
     event?.preventDefault();
-    const message = draft.trim() || (suggest ? DEFAULT_SUGGESTION_QUESTION : '');
+    // „Pflanzvorschläge“ with an empty field asks a general question.
+    const message = draft.trim() || (suggest ? t('assistant.defaultQuestion') : '');
     if (!message || busy) return;
     const controller = new AbortController();
     abort.current = controller;
@@ -100,7 +100,7 @@ export function AssistantChat({
       });
       setRemaining(result.remaining);
     } catch (cause) {
-      if (isAbort(cause)) appendToAnswer(' (abgebrochen)');
+      if (isAbort(cause)) appendToAnswer(t('assistant.aborted'));
       else setError(apiErrorMessage(cause));
     } finally {
       setBusy(false);
@@ -125,13 +125,13 @@ export function AssistantChat({
 
   return (
     <section
-      aria-label="Beet-Assistent"
+      aria-label={t('assistant.title')}
       className={cn('flex min-h-0 flex-col gap-3 overflow-y-auto', className)}
     >
       <div
         ref={log}
         role="log"
-        aria-label="Unterhaltung mit dem Assistenten"
+        aria-label={t('assistant.log')}
         aria-live="polite"
         aria-busy={busy}
         // Scrollable, so keyboard users must be able to reach it.
@@ -139,9 +139,7 @@ export function AssistantChat({
         className="focus-visible:ring-ring/50 flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto rounded-md outline-none focus-visible:ring-[3px]"
       >
         {messages.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Frag zum Beispiel, was neben deine Tomaten passt oder warum eine Warnung erscheint.
-          </p>
+          <p className="text-muted-foreground text-sm">{t('assistant.intro')}</p>
         ) : (
           messages.map((m, index) => (
             <div
@@ -155,7 +153,9 @@ export function AssistantChat({
                   : 'bg-muted self-start',
               )}
             >
-              <span className="sr-only">{m.role === 'user' ? 'Du: ' : 'Assistent: '}</span>
+              <span className="sr-only">
+                {m.role === 'user' ? t('assistant.you') : t('assistant.bot')}
+              </span>
               {/* The assistant answers in simple Markdown; the user's question stays as typed. */}
               {m.role === 'user' ? m.text : <Markdown text={m.text} />}
             </div>
@@ -164,14 +164,14 @@ export function AssistantChat({
         {busy && messages.at(-1)?.role === 'user' && (
           <p className="text-muted-foreground flex items-center gap-2 text-sm">
             <Bot className="size-4 animate-pulse" aria-hidden />
-            Der Assistent denkt nach …
+            {t('assistant.thinking')}
           </p>
         )}
       </div>
       {error && <FormMessage tone="error">{error}</FormMessage>}
       {suggestions}
       <form className="flex flex-col gap-2" onSubmit={(e) => void ask(e)}>
-        <Label htmlFor={inputId}>Frage an den Assistenten</Label>
+        <Label htmlFor={inputId}>{t('assistant.question')}</Label>
         <textarea
           ref={input}
           id={inputId}
@@ -184,12 +184,12 @@ export function AssistantChat({
           }}
           onKeyDown={onKeyDown}
           className="bg-card placeholder:text-muted-foreground focus-visible:ring-ring/50 min-h-16 w-full resize-y rounded-md border px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm"
-          placeholder="Was passt gut zu Tomaten?"
+          placeholder={t('assistant.placeholder')}
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-x-2">
             <p className="text-muted-foreground text-xs" aria-live="polite">
-              {remaining !== undefined && `Noch ${String(remaining)} Fragen heute.`}
+              {remaining !== undefined && t('assistant.remaining', { count: remaining })}
             </p>
             {messages.length > 0 && !busy && (
               <Button
@@ -200,7 +200,7 @@ export function AssistantChat({
                 onClick={restart}
               >
                 <MessageSquarePlus aria-hidden />
-                Neue Unterhaltung
+                {t('assistant.newConversation')}
               </Button>
             )}
           </div>
@@ -212,7 +212,7 @@ export function AssistantChat({
               onClick={() => abort.current?.abort()}
             >
               <Square aria-hidden />
-              Abbrechen
+              {t('common:cancel')}
             </Button>
           ) : (
             <div className="flex gap-2">
@@ -221,24 +221,23 @@ export function AssistantChat({
                   type="button"
                   variant="outline"
                   className="h-11"
-                  title="Geprüfte Pflanzvorschläge für dieses Beet, zu deiner Frage oder allgemein"
+                  title={t('assistant.suggestTitle')}
                   onClick={(e) => void ask(e, true)}
                 >
                   <Sprout aria-hidden />
-                  Pflanzvorschläge
+                  {t('assistant.suggest')}
                 </Button>
               )}
               <Button type="submit" className="h-11" disabled={!draft.trim()}>
                 <Send aria-hidden />
-                Fragen
+                {t('assistant.ask')}
               </Button>
             </div>
           )}
         </div>
       </form>
       <p id={hintId} className="text-muted-foreground text-xs">
-        Antworten stammen von einer KI und können falsch sein. Enter sendet, Umschalt+Enter macht
-        eine neue Zeile.
+        {t('assistant.disclaimer')}
       </p>
     </section>
   );

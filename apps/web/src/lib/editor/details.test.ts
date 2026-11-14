@@ -24,7 +24,11 @@ const tomato: Planting = {
 
 describe('detail panel dates', () => {
   it('formats a date with weekday and ISO week', () => {
-    expect(formatDate('2026-10-05')).toBe('Mo., 5. Oktober 2026 (KW 41)');
+    expect(formatDate('2026-10-05', 'de')).toBe('Mo., 5. Oktober 2026 (KW 41)');
+  });
+
+  it('formats a date in English with weekday and week', () => {
+    expect(formatDate('2026-10-05', 'en')).toBe('Mon, 5 October 2026 (Week 41)');
   });
 
   it('explains where the end comes from', () => {
@@ -90,9 +94,17 @@ describe('detail panel dates', () => {
   });
 
   it('checks a new end date', () => {
-    expect(checkEnd(tomato, '2026-09-30')).toEqual({ endDate: '2026-09-30' });
-    expect(checkEnd(tomato, '')).toEqual({ endDate: null });
-    expect(checkEnd(tomato, '2026-05-04')).toEqual({ error: 'Ende muss nach dem Start liegen.' });
-    expect(checkEnd(tomato, '5.10.2026')).toEqual({ error: 'Bitte ein gültiges Datum angeben.' });
+    expect(checkEnd(tomato, '2026-09-30', 'de')).toEqual({ endDate: '2026-09-30' });
+    expect(checkEnd(tomato, '', 'de')).toEqual({ endDate: null });
+    expect(checkEnd(tomato, '2026-05-04', 'de')).toEqual({
+      error: 'Ende muss nach dem Start liegen.',
+    });
+    expect(checkEnd(tomato, '5.10.2026', 'de')).toEqual({
+      error: 'Bitte ein gültiges Datum angeben.',
+    });
+    expect(checkEnd(tomato, '2026-05-04', 'en')).toEqual({
+      error: 'The end must be after the start.',
+    });
+    expect(checkEnd(tomato, '5.10.2026', 'en')).toEqual({ error: 'Please enter a valid date.' });
   });
 });

@@ -1,6 +1,7 @@
 import { formatWeek } from '@hochbeet/garden-rules';
 import { CalendarDays, ListChecks, Plus, Sprout } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BedCard } from '@/components/beds/BedCard';
 import { BedFormDialog } from '@/components/beds/BedFormDialog';
 import { EmptyState } from '@/components/EmptyState';
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useBeds } from '@/lib/garden';
 
 export function BedsPage() {
+  const { t } = useTranslation('beds');
   const [today] = useState(() => new Date());
   const { range, week } = formatWeek(today);
   const beds = useBeds();
@@ -23,7 +25,7 @@ export function BedsPage() {
 
   return (
     <>
-      <PageHeader title="Meine Beete" description="Plane deine Hochbeete Woche für Woche.">
+      <PageHeader title={t('title')} description={t('description')}>
         <div className="flex flex-wrap items-center gap-3">
           <p className="bg-card flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
             <CalendarDays className="text-primary size-4" aria-hidden />
@@ -39,11 +41,11 @@ export function BedsPage() {
                 }}
               >
                 <ListChecks aria-hidden />
-                Anzuchtplan
+                {t('sowingPlan')}
               </Button>
               <Button onClick={openCreate}>
                 <Plus aria-hidden />
-                Beet anlegen
+                {t('create')}
               </Button>
             </>
           )}
@@ -55,25 +57,20 @@ export function BedsPage() {
           {[0, 1, 2].map((i) => (
             <div key={i} className="bg-muted h-56 animate-pulse rounded-xl" />
           ))}
-          <span className="sr-only">Beete werden geladen …</span>
+          <span className="sr-only">{t('loading')}</span>
         </div>
       )}
 
-      {beds.isError && (
-        <FormMessage tone="error">
-          Deine Beete konnten nicht geladen werden. Bitte lade die Seite neu.
-        </FormMessage>
-      )}
+      {beds.isError && <FormMessage tone="error">{t('loadError')}</FormMessage>}
 
       {beds.data?.length === 0 && (
         <div className="flex flex-col items-center gap-4">
-          <EmptyState icon={Sprout} title="Noch keine Beete">
-            Leg dein erstes Hochbeet an. Danach setzt du Pflanzen und siehst Hinweise zu Abstand,
-            Nachbarn und Fruchtfolge.
+          <EmptyState icon={Sprout} title={t('empty.title')}>
+            {t('empty.text')}
           </EmptyState>
           <Button onClick={openCreate}>
             <Plus aria-hidden />
-            Erstes Beet anlegen
+            {t('createFirst')}
           </Button>
         </div>
       )}

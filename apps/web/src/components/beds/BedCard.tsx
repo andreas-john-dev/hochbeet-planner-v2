@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { weekStart } from '@hochbeet/garden-rules';
 import { Pencil, Trash2, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { activePlantings } from '@/lib/active-plantings';
@@ -12,10 +13,9 @@ import { BedFormDialog } from './BedFormDialog';
 import { BedPreview } from './BedPreview';
 import { DeleteBedDialog } from './DeleteBedDialog';
 
-const directionLabel = { H: 'Reihen parallel zur Breite', V: 'Reihen parallel zur Tiefe' };
-
 /** One bed in the overview: mini preview of the current week, size, edit and delete. */
 export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
+  const { t } = useTranslation('beds');
   const details = useBedWithPlantings(bed.id);
   const plants = usePlants();
   const [editing, setEditing] = useState(false);
@@ -47,12 +47,13 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
             </Link>
           </h2>
           <p className="text-muted-foreground text-sm">
-            {bed.widthCm} × {bed.depthCm} cm · {directionLabel[bed.mainRowDirection]}
+            {t('card.size', { width: bed.widthCm, depth: bed.depthCm })} ·{' '}
+            {t(bed.mainRowDirection === 'H' ? 'card.rowsH' : 'card.rowsV')}
           </p>
           <p className="text-muted-foreground text-xs">
             {plantings.length === 0
-              ? 'Noch keine Pflanzungen'
-              : `${String(active)} ${active === 1 ? 'Pflanzung' : 'Pflanzungen'} in dieser Woche`}
+              ? t('card.noPlantings')
+              : t('card.activePlantings', { count: active })}
           </p>
           {plantings.length > 0 && (
             <p
@@ -64,9 +65,7 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
               }
             >
               {warnings > 0 && <TriangleAlert aria-hidden className="size-3.5" />}
-              {warnings === 0
-                ? 'Keine Warnungen in dieser Saison'
-                : `${String(warnings)} ${warnings === 1 ? 'Warnung' : 'Warnungen'} in dieser Saison`}
+              {warnings === 0 ? t('card.noWarnings') : t('card.warnings', { count: warnings })}
             </p>
           )}
         </div>
@@ -75,7 +74,7 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={`Beet „${bed.name}“ bearbeiten`}
+            aria-label={t('card.edit', { name: bed.name })}
             onClick={() => {
               setEditing(true);
             }}
@@ -85,7 +84,7 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={`Beet „${bed.name}“ löschen`}
+            aria-label={t('card.delete', { name: bed.name })}
             onClick={() => {
               setDeleting(true);
             }}

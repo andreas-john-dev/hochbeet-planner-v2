@@ -1,5 +1,7 @@
 import type { IsoDate } from '@hochbeet/contracts';
 import { DEFAULT_SOIL_RENEWAL } from '@hochbeet/garden-rules';
+import { i18n } from './i18n';
+import type { Language } from './language';
 
 /** One year in the list of soil renewals: own dates, or the default 1 March. */
 export interface RenewalYear {
@@ -31,12 +33,13 @@ export function renewalYears(renewals: readonly IsoDate[], today: IsoDate): Rene
 /** Checks the edited list before saving: only real dates, each at most once. */
 export function checkRenewals(
   renewals: readonly string[],
+  language: Language,
 ): { renewals: IsoDate[] } | { error: string } {
+  const t = i18n.getFixedT(language, 'beds');
   const filled = renewals.filter((date) => date !== '');
   if (filled.some((date) => !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
-    return { error: 'Bitte ein gültiges Datum angeben.' };
+    return { error: t('renewals.invalidDate') };
   }
-  if (new Set(filled).size !== filled.length)
-    return { error: 'Ein Datum steht doppelt in der Liste.' };
+  if (new Set(filled).size !== filled.length) return { error: t('renewals.duplicate') };
   return { renewals: [...filled].sort() };
 }
