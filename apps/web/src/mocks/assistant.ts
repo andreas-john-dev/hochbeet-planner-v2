@@ -1,4 +1,5 @@
 import {
+  ASSISTANT_BLOCKED_MESSAGES,
   ASSISTANT_GROUPS,
   type AssistantEvent,
   type AssistantForgetResponse,
@@ -60,6 +61,15 @@ export const MOCK_SUGGESTIONS: Suggestion[] = [
 
 export const MOCK_SUGGESTION_SUMMARY = 'Zwei Vorschläge für die freie Fläche in der Mitte.';
 
+/**
+ * Questions with this word stand for what the real guardrail blocks (an off-topic question or
+ * a prompt attack): the mock answers with the guardrail's message, as the agent does.
+ */
+export const MOCK_BLOCKED_WORD = 'Fußball';
+
+const isBlocked = (message: string) =>
+  message.toLowerCase().includes(MOCK_BLOCKED_WORD.toLowerCase());
+
 const sse = (event: AssistantEvent) => `data: ${JSON.stringify(event)}\n\n`;
 
 /**
@@ -71,8 +81,9 @@ export const isPreference = (message: string) => /^ich\b/i.test(message.trim());
 /**
  * The Beet-Assistent without AWS for the dev server and Playwright: same checks and statuses
  * as the agent (403 without group, 400, 429 over the daily limit), then a fixed answer as
- * server-sent events, chunk by chunk. Lists and forgets remembered preferences like the agent
- * (without counting questions).
+ * server-sent events, chunk by chunk; a question with `MOCK_BLOCKED_WORD` gets the guardrail's
+ * message instead (still counted, like in the agent). Lists and forgets remembered preferences
+ * like the agent (without counting questions).
  */
 export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
   return [
@@ -109,14 +120,19 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
         );
       }
       const suggest = parsed.data.suggest === true && parsed.data.bedId !== undefined;
-      if (!suggest && isPreference(parsed.data.message)) {
+      const blocked = isBlocked(parsed.data.message);
+      if (!suggest && !blocked && isPreference(parsed.data.message)) {
         store.remember(user.id, {
           id: crypto.randomUUID(),
           text: parsed.data.message,
           createdAt: new Date().toISOString(),
         });
       }
-      const chunks = suggest ? [MOCK_SUGGESTION_SUMMARY] : mockAnswer(parsed.data.bedId);
+      const chunks = blocked
+        ? [ASSISTANT_BLOCKED_MESSAGES.input]
+        : suggest
+          ? [MOCK_SUGGESTION_SUMMARY]
+          : mockAnswer(parsed.data.bedId);
       const encoder = new TextEncoder();
       let cancelled = false;
       const body = new ReadableStream<Uint8Array>({
@@ -128,7 +144,7 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
           }
           if (suggest) {
             controller.enqueue(
-              encoder.encode(sse({ suggestions: MOCK_SUGGESTIONS, warnings: [] })),
+              encoder.encode(sse({ suggestions: blocked ? [] : MOCK_SUGGESTIONS, warnings: [] })),
             );
           }
           controller.enqueue(encoder.encode(sse({ done: true, remaining })));

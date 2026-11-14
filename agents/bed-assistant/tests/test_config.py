@@ -32,3 +32,12 @@ def test_memory_is_off_unless_configured() -> None:
 def test_needs_model_and_table() -> None:
     with pytest.raises(KeyError):
         Settings.from_env({"MODEL_ID": "m"})
+
+
+def test_guardrail_is_off_unless_configured() -> None:
+    settings = Settings.from_env({"MODEL_ID": "m", "QUOTA_TABLE": "t"})
+    assert (settings.guardrail_id, settings.guardrail_version) == ("", "")
+    guarded = Settings.from_env(
+        {"MODEL_ID": "m", "QUOTA_TABLE": "t", "GUARDRAIL_ID": "gr-1", "GUARDRAIL_VERSION": "3"}
+    )
+    assert (guarded.guardrail_id, guarded.guardrail_version) == ("gr-1", "3")

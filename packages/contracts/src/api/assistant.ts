@@ -24,6 +24,18 @@ export const ASSISTANT_SESSION_HEADER = 'X-Amzn-Bedrock-AgentCore-Runtime-Sessio
 export const MAX_ASSISTANT_MESSAGE_CHARS = 2000;
 
 /**
+ * What the assistant answers when its guardrail blocks a question (`input`, also the agent's
+ * fallback) or an answer (`output`); infra configures the guardrail with them, the mock
+ * answers with `input`.
+ */
+export const ASSISTANT_BLOCKED_MESSAGES = {
+  input:
+    'Dabei kann ich dir leider nicht helfen. Frag mich gern etwas zu deinen Beeten, Pflanzen oder zur Anzucht.',
+  output:
+    'Diese Antwort kann ich dir leider nicht geben. Frag mich gern etwas anderes zu deinen Beeten und Pflanzen.',
+} as const;
+
+/**
  * Body of a request to the runtime: the question, optionally with the bed the user is looking
  * at. The agent reads the bed itself through the gateway tools (below).
  */

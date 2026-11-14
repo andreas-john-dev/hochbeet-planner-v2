@@ -27,6 +27,12 @@ export interface AssistantConfig {
   readonly conversationRetentionDays: number;
   /** Cognito groups that may use the assistant; the runtime's authorizer checks them. */
   readonly allowedGroups: readonly string[];
+  /**
+   * Guardrail profile (cross-region) of the guardrail's Standard tier, which understands
+   * German, with the regions it routes to from the stage's region (Bedrock user guide,
+   * "Supported Regions for cross-Region guardrail inference").
+   */
+  readonly guardrailProfile: { readonly id: string; readonly regions: readonly string[] };
 }
 
 export interface StageConfig {
@@ -74,6 +80,10 @@ export const stages: readonly StageConfig[] = [
       conversationRetentionDays: ASSISTANT_CONVERSATION_DAYS,
       // The app shows the chat to the same groups (packages/contracts).
       allowedGroups: [...ASSISTANT_GROUPS],
+      guardrailProfile: {
+        id: 'eu.guardrail.v1:0',
+        regions: ['eu-central-1', 'eu-west-1', 'eu-west-3', 'eu-north-1'],
+      },
     },
     monthlyBudgetUsd: 10,
   },

@@ -1,9 +1,10 @@
-import { ASSISTANT_SESSION_HEADER } from '@hochbeet/contracts';
+import { ASSISTANT_BLOCKED_MESSAGES, ASSISTANT_SESSION_HEADER } from '@hochbeet/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '@/mocks/fetch';
 import { MockStore } from '@/mocks/store';
 import {
   MOCK_ASSISTANT_DAILY_LIMIT,
+  MOCK_BLOCKED_WORD,
   MOCK_SUGGESTION_SUMMARY,
   MOCK_SUGGESTIONS,
   mockAnswer,
@@ -198,6 +199,29 @@ describe('mock assistant', () => {
     expect(chunks).toEqual([MOCK_SUGGESTION_SUMMARY]);
     expect(received).toEqual([{ suggestions: MOCK_SUGGESTIONS, warnings: [] }]);
     expect(result.remaining).toBe(MOCK_ASSISTANT_DAILY_LIMIT - 1);
+  });
+
+  it('answers like the guardrail when a question has the blocked word, also for suggestions', async () => {
+    const fetchFn = createMockFetch(new MockStore(new MemoryStorage()));
+    for (const suggest of [false, true]) {
+      const chunks: string[] = [];
+      const received: unknown[] = [];
+      const result = await askAssistant(
+        createApiStream(() => Promise.resolve(token('|admins')), fetchFn),
+        {
+          message: `Wer wird ${MOCK_BLOCKED_WORD}-Weltmeister?`,
+          bedId: BED,
+          suggest,
+          sessionId: newSessionId(),
+          onText: (t) => chunks.push(t),
+          onSuggestions: (suggestions) => received.push(suggestions),
+        },
+      );
+      expect(chunks).toEqual([ASSISTANT_BLOCKED_MESSAGES.input]);
+      expect(received).toEqual(suggest ? [[]] : []);
+      // Blocked questions still count, as in the agent.
+      expect(result.remaining).toBe(MOCK_ASSISTANT_DAILY_LIMIT - (suggest ? 2 : 1));
+    }
   });
 
   it('stops streaming when the question is cancelled', async () => {

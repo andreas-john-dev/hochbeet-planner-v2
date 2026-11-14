@@ -1,6 +1,6 @@
 # Beet-Assistent
 
-Teil der [Architektur](../architecture.md) (Epic #89). KI-Assistent auf Bedrock AgentCore: Agent, Kostengrenzen, Tools über das Gateway, Gedächtnis, Pflanzvorschläge, Tracing und Modellvergleich.
+Teil der [Architektur](../architecture.md) (Epic #89). KI-Assistent auf Bedrock AgentCore: Agent, Kostengrenzen, Guardrails, Tools über das Gateway, Gedächtnis, Pflanzvorschläge, Tracing und Modellvergleich.
 
 Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Experiment mit Bedrock AgentCore, deshalb mit harten Kostengrenzen von Anfang an.
 
@@ -28,13 +28,51 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 
 - Code-Deployment statt Container: `pnpm --filter @hochbeet/bed-assistant build` legt in `dist/` den Agenten samt aller Abhängigkeiten als Wheels für Linux ARM64 und Python 3.13 ab (rund 80 MB); CDK lädt das als Zip-Asset hoch (`AgentRuntimeArtifact.fromCodeAsset`). So braucht die Pipeline weder Docker noch ECR.
 - Eingehend ein JWT-Authorizer auf den Cognito User Pool: Audience ist der SPA-Client, und der Claim `cognito:groups` muss `ai-testers` oder `admins` enthalten (`CONTAINS_ANY`).
-- Die Rolle darf genau ein Modell aufrufen (Inference-Profil plus das Modell dahinter in den EU-Regionen) und im Kontingent zählen; keine Marketplace-Rechte. Claude-Modelle muss ein User mit Marketplace-Rechten einmal pro Konto selbst aufrufen, damit Bedrock das Abo anlegt (siehe `docs/deployment.md`).
+- Die Rolle darf genau ein Modell aufrufen (Inference-Profil plus das Modell dahinter in den EU-Regionen), genau einen Guardrail anwenden (siehe „Guardrails“) und im Kontingent zählen; keine Marketplace-Rechte. Claude-Modelle muss ein User mit Marketplace-Rechten einmal pro Konto selbst aufrufen, damit Bedrock das Abo anlegt (siehe `docs/deployment.md`).
 - Observability: Usage-Logs nach CloudWatch (`/aws/vendedlogs/bedrock-agentcore/<stage>-bed-assistant-usage`); die Ausgaben des Agenten landen im Log der Runtime.
 - Tracing (T-47): `tracingEnabled` legt die Trace-Delivery der Runtime an (Delivery-Quelle `TRACES`, Ziel X-Ray, X-Ray-Ressourcen-Policy nur für `delivery.logs.amazonaws.com` und diese Runtime). Voraussetzung ist die X-Ray Transaction Search im Konto (einmalig von Hand, `docs/deployment.md`, Schritt 6), sonst scheitert der Deploy (so in T-40). Spans landen in der Log-Gruppe `aws/spans` und erscheinen unter CloudWatch → *GenAI Observability* → *Bedrock AgentCore*.
   - Instrumentierung: ADOT (`aws-opentelemetry-distro`) im Agenten. `main.py` ruft vor dem Import des Agenten `start_tracing()` (`bed_assistant/telemetry.py`) auf, das wie `opentelemetry-instrument` instrumentiert; so bleibt der Einstiegspunkt `main.py` und das Startskript im Code-Zip ohne festen Interpreterpfad. Aktiv nur mit `TRACING=true` aus der Infra; Tests, Modellvergleich und lokale Läufe bleiben ohne Tracing. `SERVICE_NAME` (`<stage>_bed_assistant`) benennt den Agenten in der Ansicht.
   - Inhalte: Spans zeigen Agent-, Modell- und Tool-Schritte, Dauer, Tool-Namen und Tokens. Strands schwärzt Nachrichten, Systemprompt, Tool-Argumente und -Ergebnisse (`OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_unredacted_attributes=`, also `[REDACTED]`), ADOT erfasst keine Nachrichteninhalte (`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false`), Log- und Metrik-Export von ADOT sind aus (die Runtime-Logs gibt es schon). Diese Werte setzt der Agent immer, auch wenn die Runtime andere vorgibt. HTTP-Header (ID-Token, Bearer an das Gateway) erfassen die Instrumentierungen standardmäßig nicht.
   - Kosten: Spans werden als CloudWatch Logs aufgenommen (Standard-Aufnahme, in `eu-central-1` grob 0,6 $ pro GB, plus Speicher), 1 % indexierte Spans sind frei. Eine Frage erzeugt einige Dutzend Spans mit zusammen grob 50 KB; bei 20 Fragen am Tag je Tester und wenigen Testern bleibt das unter 100 MB und damit unter 0,10 € im Monat. Die Aufbewahrung von `aws/spans` legt die Einrichtung fest (empfohlen 30 Tage).
 - Aufruf: `POST https://bedrock-agentcore.<region>.amazonaws.com/runtimes/<URL-kodierte ARN>/invocations?qualifier=DEFAULT` mit `Authorization: Bearer <ID-Token>` und einer Session-ID von mindestens 33 Zeichen im Header `X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`. Die ARN steht im SSM-Parameter und als Stack-Output; die Smoke-Tests stellen nach jedem Deploy eine kurze Frage.
+
+## Guardrails (`Prod-Assistant`, T-63)
+
+Ein Bedrock Guardrail vor dem Modell blockiert Prompt-Angriffe und Fragen ohne Bezug zum Garten. Er ergänzt die Berechtigung, ersetzt sie nicht: Die Tools bleiben nur lesend und laufen mit dem Token des Users.
+
+- **Guardrail** `<stage>-bed-assistant` (`infra/lib/assistant/guardrail.ts`, `CfnGuardrail` plus `CfnGuardrailVersion`; ein stabiles L2-Construct gibt es in aws-cdk-lib nicht):
+  - Inhaltsfilter: Prompt-Angriff stark (`HIGH`, nur auf die Eingabe, Bedrock verlangt `NONE` für die Ausgabe); Hass, Beleidigungen und Sexuelles mittel; Gewalt und Fehlverhalten schwach, damit Schädlinge, Unkraut und giftige Pflanzen Gartenfragen bleiben („Wie werde ich Wühlmäuse los?“).
+  - Verbotene Themen mit deutschen Beispielen: Programmierung und IT, Politik und Nachrichten, Finanzen und Recht, Unterhaltung und kreatives Schreiben, Hausaufgaben und Allgemeinwissen.
+  - Meldungen für blockierte Eingaben und Ausgaben: `ASSISTANT_BLOCKED_MESSAGES` in `packages/contracts` (auch für den Mock).
+  - Stufe *Standard* für Inhaltsfilter und Themen: Nur sie versteht Deutsch (*Classic* kann Englisch, Französisch und Spanisch) und erkennt neuere Angriffe. Sie verlangt das regionsübergreifende Guardrail-Profil `eu.guardrail.v1:0` (Stage-Konfiguration `guardrailProfile`); es leitet von `eu-central-1` nach `eu-central-1`, `eu-west-1`, `eu-west-3` und `eu-north-1` weiter, die Daten bleiben also in der EU.
+  - Feste Version: Die Runtime bekommt `GUARDRAIL_ID` und `GUARDRAIL_VERSION`. Die Beschreibung der Version enthält einen Hash der Richtlinien; jede Änderung ersetzt die Version, und die Runtime nutzt danach die neue.
+- **Abweichung vom Issue:** Statt eines Themas „nicht Garten“ gibt es mehrere positiv beschriebene Themen. Der Bedrock-Leitfaden zu verbotenen Themen rät ausdrücklich von Definitionen wie „alles außer …“ ab, weil die Erkennung dann unzuverlässig wird. Was keines der Themen trifft und trotzdem nichts mit dem Garten zu tun hat, lehnt weiter der Systemprompt ab. Der Preis hängt nicht an der Zahl der Themen.
+- **Rechte:** Die Runtime-Rolle darf `bedrock:ApplyGuardrail` nur auf diesen Guardrail und auf das Guardrail-Profil in den vier Regionen; an den Modellrechten ändert sich nichts.
+- **Was der Guardrail prüft:**
+
+  | Inhalt | Geprüft |
+  | --- | --- |
+  | Frage im Chat: die letzte Nachricht des Users samt Beet-Hinweis und Vorlieben in `<user_context>` | ja, bei jedem Modellaufruf der Frage |
+  | Ältere Nachrichten der Unterhaltung, Systemprompt | nein |
+  | Antworttext des Modells (im Stream, `sync`: Stücke gehen erst nach der Prüfung raus) | ja |
+  | Tool-Definitionen, Tool-Aufrufe des Modells, Tool-Ergebnisse | nein (Bedrock prüft sie beim Converse-API nie) |
+  | Wunsch bei Pflanzvorschlägen | ja, einmal vorab per `ApplyGuardrail` |
+  | Prompt und Antwort der Vorschlagsrunden | nein |
+
+  Im Chat setzt der Agent Strands' `guardrail_latest_message`: Strands packt die letzte Textnachricht des Users bei jedem Modellaufruf in `guardContent`, also prüft Bedrock nur sie. Die Alternative wäre die ganze Unterhaltung (bis zu 20 Nachrichten) bei jedem Modellaufruf und damit etwa die fünf- bis zehnfachen Kosten, ohne mehr Schutz: Frühere Fragen hat der Guardrail schon geprüft, als sie neu waren. Pflanzvorschläge laufen ohne Guardrail am Modell, weil ihre Antwort eine Tool-Eingabe (Structured Output) ist, die er nicht sieht, und weil der Prompt der Runden vor allem aus Anweisungen und Beetdaten des Codes besteht. Stattdessen prüft `BedrockGuardrailCheck` den Wunsch des Users vorab mit derselben Version.
+- **Blockierte Frage:** Bedrock antwortet statt des Modells mit der deutschen Meldung; sie erscheint im Chat wie eine normale Antwort. Kommt kein Text, ergänzt der Agent dieselbe Meldung (`BLOCKED_MESSAGE`). Die blockierte Frage ersetzt Strands im Verlauf durch „[Vom Schutzfilter entfernte Frage]“, auch in AgentCore Memory. Ein blockierter Wunsch für Pflanzvorschläge endet vor jedem Modellaufruf mit der Meldung als Zusammenfassung und ohne Vorschläge. Die Frage zählt trotzdem gegen das Tageskontingent. Das Log zählt Blockaden („guardrail intervened“) ohne Inhalt.
+- **Indirekte Prompt-Injection:** Über die Tools fließt Freitext des Users zum Modell, etwa Namen von Beeten und eigenen Sorten oder der Standort einer Anzucht-Charge (Notizen gibt `list_sowings` nicht weiter). Diese Tool-Ergebnisse prüft der Guardrail nicht. Abgesichert ist das so:
+  - Die Tools lesen nur; es gibt kein Tool, das etwas ändert, sendet oder eine URL aufruft.
+  - Sie lesen mit dem Token des Users nur seine eigenen Daten. Eingeschleuster Text kann also nur vom User selbst stammen und nur ihn selbst treffen. Globale Sorten anderer User kommen erst nach Prüfung durch einen Admin in den Katalog.
+  - Der Guardrail prüft, was das Modell daraufhin schreibt.
+  - Der Chat zeigt Antworten nur als einfaches Markdown ohne Links und Bilder, nie als HTML. So kann eine Antwort keine Daten über eine URL abfließen lassen.
+- **Kosten** (AWS-Preisliste für `eu-central-1`, Stand 11. November 2026): Inhaltsfilter und verbotene Themen kosten je 0,15 USD pro 1.000 Texteinheiten. Eine Texteinheit sind bis zu 1.000 Zeichen, und jede der beiden Richtlinien zählt für sich, zusammen also 0,30 USD pro 1.000 Texteinheiten.
+  - Chat-Frage: Bei jedem Modellaufruf zählt die Frage (meist eine Einheit, höchstens etwa drei bei 2.000 Zeichen samt Beet-Hinweis und Vorlieben), dazu der Antworttext dieses Aufrufs. Typisch sind drei Modellaufrufe mit zusammen etwa fünf Einheiten je Richtlinie, also rund 0,003 USD. Im ungünstigsten Fall (6 Tool-Aufrufe, also 7 Modellaufrufe mit langer Frage und 1.024 Tokens Antwort) sind es grob 30 Einheiten je Richtlinie, also rund 0,01 USD.
+  - Pflanzvorschläge: ein `ApplyGuardrail` mit dem Wunsch, ein bis zwei Einheiten je Richtlinie, unter 0,001 USD.
+  - Pro User und Tag bei höchstens 20 Fragen: typisch etwa 0,06 USD, höchstens etwa 0,20 USD. Ein Tester, der das Kontingent jeden Tag ausschöpft, kostet im Monat also 1,80 bis 6 USD. Mit der ganzen Unterhaltung statt der letzten Nachricht wären es bis zu etwa 0,80 USD pro Tag. Zum Vergleich kostet das Modell selbst bei Haiku 4.5 typisch einige Cent je Frage; der Guardrail kommt grob 10 % dazu.
+  - Die Testergruppe ist klein, und das Tageskontingent begrenzt auch diese Kosten; das Budget von 10 USD im Monat bleibt unverändert.
+- Mock: Fragen mit dem Wort `MOCK_BLOCKED_WORD` („Fußball“) beantwortet der Mock mit der Blockier-Meldung, auch bei Pflanzvorschlägen (dann ohne Vorschläge); das Kontingent zählt sie mit.
+- Der Modellvergleich (T-45) läuft ohne Guardrail, weil er die Umgebung der Runtime nicht setzt.
 
 ## Gateway und Tools (`Prod-Assistant`, T-41)
 
