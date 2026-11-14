@@ -2,6 +2,8 @@ export * from './constants';
 export * from './geometry';
 export * from './time';
 export * from './findings';
+export * from './locale';
+export { messagesFor, type Messages, type MonthPart } from './messages';
 export * from './context';
 export * from './sowings';
 export { spacingRule } from './rules/spacing';

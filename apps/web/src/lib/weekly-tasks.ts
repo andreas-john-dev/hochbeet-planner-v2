@@ -218,13 +218,13 @@ export function taskDetail(task: WeeklyTask, language: Language): string {
       : count(task.items, language);
   }
   const { sowing, plant } = task;
-  const week = formatWeek(task.date).week;
+  const week = formatWeek(task.date, language).week;
   switch (task.kind) {
     case 'SOW':
       return t('tasks.sowDetail', { count: sowing.sownCount, week });
     case 'PRICK_OUT':
       return t('tasks.prickOutDetail', {
-        week: formatWeek(sowing.sowDate).week,
+        week: formatWeek(sowing.sowDate, language).week,
         count: plant.sowing?.prickOutWeeks ?? 0,
       });
     case 'HARDEN':

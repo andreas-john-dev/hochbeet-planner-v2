@@ -42,6 +42,7 @@ describe('crop rotation rule', () => {
         severity: 'WARNING',
         plantingIds: ['k', 'r'],
         period: { start: '2026-06-01', end: '2026-08-03' },
+        params: { plant: 'Kohlrabi', predecessor: 'Radieschen', family: 'Kreuzblütler' },
         message:
           'Kohlrabi folgt am selben Platz direkt auf Radieschen (beide Kreuzblütler) ohne Erneuerung der Erde.',
       },
@@ -158,5 +159,19 @@ describe('crop rotation rule', () => {
       single('k', 'kohlrabi', 50, 50, { startDate: '2026-06-01' }),
     ];
     expect(run([...plantings].reverse())).toEqual(run(plantings));
+  });
+});
+
+describe('crop rotation rule in English', () => {
+  it('writes the warning in English with the same params', () => {
+    const plantings = [
+      radishAt(50, 50),
+      single('k', 'kohlrabi', 50, 50, { startDate: '2026-06-01' }),
+    ];
+    const [finding] = cropRotationRule(context(plants, plantings, {}, '05-15', [], 'en'));
+    expect(finding?.message).toBe(
+      'Kohlrabi directly follows Radieschen in the same spot (both Kreuzblütler) without renewing the soil.',
+    );
+    expect(finding?.params).toEqual(run(plantings)[0]?.params);
   });
 });

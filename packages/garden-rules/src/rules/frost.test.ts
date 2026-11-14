@@ -23,6 +23,7 @@ describe('frost rule', () => {
         severity: 'HINT',
         plantingIds: ['t'],
         period: { start: '2026-05-11', end: '2026-09-28' },
+        params: { plant: 'Tomate', lastFrost: '05-15' },
         message: 'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
       },
     ]);
@@ -65,6 +66,15 @@ describe('frost rule', () => {
     expect(frostRule(context([tomato], plantings)).map((f) => f.plantingIds)).toEqual([
       ['a'],
       ['b'],
+    ]);
+  });
+});
+
+describe('frost rule in English', () => {
+  it('writes the hint in English with the user’s frost date', () => {
+    const ctx = context([tomato], [planted('2026-05-11')], {}, '05-20', [], 'en');
+    expect(frostRule(ctx).map((f) => f.message)).toEqual([
+      'Tomate is frost-sensitive and should only go into the bed after 20 May.',
     ]);
   });
 });

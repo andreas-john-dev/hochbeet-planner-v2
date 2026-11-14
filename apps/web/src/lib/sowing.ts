@@ -33,19 +33,19 @@ const present = (lines: readonly (string | false | 0 | undefined)[]) =>
   lines.filter((line): line is string => typeof line === 'string');
 
 /**
- * The sowing details as short lines, e.g. for the plant page. The windows themselves stay
- * German until `windowText()` speaks both languages (T-69).
+ * The sowing details as short lines, e.g. for the plant page.
  */
 export function sowingLines(sowing: Sowing, language: Language, year?: number): string[] {
   const t = i18n.getFixedT(language, 'catalog');
   const d = details(sowing, language);
   return present([
     t(`method.${sowing.method}`),
-    sowing.presowWeeks && t('sowingLine.presow', { window: windowText(sowing.presowWeeks, year) }),
+    sowing.presowWeeks &&
+      t('sowingLine.presow', { window: windowText(sowing.presowWeeks, year, language) }),
     d.propagation,
     d.prickOut,
     sowing.directSowWeeks &&
-      t('sowingLine.direct', { window: windowText(sowing.directSowWeeks, year) }),
+      t('sowingLine.direct', { window: windowText(sowing.directSowWeeks, year, language) }),
     d.extra,
     d.germinationDays,
     d.germinationTemp,

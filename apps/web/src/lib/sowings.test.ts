@@ -175,7 +175,8 @@ describe('new batch', () => {
   });
 
   it('names the week with its days', () => {
-    expect(weekText('2026-03-09')).toBe('KW 11 · 9. – 15. März 2026');
+    expect(weekText('2026-03-09', 'de')).toBe('KW 11 · 9. – 15. März 2026');
+    expect(weekText('2026-03-09', 'en')).toBe('Week 11 · 9 – 15 March 2026');
   });
 });
 
@@ -260,9 +261,8 @@ describe('planting out in the editor', () => {
     expect(originText(planting, planned, lettuce, 'de')).toBe(
       'Aus der Anzucht vom 14. – 20. September 2026, 6 von 8',
     );
-    // The week stays German until the week labels are translated.
     expect(originText(planting, sowings, lettuce, 'en')).toBe(
-      'From the batch of 14. – 20. September 2026, 6 of 18',
+      'From the batch of 14 – 20 September 2026, 6 of 18',
     );
   });
 });

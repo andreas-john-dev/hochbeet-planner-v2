@@ -11,11 +11,13 @@ import { SowingPlanDialog } from '@/components/sowings/SowingPlanDialog';
 import { WeeklyTasksCard } from '@/components/sowings/WeeklyTasksCard';
 import { Button } from '@/components/ui/button';
 import { useBeds } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 
 export function BedsPage() {
   const { t } = useTranslation('beds');
   const [today] = useState(() => new Date());
-  const { range, week } = formatWeek(today);
+  const { language } = useLanguage();
+  const { range, week } = formatWeek(today, language);
   const beds = useBeds();
   const [creating, setCreating] = useState(false);
   const [planning, setPlanning] = useState(false);

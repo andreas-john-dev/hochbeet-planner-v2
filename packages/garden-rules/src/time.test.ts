@@ -255,6 +255,28 @@ describe('formatWeek', () => {
   it('accepts Date objects', () => {
     expect(formatWeek(new Date(2026, 9, 7)).week).toBe('KW 41');
   });
+
+  it('formats weeks in English', () => {
+    expect(formatWeek('2026-09-16', 'en')).toEqual({
+      range: '14 – 20 September 2026',
+      week: 'Week 38',
+      label: '14 – 20 September 2026 · Week 38',
+    });
+    expect(formatWeek('2026-04-01', 'en').label).toBe('30 March – 5 April 2026 · Week 14');
+    expect(formatWeek(new Date(2026, 9, 7), 'en').week).toBe('Week 41');
+  });
+
+  it('formats weeks across the turn of the year in English', () => {
+    expect(formatWeek('2026-01-01', 'en').label).toBe('29 December 2025 – 4 January 2026 · Week 1');
+    expect(formatWeek('2026-12-31', 'en').label).toBe(
+      '28 December 2026 – 3 January 2027 · Week 53',
+    );
+    expect(formatWeek('2027-01-04', 'en').label).toBe('4 – 10 January 2027 · Week 1');
+  });
+
+  it('stays German without a locale', () => {
+    expect(formatWeek('2026-10-07')).toEqual(formatWeek('2026-10-07', 'de'));
+  });
 });
 
 describe('soil renewal and seasons', () => {

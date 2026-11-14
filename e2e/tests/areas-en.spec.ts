@@ -1,7 +1,7 @@
 import { expect, open, signInAs, test } from './fixtures';
 
-// Seedlings, catalogue, own plants and the admin area in English. Plant names, families and
-// the week labels from garden-rules stay German until their tasks (T-69, T-71).
+// Seedlings, catalogue, own plants and the admin area in English. Plant names and families
+// stay German until the catalogue gets English names (T-71).
 test.use({ language: 'en' });
 
 test('creates a batch and moves it on to the next stage', async ({ page }) => {
@@ -55,6 +55,10 @@ test('filters the catalogue and opens a plant with its sowing calendar', async (
     'Start indoors',
   );
   await expect(calendar.locator('[data-row]')).toHaveCount(4);
+  // The weeks in words come from garden-rules, in English as well.
+  await expect(calendar.locator('[data-row="presow"]')).toContainText(
+    /Weeks? \d+(–\d+)? · (early|mid|late) [A-Z][a-z]+/,
+  );
   await expect(calendar.locator('[data-row="inBed"]')).toContainText('In the bed / harvest');
   await expect(calendar.getByText('3–4 weeks until planting out')).toBeVisible();
 });

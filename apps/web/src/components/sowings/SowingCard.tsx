@@ -79,7 +79,7 @@ export function SowingCard({
           <h3 id={titleId} className="font-semibold">
             {name}
           </h3>
-          <p className="text-muted-foreground text-sm">{weekText(sowing.sowDate)}</p>
+          <p className="text-muted-foreground text-sm">{weekText(sowing.sowDate, language)}</p>
         </div>
         <span
           className={cn(
@@ -108,7 +108,9 @@ export function SowingCard({
         {sowing.plannedTransplantDate && !done && (
           <p className="text-muted-foreground flex items-center gap-1.5">
             <CalendarClock className="size-4" aria-hidden />
-            {t('card.transplantPlanned', { week: weekText(sowing.plannedTransplantDate) })}
+            {t('card.transplantPlanned', {
+              week: weekText(sowing.plannedTransplantDate, language),
+            })}
           </p>
         )}
         {sowing.notes && (

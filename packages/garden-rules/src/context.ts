@@ -1,5 +1,6 @@
 import type { Bed, Plant, Planting, SowingBatch } from '@hochbeet/contracts';
 import { type Footprint, footprint } from './geometry';
+import type { Messages } from './messages';
 import { type Interval, plantingInterval } from './time';
 
 /** A planting together with everything the rules need about it. */
@@ -50,6 +51,10 @@ export interface RuleContext {
   lastFrost: string;
   /** The user's sowing batches by id; empty when the caller passes none. */
   sowings: ReadonlyMap<string, SowingInfo>;
+  /** Texts in the caller's language (`messagesFor()`). */
+  texts: Messages;
+  /** Name of a plant in the texts (`EvaluateOptions.plantName`). */
+  plantName: (plant: Plant) => string;
 }
 
 /** Calls `visit` once for every unordered pair of plantings. */
@@ -68,8 +73,16 @@ export function forEachPair(
 export const sortedIds = (...items: ResolvedPlanting[]) =>
   items.map((item) => item.planting.id).sort();
 
-/** "A und B" with names in German alphabetical order, so the text does not depend on input order. */
-export function pairNames(a: ResolvedPlanting, b: ResolvedPlanting): string {
-  const [first, second] = [a.plant.name, b.plant.name].sort((x, y) => x.localeCompare(y, 'de'));
-  return `${first ?? ''} und ${second ?? ''}`;
+/**
+ * The display names of a pair in alphabetical order of the language ("Kartoffel", "Tomate"),
+ * so the text does not depend on the order of the plantings.
+ */
+export function pairNames(
+  { texts, plantName }: Pick<RuleContext, 'texts' | 'plantName'>,
+  a: ResolvedPlanting,
+  b: ResolvedPlanting,
+): [string, string] {
+  const first = plantName(a.plant);
+  const second = plantName(b.plant);
+  return first.localeCompare(second, texts.collation) <= 0 ? [first, second] : [second, first];
 }

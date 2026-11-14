@@ -45,6 +45,7 @@ const COMPACT_LIMIT = 4;
  */
 export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation('sowings');
+  const { language } = useLanguage();
   const garden = useAllPlantings();
   const plants = usePlants();
   const sowings = useSowings();
@@ -88,7 +89,7 @@ export function WeeklyTasksCard({ compact = false }: { compact?: boolean }) {
           <h2 id={titleId} className="text-lg font-semibold">
             {t('tasks.title')}
           </h2>
-          <p className="text-muted-foreground text-sm">{weekText(week)}</p>
+          <p className="text-muted-foreground text-sm">{weekText(week, language)}</p>
         </div>
         <div
           role="group"

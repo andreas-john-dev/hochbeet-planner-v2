@@ -19,6 +19,7 @@ describe('spacing rule', () => {
         severity: 'WARNING',
         plantingIds: ['b', 't'],
         period: { start: '2026-05-04', end: '2026-07-27' },
+        params: { plants: ['Basilikum', 'Tomate'], overlapCm: 10 },
         message: 'Basilikum und Tomate stehen zu eng: Die Standflächen überlappen um 10 cm.',
       },
     ]);
@@ -108,5 +109,14 @@ describe('spacing rule', () => {
 
   it('skips plantings whose plant is unknown', () => {
     expect(resolvePlantings([single('x', 'unbekannt', 0, 0)], plants)).toEqual([]);
+  });
+});
+
+describe('spacing rule in English', () => {
+  it('writes the warning in English', () => {
+    const plantings = [single('t', 'tomate', 30, 30), single('b', 'basilikum', 60, 30)];
+    expect(
+      spacingRule(context(plants, plantings, {}, '05-15', [], 'en')).map((f) => f.message),
+    ).toEqual(['Basilikum and Tomate are too close: their footprints overlap by 10 cm.']);
   });
 });

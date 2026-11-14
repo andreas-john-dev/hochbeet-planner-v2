@@ -1,6 +1,8 @@
 // Builders for rule tests. Ids are short strings; the rules do not validate them.
 import type { Bed, Plant, Planting, SowingBatch, SowingWithPlantings } from '@hochbeet/contracts';
 import { resolvePlantings, type RuleContext } from './context';
+import type { RulesLocale } from './locale';
+import { messagesFor } from './messages';
 import { sowingInfos } from './sowings';
 
 export function bed(overrides: Partial<Bed> = {}): Bed {
@@ -79,12 +81,15 @@ export function context(
   bedOverrides: Partial<Bed> = {},
   lastFrost = '05-15',
   sowings: readonly SowingWithPlantings[] = [],
+  locale: RulesLocale = 'de',
 ): RuleContext {
   return {
     bed: bed(bedOverrides),
     plantings: resolvePlantings(plantings, plants),
     lastFrost,
     sowings: sowingInfos(sowings, plants),
+    texts: messagesFor(locale),
+    plantName: (p) => p.name,
   };
 }
 

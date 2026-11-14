@@ -28,13 +28,12 @@ describe('sowing texts', () => {
   });
 
   it('lists the sowing details in English', () => {
-    // The week windows come from garden-rules and stay German until T-69.
     expect(sowingLines(both, 'en', 2026)).toEqual([
       'Start indoors or direct sowing',
-      'Start indoors KW 10–14 (Anfang März bis Anfang April)',
+      'Start indoors in weeks 10–14 (early March to early April)',
       '4–6 weeks until planting out',
       'Prick out after 2 weeks',
-      'Direct sowing KW 14–32 (Ende März bis Anfang August)',
+      'Direct sowing in weeks 14–32 (late March to early August)',
       'Direct sowing stays 3 weeks longer in the bed',
       'Germinates in 6–12 days',
       'Germination temperature 18 °C',

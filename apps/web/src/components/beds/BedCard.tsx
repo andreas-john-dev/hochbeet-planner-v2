@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { activePlantings } from '@/lib/active-plantings';
 import { seasonFindings } from '@/lib/editor/warnings';
 import { useBedWithPlantings, usePlants } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 import { BedFormDialog } from './BedFormDialog';
 import { BedPreview } from './BedPreview';
 import { DeleteBedDialog } from './DeleteBedDialog';
@@ -22,9 +23,10 @@ export function BedCard({ bed, today }: { bed: Bed; today: Date }) {
   const [deleting, setDeleting] = useState(false);
   const plantings = details.data?.plantings ?? [];
   const active = activePlantings(plantings, plants.data ?? [], today).length;
-  const warnings = seasonFindings(bed, plantings, plants.data ?? [], weekStart(today)).filter(
-    (f) => f.severity === 'WARNING',
-  ).length;
+  const { language } = useLanguage();
+  const warnings = seasonFindings(bed, plantings, plants.data ?? [], weekStart(today), {
+    language,
+  }).filter((f) => f.severity === 'WARNING').length;
 
   return (
     <Card

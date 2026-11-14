@@ -3,18 +3,20 @@ import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormField } from '@/components/FormField';
+import { useLanguage } from '@/lib/i18n';
+import type { Language } from '@/lib/language';
 import { SOWING_METHODS } from '@/lib/sowing';
 import { type SowingErrors, type SowingForm, usesField } from '@/lib/sowing-form';
 import { cn } from '@/lib/utils';
 
 /**
- * Hint under a week field: where the week roughly lies in the year (German until T-69), else
- * the allowed weeks.
+ * Hint under a week field: where the week roughly lies in the year ("Anfang März", "early
+ * March"), else the allowed weeks.
  */
-function weekFieldHint(value: string, fallback: string, end = false): string {
+function weekFieldHint(value: string, fallback: string, language: Language, end = false): string {
   const week = Number(value);
   return value.trim() !== '' && Number.isInteger(week) && week >= 1 && week <= 53
-    ? weekHint(week, { end })
+    ? weekHint(week, { end, locale: language })
     : fallback;
 }
 
@@ -35,6 +37,7 @@ export function SowingFields({
   onChange: (change: Partial<SowingForm>) => void;
 }) {
   const { t } = useTranslation('catalog');
+  const { language } = useLanguage();
   const ids = { method: useId(), frost: useId() };
   const weekRange = t('sowingFields.weekRange');
   // Open when the plant has details; afterwards the user decides, errors open it again.
@@ -115,14 +118,14 @@ export function SowingFields({
               label={t('sowingFields.sowFrom')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.presowFrom, weekRange)}
+              hint={weekFieldHint(value.presowFrom, weekRange, language)}
               {...number('presowFrom')}
             />
             <FormField
               label={t('sowingFields.sowTo')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.presowTo, weekRange, true)}
+              hint={weekFieldHint(value.presowTo, weekRange, language, true)}
               {...number('presowTo')}
             />
             <FormField
@@ -154,14 +157,14 @@ export function SowingFields({
               label={t('sowingFields.sowFrom')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.directFrom, weekRange)}
+              hint={weekFieldHint(value.directFrom, weekRange, language)}
               {...number('directFrom')}
             />
             <FormField
               label={t('sowingFields.sowTo')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.directTo, weekRange, true)}
+              hint={weekFieldHint(value.directTo, weekRange, language, true)}
               {...number('directTo')}
             />
             <FormField

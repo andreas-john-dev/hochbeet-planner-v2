@@ -21,6 +21,22 @@ describe('week windows', () => {
     );
   });
 
+  it('places weeks and describes windows in English', () => {
+    expect(weekHint(1, { year: 2026, locale: 'en' })).toBe('late December');
+    expect(weekHint(10, { year: 2026, locale: 'en' })).toBe('early March');
+    expect(weekHint(12, { year: 2026, locale: 'en' })).toBe('mid March');
+    expect(windowText({ from: 10, to: 14 }, 2026, 'en')).toBe(
+      'weeks 10–14 (early March to early April)',
+    );
+    expect(windowText({ from: 20, to: 20 }, 2026, 'en')).toBe('week 20 (mid May)');
+    expect(windowText({ from: 50, to: 2 }, 2026, 'en')).toBe(
+      'weeks 50–2 (early December to mid January)',
+    );
+    expect(windowText({ from: 10, to: 14 }, 2026, 'de')).toBe(
+      windowText({ from: 10, to: 14 }, 2026),
+    );
+  });
+
   it('writes ranges with a dash only when they span', () => {
     expect(rangeText(6, 8)).toBe('6–8');
     expect(rangeText(4, 4)).toBe('4');

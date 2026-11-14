@@ -22,8 +22,8 @@ export const catalog: typeof de = {
     BOTH: 'Start indoors or direct sowing',
   },
   sowingLine: {
-    presow: 'Start indoors {{window}}',
-    direct: 'Direct sowing {{window}}',
+    presow: 'Start indoors in {{window}}',
+    direct: 'Direct sowing in {{window}}',
     propagation: '{{range}} weeks until planting out',
     prickOut_one: 'Prick out after {{count}} week',
     prickOut_other: 'Prick out after {{count}} weeks',

@@ -38,6 +38,7 @@ describe('neighbour rule', () => {
         severity: 'WARNING',
         plantingIds: ['k', 't'],
         period: { start: '2026-05-04', end: '2026-07-27' },
+        params: { plants: ['Kartoffel', 'Tomate'] },
         message: 'Kartoffel und Tomate sind schlechte Nachbarn.',
       },
     ]);
@@ -50,6 +51,7 @@ describe('neighbour rule', () => {
         severity: 'POSITIVE',
         plantingIds: ['s', 't'],
         period: { start: '2026-05-04', end: '2026-07-27' },
+        params: { plants: ['Kopfsalat', 'Tomate'] },
         message: 'Kopfsalat und Tomate sind gute Nachbarn.',
       },
     ]);
@@ -118,5 +120,18 @@ describe('neighbour rule', () => {
     const a = single('t', 'tomate', 30, 30);
     const b = single('k', 'kartoffel', 90, 30);
     expect(run(b, a)).toEqual(run(a, b));
+  });
+});
+
+describe('neighbour rule in English', () => {
+  it('writes both texts in English', () => {
+    const en = (...plantings: Parameters<typeof context>[1]) =>
+      neighborsRule(context(plants, plantings, {}, '05-15', [], 'en')).map((f) => f.message);
+    expect(en(single('t', 'tomate', 30, 30), single('k', 'kartoffel', 90, 30))).toEqual([
+      'Kartoffel and Tomate are bad neighbours.',
+    ]);
+    expect(en(single('t', 'tomate', 30, 30), single('s', 'kopfsalat', 85, 30))).toEqual([
+      'Kopfsalat and Tomate are good neighbours.',
+    ]);
   });
 });

@@ -61,6 +61,7 @@ import { createEditorStore, type EditorStore, type PreviewSowing } from '@/lib/e
 import { parseBedEditorSearch } from '@/lib/editor/search';
 import { adoptedPlanting, type ShownSuggestion, showSuggestions } from '@/lib/editor/suggestions';
 import { seasonFindings, statusByPlanting, weekOfFinding } from '@/lib/editor/warnings';
+import { useLanguage } from '@/lib/i18n';
 import { ghosts, withPlants, type Ghost } from '@/lib/editor/timeline';
 import { toCm } from '@/lib/editor/viewport';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/media-query';
@@ -553,6 +554,7 @@ function Workspace({
   // Seedlings dropped from a sowing batch, waiting for „Wie viele?“.
   const [plantOut, setPlantOut] = useState<PlantOutRequest | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const { language } = useLanguage();
   const {
     preview,
     kind,
@@ -579,10 +581,22 @@ function Workspace({
         }),
       );
     }
-    const season = seasonFindings(bed, live, plants, weekIso, lastFrost, sowings);
+    const season = seasonFindings(bed, live, plants, weekIso, { language, lastFrost, sowings });
     const thisWeek = season.filter((f) => isActiveInWeek(f.period, weekIso));
     return { seasonal: season, statuses: statusByPlanting(thisWeek) };
-  }, [allPlantings, draft, preview, bed, kind, week, plants, weekIso, lastFrost, sowings]);
+  }, [
+    allPlantings,
+    draft,
+    preview,
+    bed,
+    kind,
+    week,
+    plants,
+    weekIso,
+    lastFrost,
+    sowings,
+    language,
+  ]);
 
   const offered = useMemo(
     () => availableSowings(sowings, plants, weekIso),

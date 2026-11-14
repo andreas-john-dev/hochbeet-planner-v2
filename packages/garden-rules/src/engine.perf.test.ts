@@ -24,6 +24,14 @@ describe('rule engine performance', () => {
     expect(median, `median ${median.toFixed(1)} ms`).toBeLessThan(50);
   });
 
+  it('stays under 50 ms with English texts', () => {
+    const options = { sowings, locale: 'en' as const };
+    const median = medianMs(() => evaluateBed(bed, plantings, plants, options));
+    expect(evaluateBed(bed, plantings, plants, options)[0]?.message).toMatch(/ and | are /);
+    console.info(`evaluateBed in English: 200 plantings, median ${median.toFixed(1)} ms`);
+    expect(median, `median ${median.toFixed(1)} ms`).toBeLessThan(50);
+  });
+
   it('stays under 50 ms with sowing batches linked to the plantings', () => {
     const options = { sowings };
     const median = medianMs(() => evaluateBed(bed, plantings, plants, options));

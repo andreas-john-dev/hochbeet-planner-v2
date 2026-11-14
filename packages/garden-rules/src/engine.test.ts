@@ -90,6 +90,38 @@ describe('evaluateBed', () => {
     expect(findings.map((f) => f.rule)).toEqual(['CROP_ROTATION']);
   });
 
+  it('writes texts in the given language, German by default, with the same params', () => {
+    const german = evaluateBed(bed(), plantings, plants);
+    const english = evaluateBed(bed(), plantings, plants, { locale: 'en' });
+    expect(evaluateBed(bed(), plantings, plants, { locale: 'de' })).toEqual(german);
+    expect(english.map((f) => f.message)).toEqual([
+      'Kartoffel and Tomate are bad neighbours.',
+      'Basilikum and Kartoffel are too close: their footprints overlap by 10 cm.',
+      'Kartoffel and Tomate are too close: their footprints overlap by 10 cm.',
+      'Kartoffel reaches beyond the edge of the bed.',
+      'Basilikum and Tomate are good neighbours.',
+    ]);
+    expect(english.map(({ message: _, ...rest }) => rest)).toEqual(
+      german.map(({ message: _, ...rest }) => rest),
+    );
+  });
+
+  it('names plants through plantName, sorting pairs by that name', () => {
+    const names: Record<string, string> = {
+      tomate: 'Tomato',
+      kartoffel: 'Potato',
+      basilikum: 'Basil',
+    };
+    const findings = evaluateBed(bed(), plantings, plants, {
+      locale: 'en',
+      plantName: (p) => names[p.id] ?? p.name,
+    });
+    expect(findings.find((f) => f.rule === 'BAD_NEIGHBOR')).toMatchObject({
+      params: { plants: ['Potato', 'Tomato'] },
+      message: 'Potato and Tomato are bad neighbours.',
+    });
+  });
+
   it('returns nothing for an empty bed and skips unknown plants', () => {
     expect(evaluateBed(bed(), [], plants)).toEqual([]);
     expect(evaluateBed(bed(), [single('x', 'unbekannt', 30, 30)], plants)).toEqual([]);

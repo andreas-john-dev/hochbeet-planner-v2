@@ -20,6 +20,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
 import { useApi } from '@/lib/api-context';
 import { queryKeys, useAllPlantings, usePlants, useSowings } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 import { buildSowingPlan, saveSowingPlan, type SowingPlanRow } from '@/lib/sowing-plan';
 import { cn } from '@/lib/utils';
 
@@ -208,7 +209,8 @@ function PlanRow({
   onCount: (text: string) => void;
 }) {
   const { t } = useTranslation('sowings');
-  const { week, range } = formatWeek(row.sowDate);
+  const { language } = useLanguage();
+  const { week, range } = formatWeek(row.sowDate, language);
   const name = t('planDialog.rowName', { plant: row.plant.name, week });
   const invalid = chosen && countOf(countText) === undefined;
   const beds = row.beds.map((bed) => t('quoted', { name: bed.name })).join(', ');
@@ -240,7 +242,10 @@ function PlanRow({
             <span className="text-foreground font-medium">{row.plant.name}</span>
             <span>{t('planDialog.sowing', { week, range })}</span>
             <span className="text-muted-foreground text-xs">
-              {t('planDialog.transplant', { week: formatWeek(row.transplantDate).week, beds })}
+              {t('planDialog.transplant', {
+                week: formatWeek(row.transplantDate, language).week,
+                beds,
+              })}
             </span>
             {row.tooLate && (
               <span className="flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300">
