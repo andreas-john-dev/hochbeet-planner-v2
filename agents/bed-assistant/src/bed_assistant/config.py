@@ -26,6 +26,9 @@ class Settings:
     memory_id: str = ""
     #: Messages of a conversation the agent keeps in its context (older ones drop out).
     history_messages: int = 20
+    #: Bedrock guardrail in front of the model (T-63); empty means none.
+    guardrail_id: str = ""
+    guardrail_version: str = ""
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "Settings":
@@ -45,4 +48,6 @@ class Settings:
             suggestion_seconds=float(env.get("SUGGESTION_SECONDS", "50")),
             memory_id=env.get("MEMORY_ID", ""),
             history_messages=int(env.get("HISTORY_MESSAGES", "20")),
+            guardrail_id=env.get("GUARDRAIL_ID", ""),
+            guardrail_version=env.get("GUARDRAIL_VERSION", ""),
         )

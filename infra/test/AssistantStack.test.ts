@@ -1,6 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ASSISTANT_BLOCKED_MESSAGES } from '@hochbeet/contracts';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AssistantStack } from '../lib/assistant/AssistantStack';
@@ -50,6 +51,10 @@ describe('AssistantStack', () => {
         SUGGESTION_ROUNDS: '2',
         MEMORY_ID: ssmParam('hochbeet/prod/assistant/memory-id'),
         HISTORY_MESSAGES: '20',
+        GUARDRAIL_ID: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Guardrail'), 'GuardrailId'] },
+        GUARDRAIL_VERSION: {
+          'Fn::GetAtt': [Match.stringLikeRegexp('^GuardrailVersion'), 'Version'],
+        },
         TRACING: 'true',
         SERVICE_NAME: 'prod_bed_assistant',
       },
@@ -170,8 +175,96 @@ describe('AssistantStack', () => {
     expect(actions.filter((a) => a.startsWith('bedrock:'))).toEqual([
       'bedrock:InvokeModel',
       'bedrock:InvokeModelWithResponseStream',
+      'bedrock:ApplyGuardrail',
     ]);
     expect(actions.some((a) => a.startsWith('aws-marketplace:'))).toBe(false);
+  });
+
+  it('puts a German guardrail against prompt attacks and off-topic questions in front', () => {
+    template.resourceCountIs('AWS::Bedrock::Guardrail', 1);
+    template.hasResourceProperties('AWS::Bedrock::Guardrail', {
+      Name: 'prod-bed-assistant',
+      BlockedInputMessaging: ASSISTANT_BLOCKED_MESSAGES.input,
+      BlockedOutputsMessaging: ASSISTANT_BLOCKED_MESSAGES.output,
+      ContentPolicyConfig: {
+        FiltersConfig: Match.arrayWith([
+          { Type: 'PROMPT_ATTACK', InputStrength: 'HIGH', OutputStrength: 'NONE' },
+        ]),
+        ContentFiltersTierConfig: { TierName: 'STANDARD' },
+      },
+      TopicPolicyConfig: {
+        TopicsConfig: Match.arrayWith([
+          Match.objectLike({
+            Name: 'Programmierung und IT',
+            Type: 'DENY',
+            Examples: Match.arrayWith(['Schreib mir ein Python-Skript, das Dateien sortiert.']),
+          }),
+        ]),
+        TopicsTierConfig: { TierName: 'STANDARD' },
+      },
+      // The Standard tier (needed for German) runs through the EU guardrail profile.
+      CrossRegionConfig: {
+        GuardrailProfileArn: {
+          'Fn::Join': [
+            '',
+            [
+              'arn:',
+              { Ref: 'AWS::Partition' },
+              ':bedrock:eu-central-1:123456789012:guardrail-profile/eu.guardrail.v1:0',
+            ],
+          ],
+        },
+      },
+    });
+    const [guardrail] = Object.values(template.findResources('AWS::Bedrock::Guardrail')) as {
+      Properties: {
+        TopicPolicyConfig: {
+          TopicsConfig: { Name: string; Definition: string; Examples: string[] }[];
+        };
+      };
+    }[];
+    const topics = guardrail?.Properties.TopicPolicyConfig.TopicsConfig ?? [];
+    expect(topics.length).toBeGreaterThanOrEqual(4);
+    // Bedrock's limits: names without umlauts, short definitions, at most five examples of at
+    // most 100 characters.
+    for (const topic of topics) {
+      expect(topic.Name).toMatch(/^[0-9a-zA-Z-_ !?.]{1,100}$/);
+      expect(topic.Definition.length).toBeLessThanOrEqual(200);
+      expect(topic.Examples.length).toBeLessThanOrEqual(5);
+      expect(topic.Examples.every((e) => e.length <= 100)).toBe(true);
+    }
+    // A fixed version, published anew when the policies change.
+    template.hasResourceProperties('AWS::Bedrock::GuardrailVersion', {
+      GuardrailIdentifier: { 'Fn::GetAtt': [Match.stringLikeRegexp('^Guardrail'), 'GuardrailId'] },
+      Description: Match.stringLikeRegexp('^Policies [0-9a-f]{12}$'),
+    });
+  });
+
+  it('lets the runtime apply only this guardrail, in the regions of its profile', () => {
+    const profile = (region: string) => ({
+      'Fn::Join': [
+        '',
+        [
+          'arn:',
+          { Ref: 'AWS::Partition' },
+          `:bedrock:${region}:123456789012:guardrail-profile/eu.guardrail.v1:0`,
+        ],
+      ],
+    });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          {
+            Effect: 'Allow',
+            Action: 'bedrock:ApplyGuardrail',
+            Resource: [
+              { 'Fn::GetAtt': [Match.stringLikeRegexp('^Guardrail'), 'GuardrailArn'] },
+              ...stage.assistant.guardrailProfile.regions.map(profile),
+            ],
+          },
+        ]),
+      },
+    });
   });
 
   it('writes usage logs and delivers traces to X-Ray', () => {

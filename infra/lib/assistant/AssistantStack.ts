@@ -24,6 +24,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import { ssmParameters } from '../config/ssm';
 import type { StageConfig } from '../config/stages';
+import { AssistantGuardrail } from './guardrail';
 
 export interface AssistantStackProps extends StackProps {
   readonly stage: StageConfig;
@@ -70,7 +71,8 @@ export function gatewayToolDefinitions(): agentcore.ToolDefinition[] {
 /**
  * The Beet-Assistent on the AgentCore Runtime: Python code (Strands Agents) deployed as zip,
  * reachable only with a Cognito ID token of the groups in the stage config. The role may
- * call exactly the configured model and count questions in the quota table.
+ * call exactly the configured model, apply exactly its guardrail and count questions in the
+ * quota table.
  *
  * Its tools come from an AgentCore Gateway (MCP) that accepts the same ID tokens. A request
  * interceptor hands the caller's token to the tool Lambda, which reads beds and catalogue
@@ -81,6 +83,7 @@ export class AssistantStack extends Stack {
   readonly gateway: agentcore.Gateway;
   readonly tools: NodejsFunction;
   readonly interceptor: NodejsFunction;
+  readonly guardrail: AssistantGuardrail;
   private readonly stageModel: string;
 
   constructor(scope: Construct, id: string, props: AssistantStackProps) {
@@ -176,6 +179,11 @@ export class AssistantStack extends Stack {
     const gatewayUrl = this.gateway.gatewayUrl;
     if (!gatewayUrl) throw new Error('The gateway has no URL attribute.');
 
+    this.guardrail = new AssistantGuardrail(this, 'Guardrail', {
+      stageName: props.stage.name,
+      assistant,
+    });
+
     const usageLogs = new logs.LogGroup(this, 'UsageLogs', {
       logGroupName: `/aws/vendedlogs/bedrock-agentcore/${props.stage.name}-bed-assistant-usage`,
       retention: logs.RetentionDays.ONE_MONTH,
@@ -205,6 +213,8 @@ export class AssistantStack extends Stack {
         SUGGESTION_ROUNDS: String(assistant.suggestionRounds),
         MEMORY_ID: memoryId,
         HISTORY_MESSAGES: String(assistant.historyMessages),
+        GUARDRAIL_ID: this.guardrail.guardrail.attrGuardrailId,
+        GUARDRAIL_VERSION: this.guardrail.version.attrVersion,
         // ADOT in the agent (bed_assistant.telemetry); spans without conversation content.
         TRACING: 'true',
         SERVICE_NAME: `${props.stage.name}_bed_assistant`,
@@ -228,6 +238,13 @@ export class AssistantStack extends Stack {
           `arn:${this.partition}:bedrock:${this.region}:${this.account}:inference-profile/${assistant.modelId}`,
           `arn:${this.partition}:bedrock:*::foundation-model/${assistant.foundationModelId}`,
         ],
+      }),
+    );
+    // Exactly this guardrail, through its cross-region profile (T-63).
+    this.runtime.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:ApplyGuardrail'],
+        resources: this.guardrail.resourceArns,
       }),
     );
     this.runtime.addToRolePolicy(

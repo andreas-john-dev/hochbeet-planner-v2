@@ -1,6 +1,7 @@
 import { expect, open, signInAs, test, USERS } from './fixtures';
 import {
   askAssistant,
+  BLOCKED_ANSWER,
   exhaustAssistantQuota,
   MOCK_ANSWER,
   openAssistant,
@@ -37,6 +38,18 @@ test.describe('assistant chat', () => {
     await expect(log).not.toContainText('**');
     await expect(page.getByText('Noch 19 Fragen heute.')).toBeVisible();
     await expect(input).toHaveValue('');
+  });
+
+  test('shows the guardrail message for a blocked question like an answer', async ({ page }) => {
+    await open(page, EDITOR, 'Hochbeet Süd');
+    const input = await openAssistant(page);
+    // The mock blocks questions with this word, as the guardrail blocks off-topic ones.
+    await input.fill('Wer wird Fußball-Weltmeister?');
+    await page.getByRole('button', { name: 'Fragen' }).click();
+    const log = page.getByRole('log');
+    await expect(log.locator('[data-role="assistant"]').getByText(BLOCKED_ANSWER)).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByText('Noch 19 Fragen heute.')).toBeVisible();
   });
 
   test('can cancel an answer while it streams', async ({ page }) => {

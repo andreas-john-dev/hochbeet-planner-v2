@@ -12,7 +12,7 @@ Eine CDK-App in TypeScript deployt acht Stacks nach `eu-central-1` und den Zerti
 | `Prod-GardenStateful` | DynamoDB-Tabelle | – |
 | `Prod-GardenStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
 | `Prod-AssistantStateful` | DynamoDB-Tabelle für das Tageskontingent des Assistenten (TTL), AgentCore Memory des Assistenten (T-44) | – |
-| `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer und Usage-Logs; AgentCore Gateway mit Tool-Lambda und Request-Interceptor | User Pool, Kontingent-Tabelle; Garden- und Catalog-API über die Domain |
+| `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer und Usage-Logs; Bedrock Guardrail mit fester Version (T-63); AgentCore Gateway mit Tool-Lambda und Request-Interceptor | User Pool, Kontingent-Tabelle; Garden- und Catalog-API über die Domain |
 | `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
 | `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds; `/api/assistant/*` zur AgentCore Runtime | User Pool, API-URLs, Runtime-ARN; Zertifikat per Cross-Region-Referenz |
 

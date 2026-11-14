@@ -62,7 +62,7 @@ Der Browser meldet sich bei Cognito an und erreicht SPA, beide APIs und den Assi
 | Pflanzenkatalog | `services/catalog`, `packages/catalog-seed`, `packages/plant-icons` | Globale, angepasste und eigene Sorten, Veröffentlichung über den Admin, Startkatalog, Icons | [catalog.md](./architecture/catalog.md) |
 | Garden-Service | `services/garden` | Beete und Pflanzungen je User, Übernahme aus dem Gastmodus | [garden.md](./architecture/garden.md) |
 | Backend allgemein | `packages/service-kit` | HTTP API + Lambdalith (Hono), Auth aus dem JWT, Logging, deutsche Fehler | [backend.md](./architecture/backend.md) |
-| Beet-Assistent | `agents/bed-assistant`, `services/assistant-tools` | Strands-Agent auf AgentCore mit Kostengrenzen, Gateway-Tools, Gedächtnis, Pflanzvorschlägen und Tracing | [assistant.md](./architecture/assistant.md) |
+| Beet-Assistent | `agents/bed-assistant`, `services/assistant-tools` | Strands-Agent auf AgentCore mit Kostengrenzen, Guardrail, Gateway-Tools, Gedächtnis, Pflanzvorschlägen und Tracing | [assistant.md](./architecture/assistant.md) |
 | Frontend | `apps/web` | React-SPA mit Katalog, Beet-Editor, Gastmodus, Anmeldung und Mobile-Bedienung | [frontend.md](./architecture/frontend.md) |
 | Infrastruktur | `infra` | CDK-Stacks, CloudFront, SSM-Parameter, Cognito, cdk-nag | [infrastructure.md](./architecture/infrastructure.md) |
 | Tests und CI/CD | `e2e`, `.github/workflows` | Teststrategie, Playwright, Pipeline, Deploy nach `prod` | [testing.md](./architecture/testing.md) |

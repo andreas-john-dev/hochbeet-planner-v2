@@ -4,6 +4,10 @@ import { expect, type Page } from '@playwright/test';
 export const MOCK_ANSWER =
   'Gern! Ich habe mir dein Beet angesehen. Tomaten vertragen sich gut mit Basilikum, halte aber 50 cm Abstand zwischen den Pflanzen.';
 
+/** What the guardrail answers to a blocked question (ASSISTANT_BLOCKED_MESSAGES.input). */
+export const BLOCKED_ANSWER =
+  'Dabei kann ich dir leider nicht helfen. Frag mich gern etwas zu deinen Beeten, Pflanzen oder zur Anzucht.';
+
 /** Questions to the mock assistant per user and day (MockStore, ASSISTANT_QUOTA_KEY). */
 const QUOTA_KEY = 'hochbeet-mock-assistant';
 

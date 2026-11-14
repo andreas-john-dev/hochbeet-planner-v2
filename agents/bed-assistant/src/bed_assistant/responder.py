@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import date
 from typing import Any, Protocol
 
+import boto3
 from bedrock_agentcore.memory.integrations.strands.config import (
     AgentCoreMemoryConfig,
     RetrievalConfig,
@@ -40,6 +41,16 @@ logger = logging.getLogger("bed_assistant")
 RECALL_TOP_K = 5
 RECALL_MIN_SCORE = 0.3
 
+#: Shown when the guardrail blocks and Bedrock sends no text of its own. The guardrail answers
+#: with the same text: ASSISTANT_BLOCKED_MESSAGES.input in packages/contracts.
+BLOCKED_MESSAGE = (
+    "Dabei kann ich dir leider nicht helfen. Frag mich gern etwas zu deinen Beeten, Pflanzen "
+    "oder zur Anzucht."
+)
+
+#: Replaces a blocked question in the conversation, so it is neither kept nor sent again.
+REDACTED_QUESTION = "[Vom Schutzfilter entfernte Frage]"
+
 #: Tool result the model gets once a question has used up its tool calls.
 TOOL_LIMIT_MESSAGE = (
     "Für diese Frage sind keine weiteren Werkzeugaufrufe mehr möglich. "
@@ -51,6 +62,52 @@ class Responder(Protocol):
     def stream(self, prompt: str, caller: Caller, session_id: str | None) -> AsyncIterator[str]: ...
 
     async def suggest(self, question: str, caller: Caller, bed_id: str) -> SuggestionResult: ...
+
+
+class GuardrailCheck(Protocol):
+    def blocked(self, text: str) -> str | None:
+        """The German message if the guardrail blocks `text` as user input, else None."""
+        ...
+
+
+class BedrockGuardrailCheck:
+    """Checks a text with ApplyGuardrail: the same guardrail and version as the model's."""
+
+    def __init__(self, client: Any, settings: Settings) -> None:
+        self._client = client
+        self._settings = settings
+
+    def blocked(self, text: str) -> str | None:
+        response = self._client.apply_guardrail(
+            guardrailIdentifier=self._settings.guardrail_id,
+            guardrailVersion=self._settings.guardrail_version,
+            source="INPUT",
+            content=[{"text": {"text": text}}],
+        )
+        # Without masking filters (PII), every intervention is a block.
+        if response.get("action") != "GUARDRAIL_INTERVENED":
+            return None
+        message = "".join(str(o.get("text", "")) for o in response.get("outputs") or [])
+        return message.strip() or BLOCKED_MESSAGE
+
+
+def guardrail_config(settings: Settings) -> dict[str, Any]:
+    """
+    BedrockModel settings for the guardrail, none without one. Bedrock checks the latest user
+    text of the conversation (Strands wraps it in guardContent on every model call of the
+    question), not the older messages, and the answer while it streams (sync: chunks only leave
+    after their check). Tool results and tool inputs are never checked by Bedrock. A blocked
+    question is replaced in the conversation, also in AgentCore Memory.
+    """
+    if not (settings.guardrail_id and settings.guardrail_version):
+        return {}
+    return {
+        "guardrail_id": settings.guardrail_id,
+        "guardrail_version": settings.guardrail_version,
+        "guardrail_latest_message": True,
+        "guardrail_stream_processing_mode": "sync",
+        "guardrail_redact_input_message": REDACTED_QUESTION,
+    }
 
 
 class ToolCallLimit(HookProvider):
@@ -117,7 +174,9 @@ class StrandsResponder:
     conversation (session) and knows the caller's preferences; otherwise every question stands
     alone. Its tools come from the AgentCore Gateway with the caller's token, so it only ever
     reads the caller's own data; `max_tool_calls`, `max_tokens` and `history_messages` cap the
-    cost of one question.
+    cost of one question. With a guardrail configured, Bedrock checks questions and answers of
+    the chat; a wish for suggestions is checked once up front (`guardrail`), because their
+    answer is tool input, which the guardrail never sees.
     """
 
     def __init__(
@@ -128,6 +187,7 @@ class StrandsResponder:
         memory: MemoryStore | None = None,
         session_factory: Callable[[Settings, str, str], Any] = memory_session,
         observe: Callable[[Agent], None] | None = None,
+        guardrail: GuardrailCheck | None = None,
     ) -> None:
         self._settings = settings
         self._client_factory = client_factory
@@ -135,20 +195,34 @@ class StrandsResponder:
         self._session_factory = session_factory
         #: Sees each agent after its answer, e.g. its token usage (model comparison, T-45).
         self._observe = observe
-        self._model = BedrockModel(
-            model_id=settings.model_id,
-            region_name=settings.region,
-            max_tokens=settings.max_tokens,
-            temperature=0.3,
-        )
+        model: dict[str, Any] = {
+            "model_id": settings.model_id,
+            "region_name": settings.region,
+            "max_tokens": settings.max_tokens,
+            "temperature": 0.3,
+        }
+        guarded = guardrail_config(settings)
+        self._model = BedrockModel(**model, **guarded)
+        self._suggestion_model = BedrockModel(**model)
+        if guardrail is None and guarded:
+            guardrail = BedrockGuardrailCheck(
+                boto3.client("bedrock-runtime", region_name=settings.region), settings
+            )
+        self._guardrail = guardrail
 
-    def agent(self, caller: Caller, client: Any = None, session_id: str | None = None) -> Agent:
+    def agent(
+        self,
+        caller: Caller,
+        client: Any = None,
+        session_id: str | None = None,
+        model: BedrockModel | None = None,
+    ) -> Agent:
         if client is None and self._settings.gateway_url:
             client = self._client_factory(self._settings.gateway_url, caller.token)
         tools = [client] if client is not None else []
         session = memory_session_id(session_id) if self._settings.memory_id else None
         return Agent(
-            model=self._model,
+            model=model or self._model,
             system_prompt=SYSTEM_PROMPT,
             tools=tools,
             hooks=[ToolCallLimit(self._settings.max_tool_calls)],
@@ -173,7 +247,11 @@ class StrandsResponder:
         try:
             used_tool = False
             emitted = False
+            blocked = False
             async for event in agent.stream_async(prompt):
+                result = event.get("result")
+                if getattr(result, "stop_reason", None) == "guardrail_intervened":
+                    blocked = True
                 if "current_tool_use" in event:
                     used_tool = True
                 text = event.get("data")
@@ -184,6 +262,11 @@ class StrandsResponder:
                     used_tool = False
                     emitted = True
                     yield text
+            if blocked:
+                # Counted without content: the question stays out of the logs.
+                logger.info("guardrail intervened")
+                if not emitted:
+                    yield BLOCKED_MESSAGE
         finally:
             self._done(agent)
 
@@ -192,12 +275,18 @@ class StrandsResponder:
         Checked planting suggestions; one agent and gateway session for all rounds. The model
         only looks up plants (`SUGGESTION_TOOLS`); the bed and the checks come from the code.
         The rounds are not stored as conversation, but the caller's fitting preferences go into
-        the prompt. The whole request ends after `suggestion_seconds`.
+        the prompt. The whole request ends after `suggestion_seconds`. A wish the guardrail
+        blocks ends before any model call, with its message as the summary.
         """
         if not self._settings.gateway_url:
             raise SuggestionError("Pflanzvorschläge sind gerade nicht verfügbar.")
+        if self._guardrail is not None:
+            blocked = await asyncio.to_thread(self._guardrail.blocked, question)
+            if blocked:
+                logger.info("guardrail intervened")
+                return SuggestionResult([], [], blocked, 0)
         client = self._client_factory(self._settings.gateway_url, caller.token, SUGGESTION_TOOLS)
-        agent = self.agent(caller, client)
+        agent = self.agent(caller, client, model=self._suggestion_model)
         model = suggestion_list_model()
         preferences = await self.recall(caller, question)
 
