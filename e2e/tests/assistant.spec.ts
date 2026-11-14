@@ -32,6 +32,9 @@ test.describe('assistant chat', () => {
     // The first chunk is there before the answer is complete.
     await expect(log.getByText(/Gern!/)).toBeVisible();
     await expect(log.getByText(MOCK_ANSWER)).toBeVisible();
+    // The answer's Markdown is rendered, also across chunks: bold, without the stars.
+    await expect(log.locator('[data-role="assistant"] strong')).toHaveText('Basilikum');
+    await expect(log).not.toContainText('**');
     await expect(page.getByText('Noch 19 Fragen heute.')).toBeVisible();
     await expect(input).toHaveValue('');
   });

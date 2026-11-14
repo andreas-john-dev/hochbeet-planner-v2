@@ -18,12 +18,17 @@ export const MOCK_ASSISTANT_DAILY_LIMIT = 20;
 /** Pause between two chunks, so the answer visibly streams in and can be cancelled. */
 const CHUNK_DELAY_MS = 150;
 
-/** The fixed answer of the mock, in chunks; mentions the bed when the question has one. */
+/**
+ * The fixed answer of the mock, in chunks and with a bold word; mentions the bed when the
+ * question has one.
+ */
 export function mockAnswer(bedId: string | undefined): string[] {
   return [
     'Gern! ',
     ...(bedId ? ['Ich habe mir dein Beet angesehen. '] : []),
-    'Tomaten vertragen sich gut mit Basilikum, ',
+    // Markdown like the real assistant; the closing stars come in the next chunk.
+    'Tomaten vertragen sich gut mit **Basili',
+    'kum**, ',
     'halte aber 50 cm Abstand zwischen den Pflanzen.',
   ];
 }

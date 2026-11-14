@@ -1,6 +1,7 @@
 import type { Severity } from '@hochbeet/garden-rules';
 import { Check, CheckCheck, X } from 'lucide-react';
 import { useEffect, useId, useRef } from 'react';
+import { MarkdownInline } from '@/components/Markdown';
 import { Button } from '@/components/ui/button';
 import type { ShownSuggestion } from '@/lib/editor/suggestions';
 import { cn } from '@/lib/utils';
@@ -84,7 +85,9 @@ export function SuggestionList({
                   Übernehmen
                 </Button>
               </div>
-              <p>{item.suggestion.reason}</p>
+              <p>
+                <MarkdownInline text={item.suggestion.reason} />
+              </p>
             </li>
           ))}
         </ul>
