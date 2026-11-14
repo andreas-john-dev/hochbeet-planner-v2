@@ -16,7 +16,13 @@ import type {
   SowingBatch,
   SowingBatchFields,
 } from '@hochbeet/contracts';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type UseQueryResult,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useApi } from './api-context';
 
 export const queryKeys = {
@@ -42,6 +48,35 @@ export function useBedWithPlantings(bedId: string) {
     queryKey: queryKeys.bed(bedId),
     queryFn: () => api<BedWithPlantingsResponse>(`/api/garden/beds/${bedId}`),
   });
+}
+
+/** All plantings once every bed is loaded; pending while one is, with the first error. */
+function combinePlantings(results: UseQueryResult<BedWithPlantingsResponse>[]) {
+  const loaded = results.flatMap((r) => (r.data ? [r.data.plantings] : []));
+  return {
+    data: loaded.length === results.length ? loaded.flat() : undefined,
+    isPending: results.some((r) => r.isPending),
+    error: results.find((r) => r.error)?.error ?? null,
+  };
+}
+
+/** The plantings of all beds, loaded per bed with the same cache as the editor. */
+export function useAllPlantings() {
+  const api = useApi();
+  const beds = useBeds();
+  const plantings = useQueries({
+    queries: (beds.data ?? []).map((bed) => ({
+      queryKey: queryKeys.bed(bed.id),
+      queryFn: () => api<BedWithPlantingsResponse>(`/api/garden/beds/${bed.id}`),
+    })),
+    combine: combinePlantings,
+  });
+  return {
+    beds: beds.data,
+    plantings: beds.data ? plantings.data : undefined,
+    isPending: beds.isPending || plantings.isPending,
+    error: beds.error ?? plantings.error,
+  };
 }
 
 /** Garden settings such as the last frost; the defaults while nothing is saved (and for guests). */

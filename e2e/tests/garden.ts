@@ -240,3 +240,34 @@ export const sowingsGarden: Garden = {
     }),
   ],
 };
+
+export const PLAN_BED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0S2A';
+export const planId = (n: number) => `01J9ZQ3W8D6V2K5M7N8P9R0U${String(n).padStart(2, '0')}`;
+
+/**
+ * A bed planned for May 2027 without any batch: 4 tomatoes and 12 lettuces in two rows of 6,
+ * all planted out in KW 20. The raising plan sows the tomatoes in KW 11, the lettuce in KW 16.
+ */
+export const sowingPlanGarden: Garden = {
+  beds: [{ ...bed(PLAN_BED_ID, 'Beet Mai', 200, 120), mainRowDirection: 'H' }],
+  plantings: [
+    ...[
+      { x: 30, y: 30 },
+      { x: 90, y: 30 },
+      { x: 150, y: 30 },
+      { x: 170, y: 95 },
+    ].map((at, i) =>
+      planting(planId(i + 1), PLAN_BED_ID, PLANTS.tomato, { ...at, startDate: '2027-05-17' }),
+    ),
+    ...[70, 100].map((y, i) =>
+      planting(planId(i + 5), PLAN_BED_ID, PLANTS.lettuce, {
+        kind: 'ROW',
+        orientation: 'H',
+        lengthCm: 125,
+        x: 15,
+        y,
+        startDate: '2027-05-17',
+      }),
+    ),
+  ],
+};

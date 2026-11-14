@@ -6,6 +6,7 @@ import {
   type Garden,
   PENDING_ID,
   pendingRequest,
+  sowingPlanGarden,
   sowingsGarden,
 } from './garden';
 
@@ -80,6 +81,21 @@ export const appPages: readonly AppPage[] = [
     access: 'user',
     navLabel: 'Anzucht',
     seed: sowingsGarden,
+  },
+  {
+    // The raising plan from the beds: tomatoes and lettuce for May 2027.
+    id: 'anzucht-plan',
+    path: '/anzucht',
+    heading: 'Anzucht',
+    access: 'user',
+    seed: sowingPlanGarden,
+    setup: async (page) => {
+      await page.getByRole('button', { name: 'Anzuchtplan' }).click();
+      await page
+        .getByRole('dialog', { name: 'Anzuchtplan' })
+        .getByRole('row', { name: /Tomate/ })
+        .waitFor();
+    },
   },
   {
     id: 'katalog',

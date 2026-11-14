@@ -1,4 +1,4 @@
-import type { Plant, SowingWithPlantings } from '@hochbeet/contracts';
+import type { Plant, SowingBatch, SowingWithPlantings } from '@hochbeet/contracts';
 import type { SowingInfo } from './context';
 import { type CountablePlanting, plantCount } from './geometry';
 
@@ -27,4 +27,16 @@ export function sowingInfos(
       { sowing: item.sowing, planned: plannedCount(item, plants) },
     ]),
   );
+}
+
+/**
+ * What a batch has to give: before germination (`PLANNED`, `SOWN`) the seeds planned or sown,
+ * afterwards the seedlings alive.
+ */
+export function batchStock(
+  sowing: Pick<SowingBatch, 'stage' | 'sownCount' | 'aliveCount'>,
+): number {
+  return sowing.stage === 'PLANNED' || sowing.stage === 'SOWN'
+    ? sowing.sownCount
+    : sowing.aliveCount;
 }
