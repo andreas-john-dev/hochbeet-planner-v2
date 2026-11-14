@@ -1,11 +1,12 @@
 import { formatWeek } from '@hochbeet/garden-rules';
-import { CalendarDays, Plus, Sprout } from 'lucide-react';
+import { CalendarDays, ListChecks, Plus, Sprout } from 'lucide-react';
 import { useState } from 'react';
 import { BedCard } from '@/components/beds/BedCard';
 import { BedFormDialog } from '@/components/beds/BedFormDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { SowingPlanDialog } from '@/components/sowings/SowingPlanDialog';
 import { Button } from '@/components/ui/button';
 import { useBeds } from '@/lib/garden';
 
@@ -14,6 +15,7 @@ export function BedsPage() {
   const { range, week } = formatWeek(today);
   const beds = useBeds();
   const [creating, setCreating] = useState(false);
+  const [planning, setPlanning] = useState(false);
   const openCreate = () => {
     setCreating(true);
   };
@@ -28,10 +30,21 @@ export function BedsPage() {
             <span className="text-muted-foreground text-xs">{week}</span>
           </p>
           {beds.data && beds.data.length > 0 && (
-            <Button onClick={openCreate}>
-              <Plus aria-hidden />
-              Beet anlegen
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPlanning(true);
+                }}
+              >
+                <ListChecks aria-hidden />
+                Anzuchtplan
+              </Button>
+              <Button onClick={openCreate}>
+                <Plus aria-hidden />
+                Beet anlegen
+              </Button>
+            </>
           )}
         </div>
       </PageHeader>
@@ -73,6 +86,7 @@ export function BedsPage() {
       )}
 
       <BedFormDialog open={creating} onOpenChange={setCreating} />
+      <SowingPlanDialog open={planning} onOpenChange={setPlanning} />
     </>
   );
 }

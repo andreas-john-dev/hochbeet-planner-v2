@@ -8,6 +8,7 @@ import {
   type SowingWithPlantings,
 } from '@hochbeet/contracts';
 import {
+  batchStock,
   formatWeek,
   lastFrostDate,
   plantCount,
@@ -236,7 +237,8 @@ export function availableSowings(
 
 /**
  * Where a planting's seedlings come from, e.g. „Aus der Anzucht vom 14. – 20. September
- * 2026, 6 von 18“; undefined without a batch or for a deleted one.
+ * 2026, 6 von 18“ (before germination of the seeds planned or sown); undefined without a
+ * batch or for a deleted one.
  */
 export function originText(
   planting: Planting,
@@ -247,5 +249,5 @@ export function originText(
   if (!item) return undefined;
   return `Aus der Anzucht vom ${formatWeek(item.sowing.sowDate).range}, ${String(
     plantCount(planting, plant),
-  )} von ${String(item.sowing.aliveCount)}`;
+  )} von ${String(batchStock(item.sowing))}`;
 }

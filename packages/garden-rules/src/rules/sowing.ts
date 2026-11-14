@@ -3,6 +3,7 @@ import { format, getISOWeek, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { ResolvedPlanting, RuleContext, SowingInfo } from '../context';
 import type { Finding, SowingFinding } from '../findings';
+import { batchStock } from '../sowings';
 import { type Interval, lastFrostDate } from '../time';
 
 /** Weeks the seedlings stay in the raising after the longest raising time before a hint. */
@@ -25,12 +26,20 @@ function dayText(lastFrost: string): string {
   return format(new Date(2001, month - 1, day), 'd. MMMM', { locale: de });
 }
 
-/** Planned more seedlings than are alive; done batches count as used up, not as a mistake. */
+/**
+ * Planned more than the batch has (seeds before germination, seedlings after); done batches
+ * count as used up, not as a mistake.
+ */
 const overplanned = ({ sowing, planned }: SowingInfo) =>
-  sowing.stage !== 'DONE' && planned !== undefined && planned > sowing.aliveCount;
+  sowing.stage !== 'DONE' && planned !== undefined && planned > batchStock(sowing);
 
-const overplannedText = ({ sowing, planned }: SowingInfo) =>
-  `${String(planned ?? 0)} verplant, aber nur ${String(sowing.aliveCount)} vorhanden`;
+const STOCK_WORD = { PLANNED: 'geplant', SOWN: 'gesät' } as const;
+
+const overplannedText = ({ sowing, planned }: SowingInfo) => {
+  const word =
+    sowing.stage === 'PLANNED' || sowing.stage === 'SOWN' ? STOCK_WORD[sowing.stage] : 'vorhanden';
+  return `${String(planned ?? 0)} verplant, aber nur ${String(batchStock(sowing))} ${word}`;
+};
 
 /** From the earliest start to the latest end; open as soon as one planting is. */
 function span(intervals: readonly Interval[]): Interval {

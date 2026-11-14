@@ -1,12 +1,13 @@
 import { evaluateSowings, type SowingFinding } from '@hochbeet/garden-rules';
 import { Link } from '@tanstack/react-router';
-import { Bean, Plus } from 'lucide-react';
+import { Bean, ListChecks, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SowingCard } from '@/components/sowings/SowingCard';
 import { SowingFormDialog } from '@/components/sowings/SowingFormDialog';
+import { SowingPlanDialog } from '@/components/sowings/SowingPlanDialog';
 import { Button } from '@/components/ui/button';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
@@ -29,6 +30,7 @@ export function SowingsPage() {
   const plants = usePlants();
   const [filter, setFilter] = useState<SowingFilter>('active');
   const [creating, setCreating] = useState(false);
+  const [planning, setPlanning] = useState(false);
   const openCreate = () => {
     setCreating(true);
   };
@@ -53,12 +55,23 @@ export function SowingsPage() {
         title="Anzucht"
         description="Was du vorziehst, von der Saat bis ins Beet, mit dem Bestand an Jungpflanzen."
       >
-        {all.length > 0 && (
-          <Button onClick={openCreate}>
-            <Plus aria-hidden />
-            Neue Anzucht
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setPlanning(true);
+            }}
+          >
+            <ListChecks aria-hidden />
+            Anzuchtplan
           </Button>
-        )}
+          {all.length > 0 && (
+            <Button onClick={openCreate}>
+              <Plus aria-hidden />
+              Neue Anzucht
+            </Button>
+          )}
+        </div>
       </PageHeader>
 
       {pending && !error && <SkeletonList label="Anzuchten werden geladen …" count={4} />}
@@ -138,6 +151,7 @@ export function SowingsPage() {
         </div>
       )}
 
+      <SowingPlanDialog open={planning} onOpenChange={setPlanning} />
       {creating && <SowingFormDialog plants={plants.data ?? []} open onOpenChange={setCreating} />}
     </>
   );

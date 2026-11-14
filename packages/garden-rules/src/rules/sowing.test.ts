@@ -145,6 +145,30 @@ describe('findings at sowing batches', () => {
     ]);
   });
 
+  it('counts the seeds before germination, the seedlings after', () => {
+    const six = row('r', 'lettuce', 0, 0, 'H', 125, { sowingId: 's' });
+    // Nothing alive yet: planned or sown seeds are the stock.
+    const seeds = { sownCount: 8, aliveCount: 0 };
+    expect(of(batch('s', 'lettuce', { ...seeds, stage: 'PLANNED' }, [six]))).toEqual([]);
+    expect(of(batch('s', 'lettuce', { ...seeds, stage: 'SOWN' }, [six]))).toEqual([]);
+    expect(
+      of(batch('s', 'lettuce', { sownCount: 5, aliveCount: 0, stage: 'PLANNED' }, [six])),
+    ).toEqual([
+      expect.objectContaining({
+        rule: 'OVERPLANNED',
+        message: 'Mehr in Beeten verplant als vorhanden: 6 verplant, aber nur 5 geplant.',
+      }),
+    ]);
+    const sown = of(batch('s', 'lettuce', { sownCount: 5, aliveCount: 0, stage: 'SOWN' }, [six]));
+    expect(sown.map((f) => f.message)).toEqual([
+      'Mehr in Beeten verplant als vorhanden: 6 verplant, aber nur 5 gesät.',
+    ]);
+    // After germination only the seedlings alive count.
+    expect(
+      of(batch('s', 'lettuce', { sownCount: 8, aliveCount: 5, stage: 'GERMINATED' }, [six])),
+    ).toEqual([expect.objectContaining({ rule: 'OVERPLANNED' })]);
+  });
+
   it('hints at planting out a frost sensitive plant on or before the last frost', () => {
     const planned = (date: string) =>
       batch('t', 'tomato', { sowDate: '2026-03-16', plannedTransplantDate: date });

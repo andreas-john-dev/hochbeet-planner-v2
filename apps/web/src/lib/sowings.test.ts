@@ -227,5 +227,12 @@ describe('planting out in the editor', () => {
       'Aus der Anzucht vom 14. – 20. September 2026, 6 von 18',
     );
     expect(originText({ ...planting, sowingId: 'deleted' }, sowings, lettuce)).toBeUndefined();
+    // Before germination the planned seeds count.
+    const planned = [
+      item(batch('a', '2026-09-14', { stage: 'PLANNED', sownCount: 8, aliveCount: 0 })),
+    ];
+    expect(originText(planting, planned, lettuce)).toBe(
+      'Aus der Anzucht vom 14. – 20. September 2026, 6 von 8',
+    );
   });
 });

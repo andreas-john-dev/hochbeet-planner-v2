@@ -54,7 +54,7 @@ Eine Sorte, in einer Woche ausgesät und als Jungpflanzen vorgezogen (Epic #121)
 | `plannedTransplantDate` | ISO-Datum, optional | Geplantes Auspflanzen, Montag nach der Aussaatwoche |
 | `notes` | string, optional | Notiz, höchstens 500 Zeichen |
 
-Was schon in Beeten steht, wird nicht gespeichert, sondern berechnet: **verplant** = Summe der Stückzahlen aller verknüpften Pflanzungen (`plannedCount(batch, plants)` mit der effektiven Sorte), **verfügbar** = Bestand − verplant. Ändert sich eine Reihe, stimmen die Zahlen sofort. Wird eine Charge gelöscht, behalten ihre Pflanzungen die `sowingId`; App und Regeln behandeln sie wie „keine Charge“.
+Was schon in Beeten steht, wird nicht gespeichert, sondern berechnet: **verplant** = Summe der Stückzahlen aller verknüpften Pflanzungen (`plannedCount(batch, plants)` mit der effektiven Sorte), **verfügbar** = Bestand − verplant. Für die Warnung „mehr verplant als vorhanden“ zählt vor der Keimung die geplante bzw. gesäte Menge als Bestand (`batchStock()`). Ändert sich eine Reihe, stimmen die Zahlen sofort. Wird eine Charge gelöscht, behalten ihre Pflanzungen die `sowingId`; App und Regeln behandeln sie wie „keine Charge“.
 
 ### Plant (Sorte)
 
