@@ -33,6 +33,10 @@ export interface AppPage {
   setup?: (page: Page) => Promise<void>;
 }
 
+/** Waits for the tasks of the week, which load after the page's heading. */
+const showWeeklyTasks = (page: Page) =>
+  page.getByRole('region', { name: 'Aufgaben' }).getByRole('listitem').first().waitFor();
+
 export const appPages: readonly AppPage[] = [
   { id: 'anmelden', path: '/anmelden', heading: 'Anmelden', access: 'public' },
   { id: 'registrieren', path: '/registrieren', heading: 'Registrieren', access: 'public' },
@@ -90,6 +94,7 @@ export const appPages: readonly AppPage[] = [
     heading: 'Anzucht',
     access: 'user',
     seed: weeklyTasksGarden,
+    setup: showWeeklyTasks,
   },
   {
     // The same tasks compact in the bed overview, with a link to the rest.
@@ -98,6 +103,7 @@ export const appPages: readonly AppPage[] = [
     heading: 'Meine Beete',
     access: 'user',
     seed: weeklyTasksGarden,
+    setup: showWeeklyTasks,
   },
   {
     // The raising plan from the beds: tomatoes and lettuce for May 2027.
