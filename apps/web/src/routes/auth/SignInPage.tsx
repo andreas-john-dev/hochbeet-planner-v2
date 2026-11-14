@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useRouter, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -13,13 +14,11 @@ import { AuthHeading } from './AuthLayout';
 import { TryWithoutAccount } from './TryWithoutAccount';
 import { parseSignInSearch } from './search';
 
-const notices = {
-  bestaetigt: 'Dein Konto ist bestätigt. Du kannst dich jetzt anmelden.',
-  passwort: 'Dein Passwort wurde geändert. Melde dich mit dem neuen Passwort an.',
-} as const;
+const notices = { bestaetigt: 'signIn.confirmed', passwort: 'signIn.passwordChanged' } as const;
 
 export function SignInPage() {
   const { redirect, hinweis, email } = parseSignInSearch(useSearch({ strict: false }));
+  const { t } = useTranslation('auth');
   const { adapter, refresh } = useAuth();
   const navigate = useNavigate();
   const router = useRouter();
@@ -51,19 +50,19 @@ export function SignInPage() {
 
   return (
     <>
-      <AuthHeading title="Anmelden" description="Willkommen zurück im Hochbeet-Planer." />
+      <AuthHeading title={t('signIn.title')} description={t('signIn.description')} />
       <form onSubmit={(e) => void onSubmit(e)} noValidate className="flex flex-col gap-4">
-        {hinweis && <FormMessage tone="success">{notices[hinweis]}</FormMessage>}
+        {hinweis && <FormMessage tone="success">{t(notices[hinweis])}</FormMessage>}
         {error && <FormMessage tone="error">{error}</FormMessage>}
         <FormField
-          label="E-Mail"
+          label={t('fields.email')}
           type="email"
           autoComplete="email"
           error={form.formState.errors.email?.message}
           {...form.register('email')}
         />
         <FormField
-          label="Passwort"
+          label={t('fields.password')}
           type="password"
           autoComplete="current-password"
           error={form.formState.errors.password?.message}
@@ -73,16 +72,16 @@ export function SignInPage() {
           to="/passwort-vergessen"
           className="text-primary -mt-1 self-end text-sm font-medium hover:underline"
         >
-          Passwort vergessen?
+          {t('signIn.forgotPassword')}
         </Link>
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? 'Anmelden …' : 'Anmelden'}
+          {form.formState.isSubmitting ? t('signIn.submitting') : t('signIn.submit')}
         </Button>
       </form>
       <p className="text-muted-foreground mt-6 text-center text-sm">
-        Noch kein Konto?{' '}
+        {t('signIn.noAccount')}{' '}
         <Link to="/registrieren" className="text-primary font-medium hover:underline">
-          Registrieren
+          {t('signIn.signUp')}
         </Link>
       </p>
       <TryWithoutAccount />

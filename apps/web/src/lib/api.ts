@@ -1,3 +1,5 @@
+import { currentLanguage, i18n } from './i18n';
+
 /** Thrown for non-2xx API responses. */
 export class ApiError extends Error {
   constructor(
@@ -17,19 +19,36 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 
 export type TokenProvider = () => Promise<string | null>;
 
+/** Language of the API's messages; the services answer in German without it. */
+export type LanguageProvider = () => string;
+
+/** Headers of every API call: ID token, language and, for a body, the JSON content type. */
+async function requestHeaders(
+  init: RequestInit,
+  getIdToken: TokenProvider,
+  getLanguage: LanguageProvider,
+): Promise<Headers> {
+  const headers = new Headers(init.headers);
+  const token = await getIdToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (!headers.has('Accept-Language')) headers.set('Accept-Language', getLanguage());
+  if (init.body !== undefined && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  return headers;
+}
+
 /**
  * Fetch wrapper for `/api/...` on the same domain. Sends the Cognito ID token as
- * Bearer token and parses JSON responses.
+ * Bearer token and the app's language as `Accept-Language`, and parses JSON responses.
  */
-export function createApiClient(getIdToken: TokenProvider, fetchFn: typeof fetch = fetch) {
+export function createApiClient(
+  getIdToken: TokenProvider,
+  fetchFn: typeof fetch = fetch,
+  getLanguage: LanguageProvider = currentLanguage,
+) {
   return async function apiFetch<T>(path: `/api/${string}`, init: RequestInit = {}): Promise<T> {
-    const headers = new Headers(init.headers);
-    const token = await getIdToken();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (init.body !== undefined && !headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
-
+    const headers = await requestHeaders(init, getIdToken, getLanguage);
     const response = await fetchFn(path, { ...init, headers });
     const text = await response.text();
     const body = parseBody(text);
@@ -43,17 +62,16 @@ export function createApiClient(getIdToken: TokenProvider, fetchFn: typeof fetch
  * stream (e.g. the assistant's server-sent events). Non-2xx responses still throw `ApiError`
  * with the parsed body.
  */
-export function createApiStream(getIdToken: TokenProvider, fetchFn: typeof fetch = fetch) {
+export function createApiStream(
+  getIdToken: TokenProvider,
+  fetchFn: typeof fetch = fetch,
+  getLanguage: LanguageProvider = currentLanguage,
+) {
   return async function apiStream(
     path: `/api/${string}`,
     init: RequestInit = {},
   ): Promise<Response> {
-    const headers = new Headers(init.headers);
-    const token = await getIdToken();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (init.body !== undefined && !headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
+    const headers = await requestHeaders(init, getIdToken, getLanguage);
     const response = await fetchFn(path, { ...init, headers });
     if (!response.ok) throw new ApiError(response.status, parseBody(await response.text()));
     return response;
@@ -75,24 +93,24 @@ function parseBody(text: string): unknown {
 export type ApiFetch = ReturnType<typeof createApiClient>;
 
 /**
- * German message of a failed API call: the service's `message` if it sent one, otherwise a
- * hint that matches the kind of failure.
+ * Message of a failed API call: the service's `message` if it sent one, otherwise a hint in
+ * the app's language that matches the kind of failure.
  */
 export function apiErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     const body = error.body as { message?: unknown } | undefined;
     if (typeof body?.message === 'string') return body.message;
-    if (error.status === 401) return 'Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.';
-    if (error.status === 403) return 'Dafür fehlt dir die Berechtigung.';
-    if (error.status === 404) return 'Das gibt es nicht mehr. Bitte lade die Seite neu.';
-    if (error.status === 429) return 'Zu viele Anfragen. Bitte versuche es später noch einmal.';
+    if (error.status === 401) return i18n.t('apiError.unauthorized');
+    if (error.status === 403) return i18n.t('apiError.forbidden');
+    if (error.status === 404) return i18n.t('apiError.notFound');
+    if (error.status === 429) return i18n.t('apiError.tooManyRequests');
     if (error.status >= 500) {
-      return 'Der Server hat gerade ein Problem. Bitte versuche es gleich noch einmal.';
+      return i18n.t('apiError.server');
     }
   }
   // fetch rejects with a TypeError when the network is down.
   if (error instanceof TypeError) {
-    return 'Keine Verbindung zum Server. Prüfe deine Internetverbindung und versuche es noch einmal.';
+    return i18n.t('apiError.offline');
   }
-  return 'Das hat nicht geklappt. Bitte versuche es noch einmal.';
+  return i18n.t('apiError.generic');
 }

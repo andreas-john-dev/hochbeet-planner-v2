@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { LogOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GuestImportDialog } from '@/components/GuestImportDialog';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
@@ -12,6 +13,7 @@ import { ThemeToggle } from './ThemeToggle';
 
 /** Sidebar on desktop, top bar and bottom navigation on phones; a banner in guest mode. */
 export function AppShell() {
+  const { t } = useTranslation('layout');
   const { user, guest } = useAuth();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const items = navItems.filter(
@@ -27,7 +29,7 @@ export function AppShell() {
         <Link to="/beete" className="rounded-md px-2 py-2">
           <Logo />
         </Link>
-        <nav aria-label="Hauptnavigation" className="mt-8 flex flex-col gap-1">
+        <nav aria-label={t('nav.label')} className="mt-8 flex flex-col gap-1">
           {items.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
@@ -39,13 +41,13 @@ export function AppShell() {
               )}
             >
               <Icon className="size-[18px]" aria-hidden />
-              {label}
+              {t(`nav.${label}`)}
             </Link>
           ))}
         </nav>
         <div className="mt-auto flex flex-col gap-1 border-t pt-3">
           <p className="text-muted-foreground truncate px-3 pb-1 text-xs" title={user?.email}>
-            {guest ? 'Gastmodus' : user?.email}
+            {guest ? t('guestMode') : user?.email}
           </p>
           <ThemeToggle showLabel />
           {!guest && <SignOutButton />}
@@ -71,7 +73,7 @@ export function AppShell() {
       </div>
 
       <nav
-        aria-label="Hauptnavigation"
+        aria-label={t('nav.label')}
         data-screenshot="bottom-nav"
         className="bg-background/95 fixed inset-x-0 bottom-0 z-10 grid auto-cols-fr grid-flow-col border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
@@ -82,7 +84,7 @@ export function AppShell() {
             className="text-muted-foreground data-[status=active]:text-primary flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium"
           >
             <Icon className="size-[22px]" aria-hidden />
-            {label}
+            {t(`nav.${label}`)}
           </Link>
         ))}
       </nav>
@@ -91,6 +93,7 @@ export function AppShell() {
 }
 
 export function SignOutButton({ variant = 'sidebar' }: { variant?: 'sidebar' | 'card' }) {
+  const { t } = useTranslation('layout');
   const { signOut } = useAuth();
   const navigate = useNavigate();
   return (
@@ -102,7 +105,7 @@ export function SignOutButton({ variant = 'sidebar' }: { variant?: 'sidebar' | '
       }}
     >
       <LogOut aria-hidden />
-      Abmelden
+      {t('signOut')}
     </Button>
   );
 }

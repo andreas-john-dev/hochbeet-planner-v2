@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, apiErrorMessage, createApiClient, shouldRetry } from './api';
+import { ApiError, apiErrorMessage, createApiClient, createApiStream, shouldRetry } from './api';
+import { i18n } from './i18n';
 
 describe('createApiClient', () => {
   it('sends the ID token and parses JSON', async () => {
@@ -10,6 +11,29 @@ describe('createApiClient', () => {
     const [path, init] = fetchFn.mock.calls[0] as [string, RequestInit];
     expect(path).toBe('/api/garden/beds');
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer id-token');
+  });
+
+  it('sends the language of the app as Accept-Language', async () => {
+    const fetchFn = vi.fn().mockImplementation(() => Promise.resolve(new Response('{}')));
+    const apiFetch = createApiClient(() => Promise.resolve(null), fetchFn);
+    await apiFetch('/api/garden/beds');
+    await i18n.changeLanguage('en');
+    await apiFetch('/api/garden/beds');
+    const languages = (fetchFn.mock.calls as [string, RequestInit][]).map(([, init]) =>
+      new Headers(init.headers).get('Accept-Language'),
+    );
+    expect(languages).toEqual(['de', 'en']);
+  });
+
+  it('sends the language with streams too', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response('data: {}'));
+    await createApiStream(
+      () => Promise.resolve('t'),
+      fetchFn,
+      () => 'en',
+    )('/api/assistant/x');
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get('Accept-Language')).toBe('en');
   });
 
   it('sets JSON content type for request bodies', async () => {
@@ -56,6 +80,13 @@ describe('apiErrorMessage', () => {
     expect(apiErrorMessage(new TypeError('Failed to fetch'))).toMatch(/Keine Verbindung/);
     expect(apiErrorMessage(new Error('?'))).toBe(
       'Das hat nicht geklappt. Bitte versuche es noch einmal.',
+    );
+  });
+
+  it('follows the language of the app', async () => {
+    await i18n.changeLanguage('en');
+    expect(apiErrorMessage(new ApiError(401, undefined))).toBe(
+      'Your session has expired. Please sign in again.',
     );
   });
 });

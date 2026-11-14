@@ -1,6 +1,6 @@
 # Frontend und Mobile-UX
 
-Teil der [Architektur](../architecture.md). React-SPA: Katalog, Beet-Editor, Anzucht, Barrierefreiheit, Bedienung nach Gerät, Laufzeitkonfiguration und Anmeldung.
+Teil der [Architektur](../architecture.md). React-SPA: Katalog, Beet-Editor, Anzucht, Barrierefreiheit, Mehrsprachigkeit, Bedienung nach Gerät, Laufzeitkonfiguration und Anmeldung.
 
 Das Frontend ist eine React-SPA, die auf Desktop und Smartphone gleich gut bedienbar ist.
 
@@ -15,7 +15,8 @@ Das Frontend ist eine React-SPA, die auf Desktop und Smartphone gleich gut bedie
 | Drag & Drop | dnd-kit (Pointer-Sensor), Tastatur über einen eigenen Platzier-Modus |
 | Zoom/Pan | Pinch-Zoom und Verschieben per Geste |
 | Auth | Amplify Library (`aws-amplify/auth`), Login, Registrierung, Passwort vergessen |
-| Datum | date-fns mit deutscher Locale |
+| Datum | date-fns mit der Locale der Sprache (`de` bzw. `enGB`) |
+| Texte | i18next mit react-i18next, Deutsch und Englisch |
 
 ## Katalogansicht
 
@@ -128,10 +129,34 @@ Umsetzung (Stand T-35):
 - **WCAG 2.1 AA:** `e2e/tests/a11y.spec.ts` prüft jede Seite aus `pages.ts` in Light- und Dark-Mode mit axe-core (Kontraste, Namen, Landmarks, Überschriften) in allen drei Playwright-Projekten. Dazu prüft ein Test per Tabulator, dass jedes fokussierte Element einen sichtbaren Fokus hat.
 - **Fokus:** Ein globaler `:focus-visible`-Rahmen (2 px in `--ring`) gilt für alles ohne eigenen Fokusring, z. B. die Navigation; Bedienelemente mit eigenem Ring behalten ihn.
 - **Ladezustände:** Skelette (`components/ui/skeleton.tsx`) in Form der Inhalte statt reiner Ladetexte; Screenreader hören den Ladetext einmal über `role="status"`.
-- **Fehlermeldungen:** `apiErrorMessage()` nimmt die deutsche Meldung des Service und unterscheidet sonst abgelaufene Anmeldung (401), fehlende Berechtigung (403), nicht mehr Vorhandenes (404), Serverprobleme (5xx) und fehlende Verbindung. Fehlerseiten von Proxys, die kein JSON sind, behalten ihren Status.
+- **Fehlermeldungen:** `apiErrorMessage()` nimmt die Meldung des Service und unterscheidet sonst, in der Sprache der App, abgelaufene Anmeldung (401), fehlende Berechtigung (403), nicht mehr Vorhandenes (404), Serverprobleme (5xx) und fehlende Verbindung. Fehlerseiten von Proxys, die kein JSON sind, behalten ihren Status.
 - **Übergänge:** Seiten blenden kurz ein, das Abdunkeln hinter Dialogen ebenso; mit „Bewegung reduzieren“ entfällt beides. Dialoginhalte selbst bewegen sich nicht, damit Fokus und Scrollposition beim Öffnen stabil bleiben.
 - **Lighthouse:** `pnpm --filter e2e lighthouse` misst den Produktions-Build in `vite preview` (Mock-Auth und -API aus `config.dev.json`) mit dem mobilen Preset: Anmeldung, Beetübersicht, Editor und Katalog müssen bei Performance und Accessibility mindestens 90 erreichen. Der CI-Job `lighthouse` lädt die Berichte als Artefakt hoch. Lighthouse läuft per `npx` in fester Version statt als Abhängigkeit, weil es `@opentelemetry/api` in den Workspace zieht und damit vitest doppelt auflöst.
 - **375 px:** `shell.spec.ts` prüft weiterhin jede Seite auf horizontales Scrollen.
+
+## Mehrsprachigkeit
+
+Umsetzung (Stand T-66, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404- und 403-Seite. Die übrigen Bereiche folgen in T-67 bis T-72.
+
+- **Setup:** `src/lib/i18n.ts` initialisiert i18next synchron mit den gebündelten Texten, sodass schon der erste Render übersetzt ist. Deutsch ist Fallback und Quelle.
+  - Die Texte liegen als TS-Objekte unter `src/locales/{de,en}/<bereich>.ts`, ein Namespace je Bereich: `common`, `layout`, `auth`, `profile`.
+  - Jede englische Datei hat den Typ ihrer deutschen (`typeof de`). Ein fehlender oder zusätzlicher Schlüssel ist damit ein Typfehler.
+  - Über `CustomTypeOptions` sind auch die Schlüssel in `t()` typisiert.
+  - `src/locales/locales.test.ts` prüft zusätzlich, dass beide Sprachen dieselben Schlüssel haben und kein Text leer ist.
+  - Pluralformen über i18next (`_one`/`_other`), Werte über `{{name}}`. React maskiert selbst, deshalb `escapeValue: false`.
+- **Sprache:** `useLanguage()` (analog zu `useTheme()`) liefert `language` und `setLanguage()`. Die Wahl liegt nur im Browser (`localStorage`, Schlüssel `hochbeet-language`, Zugriffe in try/catch). Das Backend speichert keine Sprache.
+  - Startwert über `detectLanguage()` in `src/lib/language.ts`: zuerst die gespeicherte Sprache. Sonst die erste Browsersprache aus `navigator.languages`, die die App kann (`de*` → Deutsch, `en*` → Englisch). Spricht der Browser keine davon, Englisch; ohne jede Browsersprache Deutsch.
+  - Bei jedem Wechsel setzt `i18n.ts` `<html lang>`, `document.title` und die Standardmeldungen von Zod (`setZodLocale()` in `src/lib/zod-locale.ts`, `z.locales.de()` bzw. `z.locales.en()`).
+- **Sprachwahl:** Karte „Sprache“ im Profil (`LanguageButtons`). Auf den Anmeldeseiten, also auch für Gäste, ein kleiner Umschalter neben dem Farbschema (`LanguageToggle`). Er nennt die jeweils andere Sprache in ihr selbst („English“ bzw. „Deutsch“, mit passendem `lang`). Bei mehr als zwei Sprachen wird daraus ein Menü.
+- **Englisch = en-GB:** Datumsformate über `useDateLocale()` (date-fns `de` bzw. `enGB`, Woche ab Montag). Die Komponenten stellen in ihren Tasks darauf um.
+- **Texte außerhalb von Komponenten:** Zod-Schemas mit eigenen Meldungen (`lib/auth/schemas.ts`), `authErrorMessage()` und `apiErrorMessage()` formulieren über `i18n.t()` erst beim Prüfen bzw. Aufrufen. So bleiben die Schemas Modulkonstanten und folgen trotzdem der aktuellen Sprache.
+  - Reine Funktionen, die ohne React testbar bleiben sollen, bekommen in späteren Tasks `t` oder die Sprache als Parameter oder liefern Schlüssel.
+- **API:** `createApiClient()` und `createApiStream()` senden die Sprache als `Accept-Language` (`currentLanguage()`). Die Services werten den Header ab T-70 aus.
+- **URLs** bleiben deutsch (`/beete`, `/anmelden`, …).
+- **Tests:**
+  - Vitest läuft auf Deutsch (`src/test/setup.ts` setzt die Sprache vor und nach jedem Test zurück).
+  - Die Playwright-Fixture hat die Option `language` (Standard `de`), die die Sprache vor dem ersten Laden in den `localStorage` schreibt. `null` lässt die App der Browsersprache (`locale`) folgen.
+  - Einträge in `e2e/tests/pages.ts` mit `language: 'en'` laufen in axe-Prüfung und PR-Screenshots auf Englisch.
 
 ## Bedienung nach Gerät
 
@@ -205,6 +230,6 @@ Die SPA lädt beim Start eine `config.json` mit UserPool-ID, Client-ID und Regio
   - Umschalter „Diese Woche“/„Nächste Woche“: die nächste Woche zeigt nur, was dort neu hinzukommt (`newTasks()`, Aufgaben mit `since` = Woche), damit nichts doppelt erscheint.
   - Abhaken (Checkbox, benannt nur mit dem Titel; „Überfällig“ und Details als Beschreibung) speichert die Charge über `useSaveSowing()` mit `taskDone()`: Aussäen → `SOWN`, Pikieren → `PRICKED`, Abhärten → `HARDENING` (überspringt es die Keimung, startet der Bestand wie dort beim gesäten Wert). Beet-Aufgaben verlinken auf `/beete/$bedId?woche=<Montag>`; der Editor startet dann in dieser Woche (`parseBedEditorSearch()` in `lib/editor/search.ts`).
   - Kompakt (Beetübersicht): ohne Details, Beet-Aufgaben zuerst, höchstens vier, der Rest über „n weitere Aufgaben in der Anzucht“.
-- **Seiten:** `/anmelden`, `/registrieren` (mit Bestätigungscode) und `/passwort-vergessen`, mit react-hook-form, Zod und deutschen Fehlermeldungen. Die Passwortregeln spiegeln die Policy des User Pools. Fehler bei der Anmeldung verraten nicht, ob ein Konto existiert.
+- **Seiten:** `/anmelden`, `/registrieren` (mit Bestätigungscode) und `/passwort-vergessen`, mit react-hook-form, Zod und Fehlermeldungen in der Sprache der App. Die Passwortregeln spiegeln die Policy des User Pools. Fehler bei der Anmeldung verraten nicht, ob ein Konto existiert.
 - **Geschützte Routen:** Alles außer den drei Auth-Seiten und der Entwicklerseite `/dev/icons` verlangt eine Anmeldung. Ohne Login leitet der Router auf `/anmelden?redirect=<Pfad>` um und kehrt danach dorthin zurück; Weiterleitungen gehen nur auf Pfade der App. Der Admin-Bereich und sein Navigationseintrag erscheinen nur für die Gruppe `admins` (Claim `cognito:groups` im ID-Token); alle anderen sehen unter `/admin` eine 403-Seite. Das ist reine Bedienführung; geschützt werden die Admin-Daten im Catalog-Service.
-- **API-Client:** `createApiClient()` in `apps/web/src/lib/api.ts` sendet das ID-Token als `Authorization: Bearer …` an `/api/...`.
+- **API-Client:** `createApiClient()` in `apps/web/src/lib/api.ts` sendet das ID-Token als `Authorization: Bearer …` und die Sprache als `Accept-Language` an `/api/...`.

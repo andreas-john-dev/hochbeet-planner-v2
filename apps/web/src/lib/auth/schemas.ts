@@ -1,33 +1,37 @@
 import { z } from 'zod';
+import { i18n } from '@/lib/i18n';
+import type { auth } from '@/locales/de/auth';
 
-export const emailSchema = z.email('Bitte gib eine gültige E-Mail-Adresse ein.');
+/** Message in the current language, resolved when a value is checked (not at import). */
+const msg = (key: keyof typeof auth.validation) => ({
+  error: () => i18n.t(`auth:validation.${key}`),
+});
+
+export const emailSchema = z.email(msg('email'));
 
 /** Mirrors the Cognito password policy in infra (SharedStatefulStack). */
 export const newPasswordSchema = z
   .string()
-  .min(8, 'Mindestens 8 Zeichen.')
-  .regex(/[a-z]/, 'Mindestens ein Kleinbuchstabe.')
-  .regex(/[A-Z]/, 'Mindestens ein Großbuchstabe.')
-  .regex(/\d/, 'Mindestens eine Ziffer.')
-  .regex(/[^A-Za-z0-9]/, 'Mindestens ein Sonderzeichen.');
-
-export const PASSWORD_HINT =
-  'Mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Ziffer und Sonderzeichen.';
+  .min(8, msg('passwordLength'))
+  .regex(/[a-z]/, msg('passwordLowercase'))
+  .regex(/[A-Z]/, msg('passwordUppercase'))
+  .regex(/\d/, msg('passwordDigit'))
+  .regex(/[^A-Za-z0-9]/, msg('passwordSpecial'));
 
 export const codeSchema = z
   .string()
   .trim()
-  .regex(/^\d{6}$/, 'Der Code hat 6 Ziffern.');
+  .regex(/^\d{6}$/, msg('code'));
 
 export const signInSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, 'Bitte gib dein Passwort ein.'),
+  password: z.string().min(1, msg('passwordRequired')),
 });
 
 export const signUpSchema = z
   .object({ email: emailSchema, password: newPasswordSchema, passwordRepeat: z.string() })
   .refine((v) => v.password === v.passwordRepeat, {
-    message: 'Die Passwörter stimmen nicht überein.',
+    ...msg('passwordsDiffer'),
     path: ['passwordRepeat'],
   });
 

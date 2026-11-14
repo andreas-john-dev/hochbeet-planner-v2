@@ -32,7 +32,7 @@ async function expectNoHorizontalOverflow(page: Page, path: string) {
 
 test('auth pages have no horizontal scrollbar at 375 px', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  for (const { path, heading } of appPages.filter((p) => p.access === 'public')) {
+  for (const { path, heading } of appPages.filter((p) => p.access === 'public' && !p.language)) {
     await open(page, path, heading);
     await expectNoHorizontalOverflow(page, path);
   }
@@ -56,7 +56,7 @@ test('app pages have no horizontal scrollbar at 375 px', async ({ page }) => {
   );
   await page.setViewportSize({ width: 375, height: 812 });
   for (const { path, heading } of appPages.filter(
-    (p) => p.access === 'user' || p.access === 'admin',
+    (p) => (p.access === 'user' || p.access === 'admin') && !p.language,
   )) {
     await open(page, path, heading);
     await expectNoHorizontalOverflow(page, path);

@@ -1,5 +1,6 @@
 import { Link, Outlet } from '@tanstack/react-router';
 import { ShieldOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
 import { isAdmin } from '@/lib/auth/types';
@@ -14,17 +15,16 @@ export function AdminLayout() {
 }
 
 function ForbiddenPage() {
+  const { t } = useTranslation('layout');
   return (
     <div className="flex flex-col items-center gap-4 py-10 text-center">
       <span className="bg-secondary text-secondary-foreground grid size-12 place-items-center rounded-full">
         <ShieldOff aria-hidden className="size-6" />
       </span>
-      <h1 className="text-2xl font-semibold tracking-tight">Kein Zugriff</h1>
-      <p className="text-muted-foreground max-w-sm">
-        Dieser Bereich ist nur für Admins. Fehler 403: Dir fehlt die Berechtigung für diese Seite.
-      </p>
+      <h1 className="text-2xl font-semibold tracking-tight">{t('forbidden.title')}</h1>
+      <p className="text-muted-foreground max-w-sm">{t('forbidden.text')}</p>
       <Button asChild variant="outline" className="h-11">
-        <Link to="/beete">Zu den Beeten</Link>
+        <Link to="/beete">{t('toBeds')}</Link>
       </Button>
     </div>
   );

@@ -17,6 +17,9 @@ import {
  */
 export type Access = 'public' | 'user' | 'admin' | 'guest';
 
+/** Languages of the app; German unless a page says otherwise. */
+export type Language = 'de' | 'en';
+
 /** All top-level pages. Add new pages here so tests and PR screenshots cover them. */
 export interface AppPage {
   /** Stable id, used as screenshot file name. */
@@ -31,6 +34,8 @@ export interface AppPage {
   seed?: Garden;
   /** Brings the page into the state to check, e.g. an open panel; runs after the heading shows. */
   setup?: (page: Page) => Promise<void>;
+  /** Language of the page; without it German. English entries repeat a German page. */
+  language?: Language;
 }
 
 /** Waits for the tasks of the week, which load after the page's heading. */
@@ -184,6 +189,9 @@ export const appPages: readonly AppPage[] = [
     access: 'admin',
   },
   { id: 'dev-icons', path: '/dev/icons', heading: 'Icon-Galerie', access: 'public' },
+  // English: pages whose texts are translated (more follow with the other areas).
+  { id: 'en-anmelden', path: '/anmelden', heading: 'Sign in', access: 'public', language: 'en' },
+  { id: 'en-profil', path: '/profil', heading: 'Profile', access: 'user', language: 'en' },
   // Guest mode: same pages, with the guest banner and the local API.
   {
     id: 'gast-beete',
@@ -215,6 +223,8 @@ export const appPages: readonly AppPage[] = [
  */
 export const protectedPages = [
   ...new Map(
-    appPages.filter((p) => p.access === 'user' || p.access === 'admin').map((p) => [p.path, p]),
+    appPages
+      .filter((p) => (p.access === 'user' || p.access === 'admin') && !p.language)
+      .map((p) => [p.path, p]),
   ).values(),
 ];
