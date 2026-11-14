@@ -86,8 +86,9 @@ test('counts seedlings planned into beds and names them before deleting', async 
   await seedGarden(page, sowingsGarden);
   await open(page, '/anzucht', 'Anzucht');
 
-  // Active batches of this year; the row of lettuce in the bed holds 3 plants.
-  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['2026']);
+  // The tasks of the week, then the active batches of this year; the row of lettuce in the
+  // bed holds 3 plants.
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['Aufgaben', '2026']);
   const lettuce = card(page, 'Kopfsalat');
   await expect(lettuce.getByTestId('stock')).toHaveText('lebend 18 · verplant 3 · frei 15');
   await expect(card(page, 'Kohlrabi').getByTestId('stock')).toHaveText('12 gesät');
@@ -110,7 +111,7 @@ test('counts seedlings planned into beds and names them before deleting', async 
 
   // All batches: last year's peppers in their own group.
   await showing(page, 'Alle');
-  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['2026', '2025']);
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['Aufgaben', '2026', '2025']);
   await expect(card(page, 'Paprika')).toContainText('Abgeschlossen');
   await expect(card(page, 'Tomate')).toContainText('Zwei Pflanzen an die Nachbarn verschenkt.');
 });

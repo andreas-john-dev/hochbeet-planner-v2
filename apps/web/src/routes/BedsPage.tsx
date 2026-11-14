@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SowingPlanDialog } from '@/components/sowings/SowingPlanDialog';
+import { WeeklyTasksCard } from '@/components/sowings/WeeklyTasksCard';
 import { Button } from '@/components/ui/button';
 import { useBeds } from '@/lib/garden';
 
@@ -74,6 +75,12 @@ export function BedsPage() {
             <Plus aria-hidden />
             Erstes Beet anlegen
           </Button>
+        </div>
+      )}
+
+      {beds.data && beds.data.length > 0 && (
+        <div className="mb-6">
+          <WeeklyTasksCard compact />
         </div>
       )}
 

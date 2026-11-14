@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { SowingCard } from '@/components/sowings/SowingCard';
 import { SowingFormDialog } from '@/components/sowings/SowingFormDialog';
 import { SowingPlanDialog } from '@/components/sowings/SowingPlanDialog';
+import { WeeklyTasksCard } from '@/components/sowings/WeeklyTasksCard';
 import { Button } from '@/components/ui/button';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
@@ -73,6 +74,10 @@ export function SowingsPage() {
           )}
         </div>
       </PageHeader>
+
+      <div className="mb-6">
+        <WeeklyTasksCard />
+      </div>
 
       {pending && !error && <SkeletonList label="Anzuchten werden geladen …" count={4} />}
       {error && <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>}

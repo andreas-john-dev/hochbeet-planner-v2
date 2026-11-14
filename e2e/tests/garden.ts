@@ -271,3 +271,56 @@ export const sowingPlanGarden: Garden = {
     ),
   ],
 };
+
+export const TASK_BED_ID = '01J9ZQ3W8D6V2K5M7N8P9R0S3A';
+export const taskId = (n: number) => `01J9ZQ3W8D6V2K5M7N8P9R0V${String(n).padStart(2, '0')}`;
+export const taskSowingId = (n: number) => `01J9ZQ3W8D6V2K5M7N8P9R0SX${String(n)}`;
+
+/**
+ * Tasks of the week on 7 October 2026 (KW 41): lettuce to sow, kohlrabi to sow since last
+ * week, tomatoes to prick out, lettuce to harden off for a row of 3 going out in KW 42; in
+ * the bed spinach to sow directly and a kale to buy this week.
+ */
+export const weeklyTasksGarden: Garden = {
+  beds: [bed(TASK_BED_ID, 'Beet Herbst', 200, 100)],
+  plantings: [
+    planting(taskId(1), TASK_BED_ID, PLANTS.lettuce, {
+      kind: 'ROW',
+      orientation: 'H',
+      lengthCm: 50,
+      x: 20,
+      y: 20,
+      startDate: '2026-10-12',
+      sowingId: taskSowingId(4),
+    }),
+    planting(taskId(2), TASK_BED_ID, PLANTS.spinach, {
+      origin: 'DIRECT_SOW',
+      kind: 'ROW',
+      orientation: 'H',
+      lengthCm: 60,
+      x: 20,
+      y: 60,
+      startDate: '2026-10-05',
+    }),
+    planting(taskId(3), TASK_BED_ID, PLANTS.kale, { x: 150, y: 50, startDate: '2026-10-05' }),
+  ],
+  sowings: [
+    sowing(taskSowingId(1), PLANTS.lettuce, {
+      sowDate: '2026-10-05',
+      aliveCount: 0,
+      stage: 'PLANNED',
+    }),
+    sowing(taskSowingId(2), PLANTS.kohlrabi, {
+      sowDate: '2026-09-28',
+      sownCount: 8,
+      aliveCount: 0,
+      stage: 'PLANNED',
+    }),
+    sowing(taskSowingId(3), PLANTS.tomato, {
+      sowDate: '2026-09-21',
+      aliveCount: 8,
+      stage: 'GERMINATED',
+    }),
+    sowing(taskSowingId(4), PLANTS.lettuce, { sowDate: '2026-09-14', stage: 'GERMINATED' }),
+  ],
+};

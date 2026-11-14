@@ -12,7 +12,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { parseISO } from 'date-fns';
 import {
   ArrowLeft,
@@ -56,6 +56,7 @@ import {
 } from '@/lib/editor/placement';
 import { withDraft } from '@/lib/editor/plantings';
 import { createEditorStore, type EditorStore, type PreviewSowing } from '@/lib/editor/store';
+import { parseBedEditorSearch } from '@/lib/editor/search';
 import { adoptedPlanting, type ShownSuggestion, showSuggestions } from '@/lib/editor/suggestions';
 import { seasonFindings, statusByPlanting, weekOfFinding } from '@/lib/editor/warnings';
 import { ghosts, withPlants, type Ghost } from '@/lib/editor/timeline';
@@ -76,7 +77,8 @@ const ZOOM_STEP = 1.4;
 /** Route component for /beete/$bedId; remounts per bed so the editor state starts fresh. */
 export function BedEditorPage() {
   const bedId = bedIdParam(useParams({ strict: false }));
-  return <BedEditor key={bedId} bedId={bedId} />;
+  const { woche } = parseBedEditorSearch(useSearch({ strict: false }));
+  return <BedEditor key={bedId} bedId={bedId} week={woche} />;
 }
 
 // Params are untyped here: typing them via the route would make router.tsx circular.
@@ -86,14 +88,15 @@ function bedIdParam(params: unknown): string {
 }
 
 /** Bed editor: the bed true to scale with grid, plantings of the current week, zoom and pan. */
-function BedEditor({ bedId }: { bedId: string }) {
+function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string | undefined }) {
   const details = useBedWithPlantings(bedId);
   const plants = usePlants();
   const sowings = useSowings();
   // The user's last frost for the frost hint; guests and a pending load use 15 May.
   const lastFrost = useGardenSettings().data?.lastFrost;
   const [today] = useState(() => new Date());
-  const [store] = useState(() => createEditorStore(today));
+  // Opened from a task of the week: on that week, else on today's.
+  const [store] = useState(() => createEditorStore(initialWeek ? parseISO(initialWeek) : today));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, guest } = useAuth();
   const assistant = canUseAssistant(user, guest);

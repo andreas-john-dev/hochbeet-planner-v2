@@ -8,6 +8,7 @@ import {
   pendingRequest,
   sowingPlanGarden,
   sowingsGarden,
+  weeklyTasksGarden,
 } from './garden';
 
 /**
@@ -31,6 +32,10 @@ export interface AppPage {
   /** Brings the page into the state to check, e.g. an open panel; runs after the heading shows. */
   setup?: (page: Page) => Promise<void>;
 }
+
+/** Waits for the tasks of the week, which load after the page's heading. */
+const showWeeklyTasks = (page: Page) =>
+  page.getByRole('region', { name: 'Aufgaben' }).getByRole('listitem').first().waitFor();
 
 export const appPages: readonly AppPage[] = [
   { id: 'anmelden', path: '/anmelden', heading: 'Anmelden', access: 'public' },
@@ -81,6 +86,24 @@ export const appPages: readonly AppPage[] = [
     access: 'user',
     navLabel: 'Anzucht',
     seed: sowingsGarden,
+  },
+  {
+    // Tasks of the week from batches and a bed, one of them overdue.
+    id: 'anzucht-aufgaben',
+    path: '/anzucht',
+    heading: 'Anzucht',
+    access: 'user',
+    seed: weeklyTasksGarden,
+    setup: showWeeklyTasks,
+  },
+  {
+    // The same tasks compact in the bed overview, with a link to the rest.
+    id: 'beete-aufgaben',
+    path: '/beete',
+    heading: 'Meine Beete',
+    access: 'user',
+    seed: weeklyTasksGarden,
+    setup: showWeeklyTasks,
   },
   {
     // The raising plan from the beds: tomatoes and lettuce for May 2027.
