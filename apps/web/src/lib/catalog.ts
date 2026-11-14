@@ -6,29 +6,24 @@ import type {
   PlantFields,
   PlantOverride,
 } from '@hochbeet/contracts';
+import { i18n } from './i18n';
+import type { Language } from './language';
 import { parseSowingForm, type SowingErrors, type SowingForm, sowingForm } from './sowing-form';
 
-export const CATEGORY_LABEL: Record<Category, string> = {
-  GEMUESE: 'Gemüse',
-  KRAUT: 'Kräuter',
-  OBST: 'Obst',
-};
-
-export const FEEDER_LABEL: Record<Feeder, string> = {
-  STARK: 'Starkzehrer',
-  MITTEL: 'Mittelzehrer',
-  SCHWACH: 'Schwachzehrer',
-};
+/** Categories and feeders in the order the filters and forms show them. */
+export const CATEGORIES: readonly Category[] = ['GEMUESE', 'KRAUT', 'OBST'];
+export const FEEDERS: readonly Feeder[] = ['STARK', 'MITTEL', 'SCHWACH'];
 
 /** "12 Wochen", "3 Jahre" or "Dauerkultur, ohne Ende". */
-export function lifecycleText(lifecycle: Lifecycle): string {
+export function lifecycleText(lifecycle: Lifecycle, language: Language): string {
+  const t = i18n.getFixedT(language, 'catalog');
   switch (lifecycle.type) {
     case 'ANNUAL':
-      return `${String(lifecycle.cultureWeeks)} ${lifecycle.cultureWeeks === 1 ? 'Woche' : 'Wochen'}`;
+      return t('lifecycle.weeks', { count: lifecycle.cultureWeeks });
     case 'MULTI_YEAR':
-      return `${String(lifecycle.years)} ${lifecycle.years === 1 ? 'Jahr' : 'Jahre'}`;
+      return t('lifecycle.years', { count: lifecycle.years });
     case 'PERENNIAL':
-      return 'Dauerkultur, ohne Ende';
+      return t('lifecycle.perennial');
   }
 }
 
@@ -158,28 +153,30 @@ const wholeNumber = (text: string, min: number, max: number) => {
     : null;
 };
 
-/** Checks the form; returns the edited plant fields or German messages per field. */
+/** Checks the form; returns the edited plant fields or messages per field in `language`. */
 export function parseAdjustForm(
   form: AdjustForm,
+  language: Language,
 ): { fields: Partial<PlantFields> } | { errors: AdjustErrors } {
+  const t = i18n.getFixedT(language, 'catalog');
   const errors: AdjustErrors = {};
   const family = form.family.trim();
-  if (family === '') errors.family = 'Bitte gib eine Familie an.';
+  if (family === '') errors.family = t('errors.family');
   const spacingInRowCm = wholeNumber(form.spacingInRowCm, 1, 300);
-  if (spacingInRowCm === null) errors.spacingInRowCm = 'Bitte 1 bis 300 cm angeben.';
+  if (spacingInRowCm === null) errors.spacingInRowCm = t('errors.cm', { min: 1, max: 300 });
   const rowSpacingCm = wholeNumber(form.rowSpacingCm, 1, 300);
-  if (rowSpacingCm === null) errors.rowSpacingCm = 'Bitte 1 bis 300 cm angeben.';
+  if (rowSpacingCm === null) errors.rowSpacingCm = t('errors.cm', { min: 1, max: 300 });
   let lifecycle: Lifecycle | null = { type: 'PERENNIAL' };
   if (form.lifecycleType === 'ANNUAL') {
     const cultureWeeks = wholeNumber(form.lifecycleValue, 1, 104);
     lifecycle = cultureWeeks === null ? null : { type: 'ANNUAL', cultureWeeks };
-    if (!lifecycle) errors.lifecycleValue = 'Bitte 1 bis 104 Wochen angeben.';
+    if (!lifecycle) errors.lifecycleValue = t('errors.weeks', { min: 1, max: 104 });
   } else if (form.lifecycleType === 'MULTI_YEAR') {
     const years = wholeNumber(form.lifecycleValue, 1, 20);
     lifecycle = years === null ? null : { type: 'MULTI_YEAR', years };
-    if (!lifecycle) errors.lifecycleValue = 'Bitte 1 bis 20 Jahre angeben.';
+    if (!lifecycle) errors.lifecycleValue = t('errors.years', { min: 1, max: 20 });
   }
-  const sowing = parseSowingForm(form.sowing);
+  const sowing = parseSowingForm(form.sowing, language);
   if ('errors' in sowing) errors.sowing = sowing.errors;
   if (
     spacingInRowCm === null ||

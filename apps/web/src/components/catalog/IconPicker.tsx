@@ -2,7 +2,7 @@ import type { CatalogPlant, Category } from '@hochbeet/contracts';
 import { CATEGORY_ICONS, PLANT_ICON_KEYS } from '@hochbeet/plant-icons';
 import { IconSvg } from '@hochbeet/plant-icons/react';
 import { useId } from 'react';
-import { CATEGORY_LABEL } from '@/lib/catalog';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 /**
@@ -20,6 +20,7 @@ export function IconPicker({
   catalog: readonly CatalogPlant[];
   onChange: (icon: string | null) => void;
 }) {
+  const { t } = useTranslation('catalog');
   const name = useId();
   const nameOf = new Map(
     catalog.filter((p) => p.source === 'GLOBAL').map((p) => [p.icon, p.name] as const),
@@ -28,14 +29,14 @@ export function IconPicker({
     {
       key: null,
       icon: CATEGORY_ICONS[category],
-      label: `Kategorie-Icon (${CATEGORY_LABEL[category]})`,
+      label: t('form.categoryIcon', { category: t(`category.${category}`) }),
     },
     ...PLANT_ICON_KEYS.map((key) => ({ key, icon: key, label: nameOf.get(key) ?? key })),
   ];
 
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-medium">Icon</legend>
+      <legend className="mb-1 text-sm font-medium">{t('form.icon')}</legend>
       <div className="grid max-h-56 grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-1 overflow-y-auto rounded-lg border p-2">
         {options.map((option) => {
           const checked = option.key === value;

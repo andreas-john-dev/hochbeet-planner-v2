@@ -88,7 +88,12 @@ const data = (extra: Partial<WeeklyTaskData>): WeeklyTaskData => ({
   ...extra,
 });
 const summary = (tasks: WeeklyTask[]) =>
-  tasks.map((t) => [t.kind, taskTitle(t), taskDetail(t), 'overdue' in t ? t.overdue : '-']);
+  tasks.map((t) => [
+    t.kind,
+    taskTitle(t, 'de'),
+    taskDetail(t, 'de'),
+    'overdue' in t ? t.overdue : '-',
+  ]);
 const tasksOf = (week: string, extra: Partial<WeeklyTaskData>) =>
   summary(weeklyTasks(week, data(extra)));
 
@@ -248,6 +253,40 @@ describe('bed tasks', () => {
   it('skips unknown plants and beds', () => {
     const plantings = [planting('gone', week), planting(tomato.id, week, { bedId: 'gone' })];
     expect(tasksOf(week, { plantings })).toEqual([]);
+  });
+});
+
+describe('in English', () => {
+  const english = (week: string, extra: Partial<WeeklyTaskData>) =>
+    weeklyTasks(week, data(extra)).map((t) => [taskTitle(t, 'en'), taskDetail(t, 'en')]);
+
+  it('names the tasks at batches', () => {
+    expect(english('2027-03-15', { sowings: [item(batch('s', tomato.id))] })).toEqual([
+      ['Sow Tomate', '8 seeds, planned for KW 11'],
+    ]);
+    const germinated = item(batch('s', tomato.id, { stage: 'GERMINATED', aliveCount: 6 }));
+    expect(english('2027-03-29', { sowings: [germinated] })).toEqual([
+      ['Prick out Tomate', 'Sown in KW 11, prick out after 2 weeks'],
+    ]);
+    const sown = item(batch('s', tomato.id, { stage: 'SOWN' }), [linked('2027-05-24')]);
+    expect(english('2027-05-10', { sowings: [sown] })).toEqual([
+      ['Harden off Tomate', 'Plant out from KW 21'],
+    ]);
+  });
+
+  it('names the tasks in beds', () => {
+    const week = '2027-05-24';
+    const sowings = [item(batch('s', lettuce.id, { stage: 'HARDENING' }), [linked(week)])];
+    const plantings = [
+      planting(lettuce.id, week, { sowingId: 's' }),
+      planting(carrot.id, week, { origin: 'DIRECT_SOW' }),
+      planting(tomato.id, week, { bedId: balcony.id }),
+    ];
+    expect(english(week, { plantings, sowings })).toEqual([
+      ['Plant out in “Hochbeet Süd”', '1 × Kopfsalat'],
+      ['Sow directly in “Hochbeet Süd”', '1 × Möhre'],
+      ['Set out plants in “Balkon”', 'Get seedlings: 1 × Tomate'],
+    ]);
   });
 });
 

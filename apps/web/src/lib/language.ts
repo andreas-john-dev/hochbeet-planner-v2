@@ -61,3 +61,6 @@ export function initialLanguage(): Language {
 export function dateLocale(language: Language): Locale {
   return language === 'en' ? enGB : de;
 }
+
+/** BCP 47 tag of a language for `Intl` (lists, numbers, sorting); English is en-GB. */
+export const intlLocale = (language: Language): string => (language === 'en' ? 'en-GB' : 'de-DE');

@@ -14,18 +14,19 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { apiErrorMessage } from '@/lib/api';
 import { useSaveSowing } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 import {
   advance,
   complete,
   germinationText,
   hasSeedlings,
   nextStage,
-  STAGE_LABEL,
   stockOf,
   stockText,
   weekText,
@@ -49,9 +50,11 @@ export function SowingCard({
   /** Findings of `evaluateSowings()` about this batch. */
   findings?: readonly SowingFinding[];
 }) {
+  const { t } = useTranslation('sowings');
+  const { language } = useLanguage();
   const { sowing } = item;
   const plant = plants.find((p) => p.id === sowing.plantId);
-  const name = plant?.name ?? 'Unbekannte Sorte';
+  const name = plant?.name ?? t('card.unknownPlant');
   const save = useSaveSowing();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -61,7 +64,7 @@ export function SowingCard({
   const change = (fields: SowingBatchFields) => {
     save.mutate({ id: sowing.id, fields });
   };
-  const germinated = germinationText(sowing);
+  const germinated = germinationText(sowing, language);
 
   return (
     <Card
@@ -84,39 +87,39 @@ export function SowingCard({
             done ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground',
           )}
         >
-          {STAGE_LABEL[sowing.stage]}
+          {t(`stage.${sowing.stage}`)}
         </span>
       </div>
 
       <div className="grid gap-1 text-sm">
         <p>
           <span className="font-medium" data-testid="stock">
-            {stockText(sowing, stockOf(item, plants))}
+            {stockText(sowing, stockOf(item, plants), language)}
           </span>
           {germinated && <span className="text-muted-foreground"> ({germinated})</span>}
         </p>
         {sowing.location && (
           <p className="text-muted-foreground flex items-center gap-1.5">
             <MapPin className="size-4" aria-hidden />
-            <span className="sr-only">Standort:</span>
+            <span className="sr-only">{t('card.location')}</span>
             {sowing.location}
           </p>
         )}
         {sowing.plannedTransplantDate && !done && (
           <p className="text-muted-foreground flex items-center gap-1.5">
             <CalendarClock className="size-4" aria-hidden />
-            Auspflanzen geplant: {weekText(sowing.plannedTransplantDate)}
+            {t('card.transplantPlanned', { week: weekText(sowing.plannedTransplantDate) })}
           </p>
         )}
         {sowing.notes && (
           <p className="text-muted-foreground line-clamp-2 whitespace-pre-line">
-            <span className="sr-only">Notiz:</span> {sowing.notes}
+            <span className="sr-only">{t('card.notes')}</span> {sowing.notes}
           </p>
         )}
       </div>
 
       {findings.length > 0 && (
-        <ul aria-label="Hinweise zur Anzucht" className="flex flex-col gap-1 text-sm">
+        <ul aria-label={t('card.findings')} className="flex flex-col gap-1 text-sm">
           {findings.map((finding) => {
             const Icon = finding.severity === 'WARNING' ? TriangleAlert : Info;
             return (
@@ -133,7 +136,7 @@ export function SowingCard({
                 <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
                 <span>
                   <span className="sr-only">
-                    {finding.severity === 'WARNING' ? 'Warnung: ' : 'Hinweis: '}
+                    {finding.severity === 'WARNING' ? t('card.warning') : t('card.hint')}
                   </span>
                   {finding.message}
                 </span>
@@ -156,16 +159,20 @@ export function SowingCard({
             }}
           >
             <ChevronRight aria-hidden />
-            Weiter: {STAGE_LABEL[next]}
+            {t('card.next', { stage: t(`stage.${next}`) })}
           </Button>
         )}
         {hasSeedlings(sowing.stage) && !done && (
-          <div role="group" aria-label="Bestand" className="flex items-center rounded-md border">
+          <div
+            role="group"
+            aria-label={t('card.stock')}
+            className="flex items-center rounded-md border"
+          >
             <Button
               variant="ghost"
               size="icon"
               className="md:size-9"
-              aria-label="Bestand verringern"
+              aria-label={t('card.decrease')}
               disabled={save.isPending || sowing.aliveCount === 0}
               onClick={() => {
                 change(withAlive(sowing, sowing.aliveCount - 1));
@@ -180,7 +187,7 @@ export function SowingCard({
               variant="ghost"
               size="icon"
               className="md:size-9"
-              aria-label="Bestand erhöhen"
+              aria-label={t('card.increase')}
               disabled={save.isPending}
               onClick={() => {
                 change(withAlive(sowing, sowing.aliveCount + 1));
@@ -200,7 +207,7 @@ export function SowingCard({
             }}
           >
             <Check aria-hidden />
-            Abschließen
+            {t('card.complete')}
           </Button>
         )}
         <div className="ml-auto flex gap-1">
@@ -208,7 +215,7 @@ export function SowingCard({
             variant="ghost"
             size="icon"
             className="md:size-9"
-            aria-label={`${name} bearbeiten`}
+            aria-label={t('card.edit', { name })}
             onClick={() => {
               setEditing(true);
             }}
@@ -219,7 +226,7 @@ export function SowingCard({
             variant="ghost"
             size="icon"
             className="md:size-9"
-            aria-label={`${name} löschen`}
+            aria-label={t('card.delete', { name })}
             onClick={() => {
               setDeleting(true);
             }}

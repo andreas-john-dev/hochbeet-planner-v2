@@ -1,0 +1,25 @@
+/** Taking over the guest's data after sign-in. */
+export const guestImport = {
+  title: 'Beete aus dem Gastmodus übernehmen?',
+  found: 'In diesem Browser liegen {{data}} aus dem Gastmodus.',
+  accountHasBeds: 'Dein Konto hat schon Beete; die aus diesem Browser kommen dazu.',
+  accountEmpty: 'Übernimm sie in dein Konto, dann sind sie gesichert und auf allen Geräten da.',
+  discardHint: 'Verwerfen löscht sie aus diesem Browser.',
+  later: 'Später',
+  discard: 'Verwerfen',
+  importing: 'Übernehme …',
+  add: 'Lokale Beete hinzufügen',
+  import: 'Übernehmen',
+  data: {
+    beds_one: '{{count}} Beet',
+    beds_other: '{{count}} Beete',
+    plantings_one: '{{count}} Pflanzung',
+    plantings_other: '{{count}} Pflanzungen',
+    sowings_one: '{{count}} Anzucht',
+    sowings_other: '{{count}} Anzuchten',
+    ownPlants_one: '{{count}} eigene Sorte',
+    ownPlants_other: '{{count}} eigene Sorten',
+    overrides_one: '{{count}} Anpassung',
+    overrides_other: '{{count}} Anpassungen',
+  },
+};

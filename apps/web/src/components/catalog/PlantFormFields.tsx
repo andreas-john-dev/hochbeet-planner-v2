@@ -1,5 +1,6 @@
 import type { CatalogPlant, Category, Feeder, PlantFields } from '@hochbeet/contracts';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { IconPicker } from '@/components/catalog/IconPicker';
 import { NeighborPicker } from '@/components/catalog/NeighborPicker';
 import { SowingFields } from '@/components/catalog/SowingFields';
@@ -7,10 +8,11 @@ import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { apiErrorMessage } from '@/lib/api';
-import { CATEGORY_LABEL, families, FEEDER_LABEL } from '@/lib/catalog';
+import { CATEGORIES, families, FEEDERS } from '@/lib/catalog';
+import { useLanguage } from '@/lib/i18n';
 import {
   DEFAULT_COLOR,
-  LIFECYCLE_OPTIONS,
+  LIFECYCLE_TYPES,
   type PlantForm,
   type PlantFormErrors,
   parsePlantForm,
@@ -47,6 +49,8 @@ export function PlantFormFields({
   onSubmit: (fields: PlantFields) => Promise<void>;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(['catalog', 'common']);
+  const { language } = useLanguage();
   const [form, setForm] = useState<PlantForm>(initial);
   const [errors, setErrors] = useState<PlantFormErrors>({});
   const ids = {
@@ -70,7 +74,7 @@ export function PlantFormFields({
   const others = neighborCandidates;
 
   const submit = async () => {
-    const parsed = parsePlantForm(form);
+    const parsed = parsePlantForm(form, language);
     if ('errors' in parsed) {
       setErrors(parsed.errors);
       return;
@@ -92,7 +96,7 @@ export function PlantFormFields({
 
       <section className="flex flex-col gap-4">
         <FormField
-          label="Name"
+          label={t('form.name')}
           autoComplete="off"
           value={form.name}
           error={errors.name}
@@ -102,7 +106,7 @@ export function PlantFormFields({
         />
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={ids.category}>Kategorie</Label>
+            <Label htmlFor={ids.category}>{t('form.category')}</Label>
             <select
               id={ids.category}
               value={form.category}
@@ -117,20 +121,20 @@ export function PlantFormFields({
               }}
               className={selectClass}
             >
-              {(Object.keys(CATEGORY_LABEL) as Category[]).map((category) => (
+              {CATEGORIES.map((category) => (
                 <option key={category} value={category}>
-                  {CATEGORY_LABEL[category]}
+                  {t(`category.${category}`)}
                 </option>
               ))}
             </select>
           </div>
           <FormField
-            label="Familie"
+            label={t('form.family')}
             autoComplete="off"
             list={ids.families}
             value={form.family}
             error={errors.family}
-            hint="Grundlage der Fruchtfolge"
+            hint={t('form.familyHint')}
             onChange={(event) => {
               update({ family: event.target.value });
             }}
@@ -141,7 +145,7 @@ export function PlantFormFields({
             ))}
           </datalist>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={ids.feeder}>Bedarf</Label>
+            <Label htmlFor={ids.feeder}>{t('form.feeder')}</Label>
             <select
               id={ids.feeder}
               value={form.feeder}
@@ -150,9 +154,9 @@ export function PlantFormFields({
               }}
               className={selectClass}
             >
-              {(Object.keys(FEEDER_LABEL) as Feeder[]).map((feeder) => (
+              {FEEDERS.map((feeder) => (
                 <option key={feeder} value={feeder}>
-                  {FEEDER_LABEL[feeder]}
+                  {t(`feeder.${feeder}`)}
                 </option>
               ))}
             </select>
@@ -160,7 +164,7 @@ export function PlantFormFields({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <FormField
-            label="Abstand in der Reihe (cm)"
+            label={t('form.spacingInRow')}
             type="number"
             inputMode="numeric"
             min={1}
@@ -172,7 +176,7 @@ export function PlantFormFields({
             }}
           />
           <FormField
-            label="Reihenabstand (cm)"
+            label={t('form.rowSpacing')}
             type="number"
             inputMode="numeric"
             min={1}
@@ -187,9 +191,9 @@ export function PlantFormFields({
       </section>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Standzeit</legend>
+        <legend className="mb-1 text-sm font-medium">{t('form.lifecycle')}</legend>
         <div className="grid gap-2 sm:grid-cols-3">
-          {LIFECYCLE_OPTIONS.map(({ type, label, hint }) => (
+          {LIFECYCLE_TYPES.map((type) => (
             <label
               key={type}
               className={cn(
@@ -207,8 +211,12 @@ export function PlantFormFields({
                 }}
               />
               <span className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">{label}</span>
-                <span className="text-muted-foreground text-xs">{hint}</span>
+                <span className="text-sm font-medium">
+                  {t(`form.lifecycleOption.${type}.label`)}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {t(`form.lifecycleOption.${type}.hint`)}
+                </span>
               </span>
             </label>
           ))}
@@ -216,7 +224,7 @@ export function PlantFormFields({
         {form.lifecycleType !== 'PERENNIAL' && (
           <div className="max-w-56">
             <FormField
-              label={form.lifecycleType === 'ANNUAL' ? 'Kulturdauer (Wochen)' : 'Standzeit (Jahre)'}
+              label={form.lifecycleType === 'ANNUAL' ? t('form.cultureWeeks') : t('form.years')}
               type="number"
               inputMode="numeric"
               min={1}
@@ -239,7 +247,7 @@ export function PlantFormFields({
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <Label htmlFor={ids.color}>Farbe im Beet</Label>
+          <Label htmlFor={ids.color}>{t('form.color')}</Label>
           <input
             id={ids.color}
             type="color"
@@ -262,7 +270,7 @@ export function PlantFormFields({
 
       <section className="grid gap-6 sm:grid-cols-2">
         <NeighborPicker
-          label="Gute Nachbarn"
+          label={t('form.goodNeighbors')}
           tone="good"
           value={form.goodNeighbors}
           candidates={others.filter((p) => !form.badNeighbors.includes(p.id))}
@@ -271,7 +279,7 @@ export function PlantFormFields({
           }}
         />
         <NeighborPicker
-          label="Schlechte Nachbarn"
+          label={t('form.badNeighbors')}
           tone="bad"
           value={form.badNeighbors}
           candidates={others.filter((p) => !form.goodNeighbors.includes(p.id))}
@@ -286,7 +294,7 @@ export function PlantFormFields({
           {submitLabel}
         </Button>
         <Button type="button" variant="outline" className="h-11" onClick={onCancel}>
-          Abbrechen
+          {t('common:cancel')}
         </Button>
       </div>
     </form>

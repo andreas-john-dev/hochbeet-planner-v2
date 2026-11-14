@@ -1,10 +1,11 @@
 import type { CatalogPlant } from '@hochbeet/contracts';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGardenSettings } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
 import { sowingFacts } from '@/lib/sowing';
 import {
-  CALENDAR_ROW_LABEL,
   type CalendarRowKind,
   frostText,
   monthTicks,
@@ -27,16 +28,22 @@ const ROW_COLOR: Record<CalendarRowKind, string> = {
  * without details get a hint; own plants a link to add them.
  */
 export function SowingCalendar({ plant }: { plant: CatalogPlant }) {
+  const { t } = useTranslation('catalog');
+  const { language } = useLanguage();
   const [year] = useState(() => new Date().getFullYear());
   // The user's last frost from the profile; the default until it has loaded.
   const lastFrost = useGardenSettings().data?.lastFrost;
-  const calendar = sowingCalendar(plant, { year, ...(lastFrost ? { lastFrost } : {}) });
-  const ticks = monthTicks(year);
+  const calendar = sowingCalendar(plant, {
+    year,
+    language,
+    ...(lastFrost ? { lastFrost } : {}),
+  });
+  const ticks = monthTicks(year, language);
 
   return (
     <section aria-labelledby="sowing-calendar" className="flex flex-col gap-2">
       <h2 id="sowing-calendar" className="text-lg font-semibold">
-        Aussaatkalender
+        {t('calendar.title')}
       </h2>
       {calendar && plant.sowing ? (
         <div className="bg-card flex flex-col gap-3 rounded-lg border p-3">
@@ -52,7 +59,7 @@ export function SowingCalendar({ plant }: { plant: CatalogPlant }) {
               </span>
             ))}
           </div>
-          <ul className="flex flex-col gap-3" aria-label={`Aussaatkalender ${String(year)}`}>
+          <ul className="flex flex-col gap-3" aria-label={t('calendar.year', { year })}>
             {calendar.rows.map((row) => (
               <li key={row.kind} data-row={row.kind} className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
@@ -61,7 +68,7 @@ export function SowingCalendar({ plant }: { plant: CatalogPlant }) {
                       aria-hidden
                       className={cn('size-2.5 rounded-full', ROW_COLOR[row.kind])}
                     />
-                    {CALENDAR_ROW_LABEL[row.kind]}
+                    {t(`calendar.row.${row.kind}`)}
                     <span className="sr-only">:</span>
                   </span>
                   <span className="text-muted-foreground">{row.text}</span>
@@ -91,15 +98,15 @@ export function SowingCalendar({ plant }: { plant: CatalogPlant }) {
             ))}
           </ul>
           <ul className="text-muted-foreground flex flex-col gap-0.5 border-t pt-3 text-sm">
-            {sowingFacts(plant.sowing).map((fact) => (
+            {sowingFacts(plant.sowing, language).map((fact) => (
               <li key={fact}>{fact}</li>
             ))}
-            {plant.frostSensitive && <li>{frostText(lastFrost)}</li>}
+            {plant.frostSensitive && <li>{frostText(language, lastFrost)}</li>}
           </ul>
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">
-          Für diese Sorte gibt es noch keine Angaben zu Aussaat und Anzucht.
+          {t('calendar.none')}
           {plant.source === 'OWN' && (
             <>
               {' '}
@@ -108,7 +115,7 @@ export function SowingCalendar({ plant }: { plant: CatalogPlant }) {
                 params={{ plantId: plant.id }}
                 className="text-foreground font-medium underline underline-offset-4"
               >
-                Angaben ergänzen
+                {t('calendar.addDetails')}
               </Link>
             </>
           )}

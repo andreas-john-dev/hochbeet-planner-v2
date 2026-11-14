@@ -9,6 +9,7 @@ import { weekStart } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Search } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,11 +25,11 @@ import { Label } from '@/components/ui/label';
 import { apiErrorMessage } from '@/lib/api';
 import { useGardenSettings, useSaveSowing } from '@/lib/garden';
 import { monthDayText } from '@/lib/garden-settings';
+import { useLanguage } from '@/lib/i18n';
 import {
   defaultStage,
   defaultTransplantDate,
   plantsForSowing,
-  STAGE_LABEL,
   STAGES,
   weekText,
 } from '@/lib/sowings';
@@ -53,14 +54,13 @@ export function SowingFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation('sowings');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{sowing ? 'Anzucht bearbeiten' : 'Neue Anzucht'}</DialogTitle>
-          <DialogDescription>
-            Eine Sorte, in einer Woche gesät. Den Bestand pflegst du später auf der Karte.
-          </DialogDescription>
+          <DialogTitle>{sowing ? t('form.editTitle') : t('form.createTitle')}</DialogTitle>
+          <DialogDescription>{t('form.description')}</DialogDescription>
         </DialogHeader>
         {/* Mounted per opening, so every opening starts with fresh values. */}
         <SowingForm
@@ -112,6 +112,8 @@ function SowingForm({
   plants: readonly CatalogPlant[];
   onDone: () => void;
 }) {
+  const { t } = useTranslation(['sowings', 'common']);
+  const { language } = useLanguage();
   const save = useSaveSowing();
   const lastFrost = useGardenSettings().data?.lastFrost ?? DEFAULT_LAST_FROST;
   const [today] = useState(() => new Date());
@@ -151,7 +153,7 @@ function SowingForm({
         Object.fromEntries(
           parsed.error.issues.map((issue) => [
             String(issue.path[0]),
-            issue.path[0] === 'plantId' ? 'Bitte eine Sorte wählen.' : issue.message,
+            issue.path[0] === 'plantId' ? t('form.plantRequired') : issue.message,
           ]),
         ),
       );
@@ -164,14 +166,14 @@ function SowingForm({
 
   const frostHint =
     plant?.frostSensitive && !transplantSet
-      ? `, frostempfindlich: nicht vor dem ${monthDayText(lastFrost)}`
+      ? t('form.frostHint', { date: monthDayText(lastFrost, language) })
       : '';
   const transplantHint =
     form.plannedTransplantDate && plant?.sowing?.propagationWeeks && !transplantSet
-      ? `Aussaat plus ${String(plant.sowing.propagationWeeks.max)} Wochen Vorkultur${frostHint}.`
+      ? t('form.transplantHint', { count: plant.sowing.propagationWeeks.max, frost: frostHint })
       : form.plannedTransplantDate
         ? weekText(form.plannedTransplantDate)
-        : 'Optional.';
+        : t('form.optional');
 
   return (
     <form
@@ -192,7 +194,7 @@ function SowingForm({
         }}
       />
       <FormField
-        label="Aussaatwoche"
+        label={t('form.sowWeek')}
         type="date"
         required
         value={form.sowDate}
@@ -206,7 +208,7 @@ function SowingForm({
       />
       <div className="grid grid-cols-2 gap-3">
         <FormField
-          label="Gesäte Menge"
+          label={t('form.sownCount')}
           type="number"
           inputMode="numeric"
           min={1}
@@ -220,7 +222,7 @@ function SowingForm({
         />
         {sowing && (
           <FormField
-            label="Bestand"
+            label={t('form.stock')}
             type="number"
             inputMode="numeric"
             min={0}
@@ -242,9 +244,9 @@ function SowingForm({
         />
       )}
       <FormField
-        label="Standort"
+        label={t('form.location')}
         autoComplete="off"
-        placeholder="z. B. Fensterbank Küche"
+        placeholder={t('form.locationPlaceholder')}
         maxLength={60}
         value={form.location}
         error={errors.location}
@@ -253,7 +255,7 @@ function SowingForm({
         }}
       />
       <FormField
-        label="Geplantes Auspflanzen"
+        label={t('form.transplant')}
         type="date"
         value={form.plannedTransplantDate}
         hint={transplantHint}
@@ -277,10 +279,10 @@ function SowingForm({
       />
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
-          Abbrechen
+          {t('common:cancel')}
         </Button>
         <Button type="submit" disabled={save.isPending}>
-          {sowing ? 'Speichern' : 'Anzucht anlegen'}
+          {sowing ? t('common:save') : t('form.submitCreate')}
         </Button>
       </DialogFooter>
     </form>
@@ -301,6 +303,7 @@ function PlantPicker({
   error: string | undefined;
   onChange: (plantId: string) => void;
 }) {
+  const { t } = useTranslation('sowings');
   const ids = { search: useId(), error: useId() };
   const [query, setQuery] = useState('');
   const shown = plantsForSowing(plants).filter(
@@ -308,10 +311,10 @@ function PlantPicker({
   );
   return (
     <fieldset className="flex flex-col gap-2" aria-describedby={error ? ids.error : undefined}>
-      <legend className="mb-1 text-sm font-medium">Sorte</legend>
+      <legend className="mb-1 text-sm font-medium">{t('form.plant')}</legend>
       <div className="relative">
         <label htmlFor={ids.search} className="sr-only">
-          Sorte suchen
+          {t('form.search')}
         </label>
         <Search
           aria-hidden
@@ -320,7 +323,7 @@ function PlantPicker({
         <Input
           id={ids.search}
           type="search"
-          placeholder="Sorte suchen"
+          placeholder={t('form.search')}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -349,13 +352,13 @@ function PlantPicker({
               <PlantIcon plant={plant} size={24} decorative />
               <span className="flex-1 truncate">{plant.name}</span>
               {plant.sowing && plant.sowing.method !== 'DIRECT' && (
-                <span className="text-muted-foreground text-xs">Vorkultur</span>
+                <span className="text-muted-foreground text-xs">{t('form.presow')}</span>
               )}
             </label>
           </li>
         ))}
         {shown.length === 0 && (
-          <li className="text-muted-foreground px-2 py-3 text-sm">Keine Sorte gefunden.</li>
+          <li className="text-muted-foreground px-2 py-3 text-sm">{t('form.noPlant')}</li>
         )}
       </ul>
       {error && (
@@ -374,10 +377,11 @@ function StageSelect({
   value: SowingStage;
   onChange: (stage: SowingStage) => void;
 }) {
+  const { t } = useTranslation('sowings');
   const id = useId();
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>Phase</Label>
+      <Label htmlFor={id}>{t('form.stage')}</Label>
       <select
         id={id}
         className={selectClass}
@@ -388,7 +392,7 @@ function StageSelect({
       >
         {STAGES.map((stage) => (
           <option key={stage} value={stage}>
-            {STAGE_LABEL[stage]}
+            {t(`stage.${stage}`)}
           </option>
         ))}
       </select>
@@ -405,10 +409,11 @@ function NotesField({
   error: string | undefined;
   onChange: (notes: string) => void;
 }) {
+  const { t } = useTranslation('sowings');
   const id = useId();
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>Notiz</Label>
+      <Label htmlFor={id}>{t('form.notes')}</Label>
       <textarea
         id={id}
         rows={2}

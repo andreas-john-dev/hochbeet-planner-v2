@@ -1,10 +1,12 @@
 import { format } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { dateLocale, type Language } from './language';
 
-/** "Januar" … "Dezember", index 0 = January. */
-export const MONTH_NAMES = Array.from({ length: 12 }, (_, month) =>
-  format(new Date(2001, month, 1), 'LLLL', { locale: de }),
-);
+/** "Januar" … "Dezember" (or "January" …), index 0 = January. */
+export function monthNames(language: Language): string[] {
+  return Array.from({ length: 12 }, (_, month) =>
+    format(new Date(2001, month, 1), 'LLLL', { locale: dateLocale(language) }),
+  );
+}
 
 /** Days of a month in a common year: the settings hold days that exist every year. */
 export function daysInMonth(month: number): number {
@@ -23,8 +25,10 @@ export function toMonthDay(month: number, day: number): string {
   return `${pad(month)}-${pad(Math.min(day, daysInMonth(month)))}`;
 }
 
-/** `05-15` → "15. Mai". */
-export function monthDayText(value: string): string {
+/** `05-15` → "15. Mai" or "15 May". */
+export function monthDayText(value: string, language: Language): string {
   const { month, day } = monthDay(value);
-  return `${String(day)}. ${MONTH_NAMES[month - 1] ?? ''}`;
+  return format(new Date(2001, month - 1, day), language === 'de' ? 'd. MMMM' : 'd MMMM', {
+    locale: dateLocale(language),
+  });
 }

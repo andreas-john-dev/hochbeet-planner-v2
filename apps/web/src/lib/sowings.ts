@@ -17,15 +17,8 @@ import {
 } from '@hochbeet/garden-rules';
 import { addWeeks, formatISO, parseISO } from 'date-fns';
 import type { PreviewSowing } from './editor/store';
-
-export const STAGE_LABEL: Record<SowingStage, string> = {
-  PLANNED: 'Geplant',
-  SOWN: 'Gesät',
-  GERMINATED: 'Gekeimt',
-  PRICKED: 'Pikiert',
-  HARDENING: 'Abhärten',
-  DONE: 'Abgeschlossen',
-};
+import { i18n } from './i18n';
+import { intlLocale, type Language } from './language';
 
 /** The stages in order; `DONE` comes only through „Abschließen“. */
 export const STAGES: readonly SowingStage[] = [
@@ -74,11 +67,7 @@ export const withAlive = (batch: SowingBatch, aliveCount: number): SowingBatchFi
 
 export type SowingFilter = 'active' | 'done' | 'all';
 
-export const SOWING_FILTERS: readonly { value: SowingFilter; label: string }[] = [
-  { value: 'active', label: 'Aktiv' },
-  { value: 'done', label: 'Abgeschlossen' },
-  { value: 'all', label: 'Alle' },
-];
+export const SOWING_FILTERS: readonly SowingFilter[] = ['active', 'done', 'all'];
 
 export function filterSowings(
   sowings: readonly SowingWithPlantings[],
@@ -128,18 +117,30 @@ const count = (n: number | undefined) =>
  * The stock in one line: „lebend 18 · verplant 12 · frei 6“ for seedlings, the sown (or
  * planned) amount before germination, with what is already planned into beds.
  */
-export function stockText(sowing: SowingBatch, stock: Stock): string {
+export function stockText(sowing: SowingBatch, stock: Stock, language: Language): string {
+  const t = i18n.getFixedT(language, 'sowings');
   if (!hasSeedlings(sowing.stage)) {
-    const seeds = `${String(sowing.sownCount)} ${sowing.stage === 'PLANNED' ? 'geplant' : 'gesät'}`;
-    return stock.planned ? `${seeds} · verplant ${count(stock.planned)}` : seeds;
+    const seeds = t(sowing.stage === 'PLANNED' ? 'stock.planned' : 'stock.sown', {
+      count: sowing.sownCount,
+    });
+    return stock.planned
+      ? t('stock.seedsAllocated', { seeds, planned: count(stock.planned) })
+      : seeds;
   }
-  return `lebend ${count(stock.alive)} · verplant ${count(stock.planned)} · frei ${count(stock.free)}`;
+  return t('stock.seedlings', {
+    alive: count(stock.alive),
+    planned: count(stock.planned),
+    free: count(stock.free),
+  });
 }
 
 /** „18 von 24 gekeimt“, while the batch has just germinated. */
-export function germinationText(sowing: SowingBatch): string | undefined {
+export function germinationText(sowing: SowingBatch, language: Language): string | undefined {
   return sowing.stage === 'GERMINATED'
-    ? `${String(sowing.aliveCount)} von ${String(sowing.sownCount)} gekeimt`
+    ? i18n.getFixedT(language, 'sowings')('stock.germinated', {
+        alive: sowing.aliveCount,
+        sown: sowing.sownCount,
+      })
     : undefined;
 }
 
@@ -186,15 +187,15 @@ export function defaultTransplantDate(
 export function linkedPlantingsText(
   plantings: SowingWithPlantings['plantings'],
   bedName: (bedId: string) => string,
+  language: Language,
 ): string | undefined {
   if (plantings.length === 0) return undefined;
-  const beds = [...new Set(plantings.map((p) => bedName(p.bedId)))].map((name) => `„${name}“`);
-  const where =
-    beds.length > 1 ? `${beds.slice(0, -1).join(', ')} und ${beds.at(-1) ?? ''}` : beds[0];
-  const one = plantings.length === 1;
-  return `${one ? '1 Pflanzung' : `${String(plantings.length)} Pflanzungen`} in ${where ?? ''} ${
-    one ? 'stammt' : 'stammen'
-  } aus dieser Anzucht. ${one ? 'Sie bleibt' : 'Sie bleiben'} im Beet, nur die Verbindung zur Anzucht geht verloren.`;
+  const t = i18n.getFixedT(language, 'sowings');
+  const beds = [...new Set(plantings.map((p) => bedName(p.bedId)))].map((name) =>
+    t('quoted', { name }),
+  );
+  const where = new Intl.ListFormat(intlLocale(language), { type: 'conjunction' }).format(beds);
+  return t('deleteDialog.linked', { count: plantings.length, beds: where });
 }
 
 /** A batch the editor offers for planting out, with its plant and how many are free. */
@@ -244,10 +245,13 @@ export function originText(
   planting: Planting,
   sowings: readonly SowingWithPlantings[],
   plant: Pick<Plant, 'spacingInRowCm'>,
+  language: Language,
 ): string | undefined {
   const item = sowings.find((s) => s.sowing.id === planting.sowingId);
   if (!item) return undefined;
-  return `Aus der Anzucht vom ${formatWeek(item.sowing.sowDate).range}, ${String(
-    plantCount(planting, plant),
-  )} von ${String(batchStock(item.sowing))}`;
+  return i18n.getFixedT(language, 'sowings')('origin', {
+    range: formatWeek(item.sowing.sowDate).range,
+    planted: plantCount(planting, plant),
+    stock: batchStock(item.sowing),
+  });
 }

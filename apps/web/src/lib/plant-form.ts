@@ -1,6 +1,8 @@
 import type { CatalogPlant, Category, Lifecycle, PlantFields } from '@hochbeet/contracts';
 import { CATEGORY_ICONS, hasIcon } from '@hochbeet/plant-icons';
 import { type AdjustErrors, type AdjustForm, adjustForm, parseAdjustForm } from './catalog';
+import { i18n } from './i18n';
+import type { Language } from './language';
 import { EMPTY_SOWING_FORM } from './sowing-form';
 
 /** Form values of an own plant; `icon: null` means the category icon. */
@@ -22,24 +24,8 @@ export const DEFAULT_COLOR: Record<Category, string> = {
   KRAUT: '#6a994e',
 };
 
-/** The lifecycle choices with an explanation of what they mean in the bed. */
-export const LIFECYCLE_OPTIONS: { type: Lifecycle['type']; label: string; hint: string }[] = [
-  {
-    type: 'ANNUAL',
-    label: 'Eine Kultur',
-    hint: 'Steht einige Wochen im Beet, z. B. Salat 8 Wochen. Danach endet die Pflanzung von selbst.',
-  },
-  {
-    type: 'MULTI_YEAR',
-    label: 'Mehrere Jahre',
-    hint: 'Bleibt einige Jahre, z. B. Erdbeeren 3 Jahre, und endet dann.',
-  },
-  {
-    type: 'PERENNIAL',
-    label: 'Dauerkultur',
-    hint: 'Bleibt, bis du sie aus dem Beet entfernst, z. B. Schnittlauch.',
-  },
-];
+/** The lifecycle choices; the form explains each in the bed (`form.lifecycleOption`). */
+export const LIFECYCLE_TYPES: readonly Lifecycle['type'][] = ['ANNUAL', 'MULTI_YEAR', 'PERENNIAL'];
 
 export const EMPTY_PLANT_FORM: PlantForm = {
   name: '',
@@ -70,17 +56,18 @@ export function plantForm(plant: CatalogPlant): PlantForm {
   };
 }
 
-/** Checks the form; returns the plant fields or German messages per field. */
+/** Checks the form; returns the plant fields or messages per field in `language`. */
 export function parsePlantForm(
   form: PlantForm,
+  language: Language,
 ): { fields: PlantFields } | { errors: PlantFormErrors } {
   const name = form.name.trim();
-  const rest = parseAdjustForm(form);
+  const rest = parseAdjustForm(form, language);
   if (name === '' || 'errors' in rest) {
     return {
       errors: {
         ...('errors' in rest ? rest.errors : {}),
-        ...(name === '' ? { name: 'Bitte gib einen Namen an.' } : {}),
+        ...(name === '' ? { name: i18n.getFixedT(language, 'catalog')('errors.name') } : {}),
       },
     };
   }

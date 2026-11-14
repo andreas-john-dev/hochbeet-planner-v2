@@ -1,24 +1,21 @@
-import type { SowingMethod } from '@hochbeet/contracts';
 import { weekHint } from '@hochbeet/garden-rules';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FormField } from '@/components/FormField';
-import { SOWING_METHOD_LABEL } from '@/lib/sowing';
+import { SOWING_METHODS } from '@/lib/sowing';
 import { type SowingErrors, type SowingForm, usesField } from '@/lib/sowing-form';
 import { cn } from '@/lib/utils';
 
-const METHODS: { method: SowingMethod; hint: string }[] = [
-  { method: 'DIRECT', hint: 'Wird direkt ins Beet gesät, z. B. Möhren.' },
-  { method: 'PRESOW', hint: 'Wird vorgezogen und als Jungpflanze gesetzt, z. B. Tomaten.' },
-  { method: 'BOTH', hint: 'Geht beides, z. B. Salat.' },
-];
-
-/** Hint under a week field: where the week roughly lies in the year. */
-function weekFieldHint(value: string, end = false): string {
+/**
+ * Hint under a week field: where the week roughly lies in the year (German until T-69), else
+ * the allowed weeks.
+ */
+function weekFieldHint(value: string, fallback: string, end = false): string {
   const week = Number(value);
   return value.trim() !== '' && Number.isInteger(week) && week >= 1 && week <= 53
     ? weekHint(week, { end })
-    : 'KW 1 bis 53';
+    : fallback;
 }
 
 /**
@@ -37,7 +34,9 @@ export function SowingFields({
   allowNone: boolean;
   onChange: (change: Partial<SowingForm>) => void;
 }) {
+  const { t } = useTranslation('catalog');
   const ids = { method: useId(), frost: useId() };
+  const weekRange = t('sowingFields.weekRange');
   // Open when the plant has details; afterwards the user decides, errors open it again.
   const [open, setOpen] = useState(value.method !== null || value.frostSensitive);
   const hasErrors = Object.keys(errors).length > 0;
@@ -61,7 +60,7 @@ export function SowingFields({
       }}
     >
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium md:min-h-9 [&::-webkit-details-marker]:hidden">
-        Aussaat & Anzucht
+        {t('sowingFields.title')}
         <ChevronDown aria-hidden className="size-4 transition-transform group-open:rotate-180" />
       </summary>
       <div className="flex flex-col gap-4 border-t p-3">
@@ -76,33 +75,31 @@ export function SowingFields({
             }}
           />
           <span className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium">Frostempfindlich</span>
-            <span className="text-muted-foreground text-xs">
-              Kommt erst nach dem letzten Frost ins Freie, z. B. nach den Eisheiligen.
-            </span>
+            <span className="text-sm font-medium">{t('sowingFields.frostSensitive')}</span>
+            <span className="text-muted-foreground text-xs">{t('sowingFields.frostHint')}</span>
           </span>
         </label>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium">Aussaat</legend>
+          <legend className="mb-1 text-sm font-medium">{t('sowingFields.sowing')}</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {allowNone && (
               <MethodOption
                 name={ids.method}
-                label="Keine Angaben"
-                hint="Ohne Aussaatdaten."
+                label={t('sowingFields.none')}
+                hint={t('sowingFields.noneHint')}
                 checked={value.method === null}
                 onSelect={() => {
                   onChange({ method: null });
                 }}
               />
             )}
-            {METHODS.map(({ method, hint }) => (
+            {SOWING_METHODS.map((method) => (
               <MethodOption
                 key={method}
                 name={ids.method}
-                label={SOWING_METHOD_LABEL[method]}
-                hint={hint}
+                label={t(`method.${method}`)}
+                hint={t(`sowingFields.methodHint.${method}`)}
                 checked={value.method === method}
                 onSelect={() => {
                   onChange({ method });
@@ -113,92 +110,92 @@ export function SowingFields({
         </fieldset>
 
         {uses('presowFrom') && (
-          <Group title="Vorkultur">
+          <Group title={t('sowingFields.presow')}>
             <FormField
-              label="Aussaat ab KW"
+              label={t('sowingFields.sowFrom')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.presowFrom)}
+              hint={weekFieldHint(value.presowFrom, weekRange)}
               {...number('presowFrom')}
             />
             <FormField
-              label="Aussaat bis KW"
+              label={t('sowingFields.sowTo')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.presowTo, true)}
+              hint={weekFieldHint(value.presowTo, weekRange, true)}
               {...number('presowTo')}
             />
             <FormField
-              label="Vorkultur von (Wochen)"
+              label={t('sowingFields.propagationMin')}
               min={1}
               max={26}
-              hint="Bis zum Auspflanzen"
+              hint={t('sowingFields.propagationHint')}
               {...number('propagationMin')}
             />
             <FormField
-              label="Vorkultur bis (Wochen)"
+              label={t('sowingFields.propagationMax')}
               min={1}
               max={26}
               {...number('propagationMax')}
             />
             <FormField
-              label="Pikieren nach (Wochen)"
+              label={t('sowingFields.prickOut')}
               min={1}
               max={12}
-              hint="Optional"
+              hint={t('sowingFields.optional')}
               {...number('prickOutWeeks')}
             />
           </Group>
         )}
 
         {uses('directFrom') && (
-          <Group title="Direktsaat">
+          <Group title={t('sowingFields.direct')}>
             <FormField
-              label="Aussaat ab KW"
+              label={t('sowingFields.sowFrom')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.directFrom)}
+              hint={weekFieldHint(value.directFrom, weekRange)}
               {...number('directFrom')}
             />
             <FormField
-              label="Aussaat bis KW"
+              label={t('sowingFields.sowTo')}
               min={1}
               max={53}
-              hint={weekFieldHint(value.directTo, true)}
+              hint={weekFieldHint(value.directTo, weekRange, true)}
               {...number('directTo')}
             />
             <FormField
-              label="Länger im Beet (Wochen)"
+              label={t('sowingFields.extraWeeks')}
               min={0}
               max={26}
-              hint="Optional: Keimen und erste Wochen, kommt bei Direktsaat zur Kulturdauer dazu"
+              hint={t('sowingFields.extraWeeksHint')}
               {...number('directSowExtraWeeks')}
             />
           </Group>
         )}
 
         {value.method !== null && (
-          <Group title="Keimung (optional)">
+          <Group title={t('sowingFields.germination')}>
             <FormField
-              label="Keimdauer von (Tage)"
+              label={t('sowingFields.germinationDaysMin')}
               min={1}
               max={60}
               {...number('germinationDaysMin')}
             />
             <FormField
-              label="Keimdauer bis (Tage)"
+              label={t('sowingFields.germinationDaysMax')}
               min={1}
               max={60}
               {...number('germinationDaysMax')}
             />
             <FormField
-              label="Keimtemperatur von (°C)"
+              label={t('sowingFields.germinationTempMin')}
               min={0}
               max={40}
               {...number('germinationTempMin')}
             />
             <FormField
-              label="Keimtemperatur bis (°C)"
+              label={t('sowingFields.germinationTempMax')}
               min={0}
               max={40}
               {...number('germinationTempMax')}

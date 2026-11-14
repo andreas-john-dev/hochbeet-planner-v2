@@ -189,7 +189,7 @@ export const appPages: readonly AppPage[] = [
     access: 'admin',
   },
   { id: 'dev-icons', path: '/dev/icons', heading: 'Icon-Galerie', access: 'public' },
-  // English: pages whose texts are translated (more follow with the other areas).
+  // English: one entry per translated area.
   { id: 'en-anmelden', path: '/anmelden', heading: 'Sign in', access: 'public', language: 'en' },
   { id: 'en-profil', path: '/profil', heading: 'Profile', access: 'user', language: 'en' },
   {
@@ -208,6 +208,29 @@ export const appPages: readonly AppPage[] = [
     seed: exampleGarden,
     language: 'en',
   },
+  {
+    id: 'en-anzucht',
+    path: '/anzucht',
+    heading: 'Seedlings',
+    access: 'user',
+    seed: sowingsGarden,
+    language: 'en',
+  },
+  {
+    id: 'en-katalog',
+    path: '/katalog',
+    heading: 'Plant catalogue',
+    access: 'user',
+    language: 'en',
+  },
+  {
+    id: 'en-katalog-sorte',
+    path: '/katalog/01M49THV00RK9E9PC83NEE87CJ',
+    heading: 'Kopfsalat',
+    access: 'user',
+    language: 'en',
+  },
+  { id: 'en-admin', path: '/admin', heading: 'Administration', access: 'admin', language: 'en' },
   // Guest mode: same pages, with the guest banner and the local API.
   {
     id: 'gast-beete',

@@ -1,8 +1,8 @@
-import type { Category, Feeder } from '@hochbeet/contracts';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import { Link } from '@tanstack/react-router';
 import { Plus, Search } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SourceBadge } from '@/components/catalog/SourceBadge';
 import { FormMessage } from '@/components/FormField';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SkeletonList } from '@/components/ui/skeleton';
 import {
-  CATEGORY_LABEL,
+  CATEGORIES,
   type CatalogFilter,
   families,
-  FEEDER_LABEL,
+  FEEDERS,
   filterCatalog,
   NO_FILTER,
 } from '@/lib/catalog';
@@ -49,6 +49,7 @@ function Chip({
 
 /** The user's catalogue: global plants (possibly adjusted) and own plants, searchable. */
 export function CatalogPage() {
+  const { t } = useTranslation('catalog');
   const plants = usePlants();
   const [filter, setFilter] = useState<CatalogFilter>(NO_FILTER);
   const searchId = useId();
@@ -61,21 +62,18 @@ export function CatalogPage() {
 
   return (
     <>
-      <PageHeader
-        title="Pflanzenkatalog"
-        description="Gemüse, Obst und Kräuter mit Abständen, Standzeit und Nachbarn."
-      >
+      <PageHeader title={t('title')} description={t('description')}>
         <Button asChild className="h-11 md:h-10">
           <Link to="/katalog/neu">
             <Plus aria-hidden />
-            Eigene Sorte anlegen
+            {t('createOwn')}
           </Link>
         </Button>
       </PageHeader>
-      <div className="flex flex-col gap-3" role="search" aria-label="Sorten filtern">
+      <div className="flex flex-col gap-3" role="search" aria-label={t('list.filters')}>
         <div className="relative">
           <label htmlFor={searchId} className="sr-only">
-            Sorte oder Familie suchen
+            {t('list.search')}
           </label>
           <Search
             aria-hidden
@@ -84,7 +82,7 @@ export function CatalogPage() {
           <Input
             id={searchId}
             type="search"
-            placeholder="Sorte oder Familie suchen"
+            placeholder={t('list.search')}
             value={filter.query}
             onChange={(event) => {
               update({ query: event.target.value });
@@ -92,16 +90,16 @@ export function CatalogPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Kategorie">
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t('list.category')}>
           <Chip
             pressed={filter.category === null}
             onClick={() => {
               update({ category: null });
             }}
           >
-            Alle
+            {t('list.all')}
           </Chip>
-          {(Object.keys(CATEGORY_LABEL) as Category[]).map((category) => (
+          {CATEGORIES.map((category) => (
             <Chip
               key={category}
               pressed={filter.category === category}
@@ -109,13 +107,13 @@ export function CatalogPage() {
                 update({ category });
               }}
             >
-              {CATEGORY_LABEL[category]}
+              {t(`category.${category}`)}
             </Chip>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Bedarf">
-            {(Object.keys(FEEDER_LABEL) as Feeder[]).map((feeder) => (
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('list.feeder')}>
+            {FEEDERS.map((feeder) => (
               <Chip
                 key={feeder}
                 pressed={filter.feeder === feeder}
@@ -123,12 +121,12 @@ export function CatalogPage() {
                   update({ feeder: filter.feeder === feeder ? null : feeder });
                 }}
               >
-                {FEEDER_LABEL[feeder]}
+                {t(`feeder.${feeder}`)}
               </Chip>
             ))}
           </div>
           <label htmlFor={familyId} className="sr-only">
-            Familie
+            {t('list.family')}
           </label>
           <select
             id={familyId}
@@ -138,7 +136,7 @@ export function CatalogPage() {
             }}
             className="bg-card focus-visible:ring-ring/50 h-11 rounded-md border px-3 text-base outline-none focus-visible:ring-[3px] md:h-9 md:text-sm"
           >
-            <option value="">Alle Familien</option>
+            <option value="">{t('list.allFamilies')}</option>
             {families(all).map((family) => (
               <option key={family} value={family}>
                 {family}
@@ -150,19 +148,15 @@ export function CatalogPage() {
 
       {plants.isError ? (
         <div className="mt-6">
-          <FormMessage tone="error">
-            Der Katalog konnte nicht geladen werden. Bitte lade die Seite neu.
-          </FormMessage>
+          <FormMessage tone="error">{t('loadError')}</FormMessage>
         </div>
       ) : (
         <>
           <p className="text-muted-foreground mt-4 mb-2 text-sm" aria-live="polite">
-            {plants.isPending
-              ? ''
-              : `${String(shown.length)} ${shown.length === 1 ? 'Sorte' : 'Sorten'}`}
+            {plants.isPending ? '' : t('list.count', { count: shown.length })}
           </p>
-          {plants.isPending && <SkeletonList label="Katalog wird geladen …" count={9} />}
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Sorten">
+          {plants.isPending && <SkeletonList label={t('loading')} count={9} />}
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label={t('list.plants')}>
             {shown.map((plant) => (
               <li key={plant.id}>
                 <Link
@@ -177,7 +171,7 @@ export function CatalogPage() {
                       <SourceBadge plant={plant} />
                     </span>
                     <span className="text-muted-foreground truncate text-xs">
-                      {plant.family} · {FEEDER_LABEL[plant.feeder]}
+                      {plant.family} · {t(`feeder.${plant.feeder}`)}
                     </span>
                   </span>
                 </Link>
@@ -185,9 +179,7 @@ export function CatalogPage() {
             ))}
           </ul>
           {!plants.isPending && shown.length === 0 && (
-            <p className="text-muted-foreground mt-6 text-center text-sm">
-              Keine Sorte passt zu Suche und Filtern.
-            </p>
+            <p className="text-muted-foreground mt-6 text-center text-sm">{t('list.none')}</p>
           )}
         </>
       )}

@@ -24,7 +24,7 @@ const filled = {
 
 describe('own plant form', () => {
   it('turns the form into plant fields, with the category icon as fallback', () => {
-    expect(parsePlantForm(filled)).toEqual({
+    expect(parsePlantForm(filled, 'de')).toEqual({
       fields: {
         name: 'Haferwurzel',
         category: 'GEMUESE',
@@ -39,12 +39,12 @@ describe('own plant form', () => {
         icon: 'category-gemuese',
       },
     });
-    const herb = parsePlantForm({ ...filled, category: 'KRAUT', icon: 'dill' });
+    const herb = parsePlantForm({ ...filled, category: 'KRAUT', icon: 'dill' }, 'de');
     expect('fields' in herb && herb.fields.icon).toBe('dill');
   });
 
   it('reports missing values per field', () => {
-    expect(parsePlantForm(EMPTY_PLANT_FORM)).toEqual({
+    expect(parsePlantForm(EMPTY_PLANT_FORM, 'de')).toEqual({
       errors: {
         name: 'Bitte gib einen Namen an.',
         family: 'Bitte gib eine Familie an.',
@@ -53,10 +53,19 @@ describe('own plant form', () => {
         lifecycleValue: 'Bitte 1 bis 104 Wochen angeben.',
       },
     });
+    expect(parsePlantForm(EMPTY_PLANT_FORM, 'en')).toEqual({
+      errors: {
+        name: 'Please enter a name.',
+        family: 'Please enter a family.',
+        spacingInRowCm: 'Please enter 1 to 300 cm.',
+        rowSpacingCm: 'Please enter 1 to 300 cm.',
+        lifecycleValue: 'Please enter 1 to 104 weeks.',
+      },
+    });
   });
 
   it('round-trips an own plant', () => {
-    const parsed = parsePlantForm(filled);
+    const parsed = parsePlantForm(filled, 'de');
     if (!('fields' in parsed)) throw new Error('invalid');
     const own: CatalogPlant = {
       ...parsed.fields,
