@@ -694,6 +694,196 @@
     }
   },
   {
+    "id": "anzucht-aufgaben",
+    "path": "/anzucht",
+    "heading": "Anzucht",
+    "access": "user",
+    "seed": {
+      "beds": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "name": "Beet Herbst",
+          "widthCm": 200,
+          "depthCm": 100,
+          "mainRowDirection": "V",
+          "soilRenewals": []
+        }
+      ],
+      "plantings": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0V01",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "origin": "TRANSPLANT",
+          "kind": "ROW",
+          "x": 20,
+          "y": 20,
+          "startDate": "2026-10-12",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 50,
+          "sowingId": "01J9ZQ3W8D6V2K5M7N8P9R0SX4"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0V02",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "plantId": "01M49THV009C9ACEM9APGSMT4E",
+          "origin": "DIRECT_SOW",
+          "kind": "ROW",
+          "x": 20,
+          "y": 60,
+          "startDate": "2026-10-05",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 60
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0V03",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "plantId": "01M49THV00A6TVTS7JDM60G9YY",
+          "origin": "TRANSPLANT",
+          "kind": "SINGLE",
+          "x": 150,
+          "y": 50,
+          "startDate": "2026-10-05",
+          "endDate": null,
+          "removedDate": null
+        }
+      ],
+      "sowings": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX1",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "sowDate": "2026-10-05",
+          "sownCount": 12,
+          "aliveCount": 0,
+          "stage": "PLANNED"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX2",
+          "plantId": "01M49THV007TNRTCQDEDDW9N6D",
+          "sowDate": "2026-09-28",
+          "sownCount": 8,
+          "aliveCount": 0,
+          "stage": "PLANNED"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX3",
+          "plantId": "01M49THV00QS1SEJEM64991JH5",
+          "sowDate": "2026-09-21",
+          "sownCount": 12,
+          "aliveCount": 8,
+          "stage": "GERMINATED"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX4",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "sowDate": "2026-09-14",
+          "sownCount": 12,
+          "aliveCount": 10,
+          "stage": "GERMINATED"
+        }
+      ]
+    }
+  },
+  {
+    "id": "beete-aufgaben",
+    "path": "/beete",
+    "heading": "Meine Beete",
+    "access": "user",
+    "seed": {
+      "beds": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "name": "Beet Herbst",
+          "widthCm": 200,
+          "depthCm": 100,
+          "mainRowDirection": "V",
+          "soilRenewals": []
+        }
+      ],
+      "plantings": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0V01",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "origin": "TRANSPLANT",
+          "kind": "ROW",
+          "x": 20,
+          "y": 20,
+          "startDate": "2026-10-12",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 50,
+          "sowingId": "01J9ZQ3W8D6V2K5M7N8P9R0SX4"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0V02",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "plantId": "01M49THV009C9ACEM9APGSMT4E",
+          "origin": "DIRECT_SOW",
+          "kind": "ROW",
+          "x": 20,
+          "y": 60,
+          "startDate": "2026-10-05",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 60
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0V03",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S3A",
+          "plantId": "01M49THV00A6TVTS7JDM60G9YY",
+          "origin": "TRANSPLANT",
+          "kind": "SINGLE",
+          "x": 150,
+          "y": 50,
+          "startDate": "2026-10-05",
+          "endDate": null,
+          "removedDate": null
+        }
+      ],
+      "sowings": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX1",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "sowDate": "2026-10-05",
+          "sownCount": 12,
+          "aliveCount": 0,
+          "stage": "PLANNED"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX2",
+          "plantId": "01M49THV007TNRTCQDEDDW9N6D",
+          "sowDate": "2026-09-28",
+          "sownCount": 8,
+          "aliveCount": 0,
+          "stage": "PLANNED"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX3",
+          "plantId": "01M49THV00QS1SEJEM64991JH5",
+          "sowDate": "2026-09-21",
+          "sownCount": 12,
+          "aliveCount": 8,
+          "stage": "GERMINATED"
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0SX4",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "sowDate": "2026-09-14",
+          "sownCount": 12,
+          "aliveCount": 10,
+          "stage": "GERMINATED"
+        }
+      ]
+    }
+  },
+  {
     "id": "anzucht-plan",
     "path": "/anzucht",
     "heading": "Anzucht",
