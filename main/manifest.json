@@ -1078,6 +1078,20 @@
     "access": "public"
   },
   {
+    "id": "en-anmelden",
+    "path": "/anmelden",
+    "heading": "Sign in",
+    "access": "public",
+    "language": "en"
+  },
+  {
+    "id": "en-profil",
+    "path": "/profil",
+    "heading": "Profile",
+    "access": "user",
+    "language": "en"
+  },
+  {
     "id": "gast-beete",
     "path": "/beete",
     "heading": "Meine Beete",
