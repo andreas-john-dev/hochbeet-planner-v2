@@ -1,6 +1,6 @@
 # Beet-Assistent
 
-Teil der [Architektur](../architecture.md) (Epic #89). KI-Assistent auf Bedrock AgentCore: Agent, Kostengrenzen, Guardrails, Tools über das Gateway, Gedächtnis, Pflanzvorschläge, Tracing und Modellvergleich.
+Teil der [Architektur](../architecture.md) (Epic #89). KI-Assistent auf Bedrock AgentCore: Agent, Kostengrenzen, Prompt-Caching, Guardrails, Tools über das Gateway, Gedächtnis, Pflanzvorschläge, Tracing und Modellvergleich.
 
 Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Experiment mit Bedrock AgentCore, deshalb mit harten Kostengrenzen von Anfang an.
 
@@ -23,6 +23,25 @@ Ein KI-Assistent, der Warnungen erklärt und beim Planen hilft. Vor allem ein Ex
 - Vom Gesprächsverlauf behält der Agent höchstens `historyMessages` (20) Nachrichten im Kontext (Sliding Window); alte Tool-Ergebnisse werden beim Wiederherstellen weggelassen. So wächst eine Frage in einem langen Gespräch nicht beliebig. Vorlieben kommen höchstens fünf pro Frage dazu.
 - Zugang nur für die Cognito-Gruppen `ai-testers` und `admins`; Gäste nie.
 - AWS-Budget (`Prod-SharedStateful`) für das ganze Konto, 10 USD im Monat, Mails bei 80 % und 100 % der tatsächlichen Kosten an die GitHub-Variable `BUDGET_ALERT_EMAIL`.
+
+## Prompt-Caching (T-65): aus
+
+Systemprompt und Tool-Definitionen sind bei jeder Frage gleich und damit grundsätzlich cachebar. Gemessen am 14. November 2026 für Claude Haiku 4.5, ohne Modellaufruf:
+
+| Teil des Requests (Converse, wie Strands ihn baut) | Fragen | Pflanzvorschläge |
+| --- | --- | --- |
+| Systemprompt (`SYSTEM_PROMPT`) | 2.009 Zeichen | 2.009 Zeichen |
+| Tools (`toolConfig` als JSON) | 2.746 Zeichen (5 Gateway-Tools) | 1.922 Zeichen (`find_plants` und das Tool `SuggestionList` der strukturierten Ausgabe) |
+| Systemprompt für Tool-Nutzung, den Bedrock bei Claude ergänzt | 496 Tokens | 496 Tokens |
+| **Geschätzt zusammen** | **≈ 1.900 Tokens, höchstens ≈ 2.400** | **≈ 1.600 Tokens, höchstens ≈ 2.100** |
+| Mindestgröße pro Cache-Checkpoint, Claude Haiku 4.5 | 4.096 Tokens | 4.096 Tokens |
+
+- Geschätzt mit 3,5 Zeichen pro Token, die obere Grenze mit 2,5 Zeichen pro Token; deutscher Text und JSON-Schemas liegen dazwischen. Selbst die obere Grenze erreicht nur gut die Hälfte des Minimums, eine genaue Zählung ändert die Entscheidung also nicht. Der Token-Zähler von Bedrock (`CountTokens`, mit der Modell-ID ohne Inference-Profil) war aus der Session nicht erreichbar. Die Zeichenzahlen stammen aus dem Request, den `BedrockModel.format_request()` mit den Tool-Definitionen aus `gatewayToolDefinitions()` baut. Die Mindestgröße steht in der Bedrock-Doku zu Prompt-Caching, der Tool-Prompt in der Doku von Anthropic zu Tool Use.
+- Bedrock zählt die Mindestgröße über alles vor dem Checkpoint, in der Reihenfolge `tools` → `system` → `messages`. Ein Checkpoint hinter Systemprompt und Tools bliebe also wirkungslos: Bedrock nimmt die Anfrage an, cacht aber nichts.
+- **Entscheidung:** nicht eingeschaltet. `BedrockModel` bekommt keine `cache_config`, der Modellvergleich erfasst keine Cache-Tokens.
+- Amazon Nova Lite, die Alternative aus dem Modellvergleich, cacht nur `system` und `messages`, keine Tools, und erst ab 1.000 Tokens; der Systemprompt allein (≈ 600 Tokens) reicht dafür auch nicht.
+- **Neu prüfen** bei einem Modellwechsel (neuere Claude-Modelle cachen schon ab 512 oder 1.024 Tokens), wenn Systemprompt oder Tools deutlich wachsen (über ≈ 10.000 Zeichen zusammen), oder wenn das Gateway mehr Tools liefert.
+- **Nicht untersucht** (außerhalb von T-65): einen Checkpoint im Verlauf, z. B. über die automatische Platzierung (`cache_control` im Request). Innerhalb einer Frage wiederholt jeder weitere Modellaufruf nach einem Tool-Aufruf den Request davor, dann kann der Präfix mit Tool-Ergebnissen über 4.096 Tokens kommen (im Modellvergleich im Schnitt 8.783 Eingabe-Tokens auf knapp drei Modellaufrufe je Frage). Ob sich das lohnt, zeigt erst ein Lauf mit Cache-Tokens: Schreiben kostet bei Claude das 1,25-Fache, Lesen ein Zehntel des Eingabepreises. Ein Treffer ist aber nicht garantiert, denn der Cache liegt auf dem Server, der die Anfrage bearbeitet hat, und das EU-Inference-Profil verteilt auf mehrere Regionen.
 
 ## Runtime (`Prod-Assistant`)
 
