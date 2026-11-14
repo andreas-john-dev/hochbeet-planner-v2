@@ -5,6 +5,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { Search } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useStore } from 'zustand';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { CATEGORIES, filterPlants } from '@/lib/editor/palette';
 import type { PlantingKind } from '@/lib/editor/placement';
@@ -12,10 +13,10 @@ import type { EditorStore, PreviewSowing } from '@/lib/editor/store';
 import { type AvailableSowing, previewSowing } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
 
-const KINDS: readonly { value: PlantingKind; label: string }[] = [
-  { value: 'SINGLE', label: 'Einzelpflanze' },
-  { value: 'ROW', label: 'Reihe' },
-];
+const KINDS = [
+  { value: 'SINGLE', label: 'palette.single' },
+  { value: 'ROW', label: 'palette.row' },
+] as const satisfies readonly { value: PlantingKind; label: string }[];
 
 /** Small pill buttons for one choice out of a few; `aria-pressed` marks the active one. */
 function Choice({
@@ -64,6 +65,7 @@ const itemClass = (active: boolean, tall = false) =>
 
 /** Name and, for a sowing batch, its week and free seedlings. */
 function ItemLabel({ plant, sowing }: { plant: Plant; sowing: PreviewSowing | undefined }) {
+  const { t } = useTranslation('editor');
   return (
     <>
       <PlantIcon plant={plant} size={28} decorative />
@@ -71,7 +73,7 @@ function ItemLabel({ plant, sowing }: { plant: Plant; sowing: PreviewSowing | un
         <span className="truncate">{plant.name}</span>
         {sowing && (
           <span className="text-muted-foreground truncate text-xs">
-            {formatWeek(sowing.sowDate).week} · {String(sowing.free)} frei
+            {t('palette.free', { week: formatWeek(sowing.sowDate).week, count: sowing.free })}
           </span>
         )}
       </span>
@@ -165,6 +167,7 @@ export function PlantPalette({
   variant?: 'sidebar' | 'sheet';
   className?: string;
 }) {
+  const { t } = useTranslation('editor');
   const sheet = variant === 'sheet';
   const Item = sheet ? TapItem : DraggableItem;
   const [query, setQuery] = useState('');
@@ -175,20 +178,23 @@ export function PlantPalette({
 
   return (
     <aside
-      aria-label="Pflanzen hinzufügen"
+      aria-label={t('palette.title')}
       className={cn(
         'flex min-h-0 flex-col gap-3',
         !sheet && 'bg-card rounded-xl border p-3',
         className,
       )}
     >
-      {!sheet && <h2 className="text-sm font-semibold">Pflanzen hinzufügen</h2>}
+      {!sheet && <h2 className="text-sm font-semibold">{t('palette.title')}</h2>}
       {sowings.length > 0 && (
         <section aria-labelledby={`${searchId}-sowings`} className="flex flex-col gap-1">
           <h3 id={`${searchId}-sowings`} className="text-muted-foreground text-xs font-medium">
-            Aus der Anzucht
+            {t('palette.fromSowings')}
           </h3>
-          <ul aria-label="Anzuchten" className="-mx-1 flex max-h-40 flex-col overflow-y-auto px-1">
+          <ul
+            aria-label={t('palette.sowings')}
+            className="-mx-1 flex max-h-40 flex-col overflow-y-auto px-1"
+          >
             {sowings.map((available) => {
               const sowing = previewSowing(available);
               return (
@@ -206,7 +212,11 @@ export function PlantPalette({
           </ul>
         </section>
       )}
-      <div role="group" aria-label="Pflanzart" className="bg-muted flex gap-1 rounded-lg p-1">
+      <div
+        role="group"
+        aria-label={t('palette.kind')}
+        className="bg-muted flex gap-1 rounded-lg p-1"
+      >
         {KINDS.map((k) => (
           <Choice
             key={k.value}
@@ -216,13 +226,13 @@ export function PlantPalette({
               setKind(k.value);
             }}
           >
-            {k.label}
+            {t(k.label)}
           </Choice>
         ))}
       </div>
       <div className="relative">
         <label htmlFor={searchId} className="sr-only">
-          Sorte suchen
+          {t('palette.search')}
         </label>
         <Search
           aria-hidden
@@ -231,7 +241,7 @@ export function PlantPalette({
         <Input
           id={searchId}
           type="search"
-          placeholder="Sorte suchen"
+          placeholder={t('palette.search')}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -239,7 +249,7 @@ export function PlantPalette({
           className="pl-9"
         />
       </div>
-      <div role="group" aria-label="Kategorie" className="flex flex-wrap gap-1">
+      <div role="group" aria-label={t('palette.category')} className="flex flex-wrap gap-1">
         <Choice
           large={sheet}
           pressed={category === null}
@@ -247,23 +257,26 @@ export function PlantPalette({
             setCategory(null);
           }}
         >
-          Alle
+          {t('palette.all')}
         </Choice>
         {CATEGORIES.map((c) => (
           <Choice
-            key={c.value}
+            key={c}
             large={sheet}
-            pressed={category === c.value}
+            pressed={category === c}
             onClick={() => {
-              setCategory(c.value);
+              setCategory(c);
             }}
           >
-            {c.label}
+            {t(`palette.categories.${c}`)}
           </Choice>
         ))}
       </div>
       {shown.length > 0 ? (
-        <ul aria-label="Sorten" className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+        <ul
+          aria-label={t('palette.varieties')}
+          className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
+        >
           {shown.map((plant) => (
             <Item
               key={plant.id}
@@ -278,13 +291,9 @@ export function PlantPalette({
           ))}
         </ul>
       ) : (
-        <p className="text-muted-foreground text-sm">Keine Sorte gefunden.</p>
+        <p className="text-muted-foreground text-sm">{t('palette.noMatch')}</p>
       )}
-      {!sheet && (
-        <p className="text-muted-foreground text-xs">
-          Ins Beet ziehen oder auswählen und mit Pfeiltasten und Enter setzen.
-        </p>
-      )}
+      {!sheet && <p className="text-muted-foreground text-xs">{t('palette.help')}</p>}
     </aside>
   );
 }

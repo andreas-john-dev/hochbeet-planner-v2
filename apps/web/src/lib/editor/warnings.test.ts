@@ -1,6 +1,6 @@
 import { seedPlants } from '@hochbeet/catalog-seed';
 import type { Bed, Planting } from '@hochbeet/contracts';
-import type { Finding } from '@hochbeet/garden-rules';
+import type { Finding, Interval } from '@hochbeet/garden-rules';
 import { describe, expect, it } from 'vitest';
 import {
   findingsSummary,
@@ -130,23 +130,45 @@ describe('finding week and period', () => {
   });
 
   it('formats the period in ISO weeks', () => {
-    expect(formatPeriod({ start: '2026-05-04', end: '2026-06-01' })).toBe('KW 19 – KW 22 2026');
-    expect(formatPeriod({ start: '2026-05-04', end: '2026-05-11' })).toBe('KW 19 2026');
-    expect(formatPeriod({ start: '2026-04-06', end: null })).toBe('ab KW 15 2026');
-    expect(formatPeriod({ start: '2026-11-02', end: '2027-03-01' })).toBe('KW 45 2026 – KW 8 2027');
+    const de = (period: Interval) => formatPeriod(period, 'de');
+    expect(de({ start: '2026-05-04', end: '2026-06-01' })).toBe('KW 19 – KW 22 2026');
+    expect(de({ start: '2026-05-04', end: '2026-05-11' })).toBe('KW 19 2026');
+    expect(de({ start: '2026-04-06', end: null })).toBe('ab KW 15 2026');
+    expect(de({ start: '2026-11-02', end: '2027-03-01' })).toBe('KW 45 2026 – KW 8 2027');
+  });
+
+  it('formats the period in English', () => {
+    const en = (period: Interval) => formatPeriod(period, 'en');
+    expect(en({ start: '2026-05-04', end: '2026-06-01' })).toBe('Week 19 – Week 22 2026');
+    expect(en({ start: '2026-05-04', end: '2026-05-11' })).toBe('Week 19 2026');
+    expect(en({ start: '2026-04-06', end: null })).toBe('from Week 15 2026');
+    expect(en({ start: '2026-11-02', end: '2027-03-01' })).toBe('Week 45 2026 – Week 8 2027');
   });
 });
 
 describe('summary', () => {
   it('counts per severity', () => {
     expect(
-      findingsSummary([
-        finding('WARNING', []),
-        finding('WARNING', []),
-        finding('HINT', []),
-        finding('POSITIVE', []),
-      ]),
+      findingsSummary(
+        [
+          finding('WARNING', []),
+          finding('WARNING', []),
+          finding('HINT', []),
+          finding('POSITIVE', []),
+        ],
+        'de',
+      ),
     ).toBe('2 Warnungen · 1 Hinweis · 1 × gute Nachbarn');
-    expect(findingsSummary([])).toBe('Keine Warnungen');
+    expect(findingsSummary([], 'de')).toBe('Keine Warnungen');
+  });
+
+  it('counts per severity in English', () => {
+    expect(
+      findingsSummary(
+        [finding('WARNING', []), finding('HINT', []), finding('HINT', []), finding('POSITIVE', [])],
+        'en',
+      ),
+    ).toBe('1 warning · 2 hints · 1 × good neighbours');
+    expect(findingsSummary([], 'en')).toBe('No warnings');
   });
 });

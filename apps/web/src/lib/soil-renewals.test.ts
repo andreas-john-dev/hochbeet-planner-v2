@@ -23,15 +23,24 @@ describe('soil renewal years', () => {
 
 describe('checking renewals', () => {
   it('drops empty fields and sorts', () => {
-    expect(checkRenewals(['2026-07-20', '', '2026-03-01'])).toEqual({
+    expect(checkRenewals(['2026-07-20', '', '2026-03-01'], 'de')).toEqual({
       renewals: ['2026-03-01', '2026-07-20'],
     });
   });
 
   it('rejects duplicates and broken dates', () => {
-    expect(checkRenewals(['2026-07-20', '2026-07-20'])).toEqual({
+    expect(checkRenewals(['2026-07-20', '2026-07-20'], 'de')).toEqual({
       error: 'Ein Datum steht doppelt in der Liste.',
     });
-    expect(checkRenewals(['20.07.2026'])).toEqual({ error: 'Bitte ein gültiges Datum angeben.' });
+    expect(checkRenewals(['20.07.2026'], 'de')).toEqual({
+      error: 'Bitte ein gültiges Datum angeben.',
+    });
+  });
+
+  it('words its errors in English', () => {
+    expect(checkRenewals(['2026-07-20', '2026-07-20'], 'en')).toEqual({
+      error: 'A date appears twice in the list.',
+    });
+    expect(checkRenewals(['20.07.2026'], 'en')).toEqual({ error: 'Please enter a valid date.' });
   });
 });

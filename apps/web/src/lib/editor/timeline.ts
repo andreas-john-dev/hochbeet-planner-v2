@@ -7,11 +7,26 @@ import {
   weekStart,
 } from '@hochbeet/garden-rules';
 import { addWeeks, formatISO, getMonth, getYear, parseISO } from 'date-fns';
+import { i18n } from '@/lib/i18n';
+import type { Language } from '@/lib/language';
 
 /** Footprints closer than this count as touching, not overlapping (as in the rules). */
 const EPSILON_CM = 1e-6;
 
-const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const MONTHS = [
+  'jan',
+  'feb',
+  'mar',
+  'apr',
+  'may',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'oct',
+  'nov',
+  'dec',
+] as const;
 
 const toIso = (date: Date): IsoDate => formatISO(date, { representation: 'date' });
 
@@ -30,13 +45,18 @@ export function sliderWeeks(week: IsoDate): IsoDate[] {
 }
 
 /** Month labels under the slider: name and position as share of the slider (0 to 1). */
-export function monthMarks(weeks: readonly IsoDate[]): { label: string; at: number }[] {
+export function monthMarks(
+  weeks: readonly IsoDate[],
+  language: Language,
+): { label: string; at: number }[] {
+  const t = i18n.getFixedT(language, 'editor');
   const marks: { label: string; at: number }[] = [];
   weeks.forEach((week, index) => {
-    const month = getMonth(parseISO(week));
-    if (marks.length === 0 || marks.at(-1)?.label !== MONTHS[month]) {
+    const month = MONTHS[getMonth(parseISO(week))] ?? 'jan';
+    const label = t(`months.${month}`);
+    if (marks.length === 0 || marks.at(-1)?.label !== label) {
       marks.push({
-        label: MONTHS[month] ?? '',
+        label,
         at: weeks.length > 1 ? index / (weeks.length - 1) : 0,
       });
     }

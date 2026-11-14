@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { BedFormDialog } from '@/components/beds/BedFormDialog';
 import { AssistantChat } from '@/components/editor/AssistantChat';
 import { BedCanvas } from '@/components/editor/BedCanvas';
@@ -89,6 +91,7 @@ function bedIdParam(params: unknown): string {
 
 /** Bed editor: the bed true to scale with grid, plantings of the current week, zoom and pan. */
 function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string | undefined }) {
+  const { t } = useTranslation('editor');
   const details = useBedWithPlantings(bedId);
   const plants = usePlants();
   const sowings = useSowings();
@@ -249,7 +252,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
       className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
     >
       <ArrowLeft className="size-4" aria-hidden />
-      Alle Beete
+      {t('back')}
     </Link>
   );
 
@@ -259,13 +262,11 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
       <div className="flex flex-col gap-6">
         {backLink}
         {notFound ? (
-          <EmptyState icon={MapPinOff} title="Beet nicht gefunden">
-            Dieses Beet gibt es nicht oder nicht mehr.
+          <EmptyState icon={MapPinOff} title={t('notFound.title')}>
+            {t('notFound.text')}
           </EmptyState>
         ) : (
-          <FormMessage tone="error">
-            Das Beet konnte nicht geladen werden. Bitte lade die Seite neu.
-          </FormMessage>
+          <FormMessage tone="error">{t('loadError')}</FormMessage>
         )}
       </div>
     );
@@ -281,19 +282,19 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">
-            {bed?.name ?? 'Beet'}
+            {bed?.name ?? t('bed')}
           </h1>
           <p className="text-muted-foreground text-sm">
-            {bed && `${String(bed.widthCm)} × ${String(bed.depthCm)} cm`}
+            {bed && t('size', { width: bed.widthCm, depth: bed.depthCm })}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <div className="flex gap-2" role="toolbar" aria-label="Bearbeiten">
+          <div className="flex gap-2" role="toolbar" aria-label={t('toolbar.edit')}>
             <Button
               variant="outline"
               size="icon"
-              aria-label="Beet bearbeiten"
-              title="Beet bearbeiten: Name, Maße, Erneuerung der Erde"
+              aria-label={t('toolbar.bedSettings')}
+              title={t('toolbar.bedSettingsTitle')}
               disabled={!bed}
               onClick={() => {
                 setSettingsOpen(true);
@@ -304,8 +305,8 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
             <Button
               variant="outline"
               size="icon"
-              aria-label="Rückgängig"
-              title="Rückgängig (Strg+Z)"
+              aria-label={t('toolbar.undo')}
+              title={t('toolbar.undoTitle')}
               aria-keyshortcuts="Control+Z"
               disabled={history.past.length === 0}
               onClick={() => {
@@ -317,8 +318,8 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
             <Button
               variant="outline"
               size="icon"
-              aria-label="Wiederholen"
-              title="Wiederholen (Strg+Umschalt+Z)"
+              aria-label={t('toolbar.redo')}
+              title={t('toolbar.redoTitle')}
               aria-keyshortcuts="Control+Shift+Z"
               disabled={history.future.length === 0}
               onClick={() => {
@@ -328,11 +329,11 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
               <Redo2 />
             </Button>
           </div>
-          <div className="flex gap-2" role="toolbar" aria-label="Ansicht">
+          <div className="flex gap-2" role="toolbar" aria-label={t('toolbar.view')}>
             <Button
               variant="outline"
               size="icon"
-              aria-label="Verkleinern"
+              aria-label={t('toolbar.zoomOut')}
               onClick={() => {
                 store.getState().zoomBy(1 / ZOOM_STEP);
               }}
@@ -342,7 +343,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
             <Button
               variant="outline"
               size="icon"
-              aria-label="Vergrößern"
+              aria-label={t('toolbar.zoomIn')}
               onClick={() => {
                 store.getState().zoomBy(ZOOM_STEP);
               }}
@@ -358,7 +359,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
               }}
             >
               <Maximize aria-hidden />
-              Auf Beet einpassen
+              {t('toolbar.fit')}
             </Button>
           </div>
           {assistant && (
@@ -372,7 +373,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
               }}
             >
               <MessageCircle aria-hidden />
-              Assistent
+              {t('toolbar.assistant')}
             </Button>
           )}
         </div>
@@ -406,7 +407,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
               className="bg-muted h-[60dvh] min-h-72 animate-pulse rounded-xl border md:h-[65dvh]"
               aria-busy="true"
             >
-              <span className="sr-only">Beet wird geladen …</span>
+              <span className="sr-only">{t('loading')}</span>
             </div>
           )}
         </div>
@@ -420,12 +421,12 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
           >
             <div className="flex items-center justify-between gap-2">
               <h2 id={`${assistantId}-title`} className="font-semibold">
-                Beet-Assistent
+                {t('assistant.title')}
               </h2>
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Assistent schließen"
+                aria-label={t('assistant.close')}
                 onClick={() => {
                   setAssistantOpen(false);
                 }}
@@ -448,7 +449,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
       {assistant && bed && (
         <Sheet open={!isDesktop && assistantOpen} onOpenChange={setAssistantOpen}>
           <SheetContent aria-describedby={undefined} className="h-[85dvh]">
-            <SheetTitle>Beet-Assistent</SheetTitle>
+            <SheetTitle>{t('assistant.title')}</SheetTitle>
             <AssistantChat
               bedId={bed.id}
               onSuggestions={receiveSuggestions}
@@ -462,42 +463,48 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
   );
 }
 
-const announcements: Announcements = {
-  onDragStart: ({ active }) => `${plantName(active.data.current)} aufgenommen.`,
-  onDragOver: ({ active, over }) =>
-    over ? `${plantName(active.data.current)} über dem Beet.` : undefined,
-  onDragEnd: ({ active }) => `${plantName(active.data.current)} abgelegt.`,
-  onDragCancel: ({ active }) => `Ziehen von ${plantName(active.data.current)} abgebrochen.`,
-};
+type EditorT = TFunction<'editor'>;
 
-function plantName(data: unknown) {
-  return (data as PaletteDragData | undefined)?.plant.name ?? 'Pflanze';
+/** What screen readers hear while a plant is dragged from the palette. */
+function announcements(t: EditorT): Announcements {
+  const plant = (data: unknown) =>
+    (data as PaletteDragData | undefined)?.plant.name ?? t('placement.plant');
+  return {
+    onDragStart: ({ active }) => t('placement.pickedUp', { plant: plant(active.data.current) }),
+    onDragOver: ({ active, over }) =>
+      over ? t('placement.overBed', { plant: plant(active.data.current) }) : undefined,
+    onDragEnd: ({ active }) => t('placement.dropped', { plant: plant(active.data.current) }),
+    onDragCancel: ({ active }) =>
+      t('placement.dragCancelled', { plant: plant(active.data.current) }),
+  };
 }
 
 /** The line under the bed: what the user can do right now, read out by screen readers. */
-function hint({
-  placing,
-  kind,
-  selected,
-  isDesktop,
-}: {
-  placing: { plant: Plant; at: { x: number; y: number } } | null;
-  kind: Planting['kind'];
-  selected: string | undefined;
-  isDesktop: boolean;
-}) {
+function hint(
+  t: EditorT,
+  {
+    placing,
+    kind,
+    selected,
+    isDesktop,
+  }: {
+    placing: { plant: Plant; at: { x: number; y: number } } | null;
+    kind: Planting['kind'];
+    selected: string | undefined;
+    isDesktop: boolean;
+  },
+) {
   if (placing) {
-    const what = `${placing.plant.name} als ${kind === 'ROW' ? 'Reihe' : 'Einzelpflanze'} bei ${String(placing.at.x)} × ${String(placing.at.y)} cm`;
-    return isDesktop
-      ? `${what}: Pfeiltasten verschieben (mit Umschalt 25 cm), Enter oder Klick setzt, Escape bricht ab.`
-      : `${what}: Auf die gewünschte Stelle im Beet tippen, dann „Hier pflanzen“.`;
+    const what = t('placement.what', {
+      plant: placing.plant.name,
+      kind: t(kind === 'ROW' ? 'placement.asRow' : 'placement.asSingle'),
+      x: placing.at.x,
+      y: placing.at.y,
+    });
+    return isDesktop ? t('placement.keyboardHint', { what }) : t('placement.touchHint', { what });
   }
-  if (selected && isDesktop) {
-    return `${selected} ausgewählt: ziehen oder Pfeiltasten verschieben, Entf löscht, Escape hebt die Auswahl auf.`;
-  }
-  return isDesktop
-    ? 'Zoomen mit dem Mausrad oder zwei Fingern, verschieben durch Ziehen. Pflanzung anklicken zum Bearbeiten.'
-    : 'Mit zwei Fingern zoomen, mit einem verschieben. Pflanzung antippen zum Bearbeiten, lange drücken zum Verschieben.';
+  if (selected && isDesktop) return t('placement.selectedHint', { plant: selected });
+  return isDesktop ? t('placement.desktopHint') : t('placement.touchIdleHint');
 }
 
 /** Client coordinates where a pointer drag currently is. */
@@ -539,6 +546,7 @@ function Workspace({
   sowings: readonly SowingWithPlantings[];
   onCommit: (changes: Change | Entry) => void;
 }) {
+  const { t } = useTranslation(['editor', 'common']);
   const svgRef = useRef<SVGSVGElement>(null);
   const hintId = useId();
   const [dragged, setDragged] = useState<PaletteDragData | null>(null);
@@ -710,11 +718,8 @@ function Workspace({
       onDragEnd={onDragEnd}
       onDragCancel={onDragCancel}
       accessibility={{
-        announcements,
-        screenReaderInstructions: {
-          draggable:
-            'Mit der Maus ins Beet ziehen. Mit Enter auswählen und im Beet mit den Pfeiltasten setzen.',
-        },
+        announcements: announcements(t),
+        screenReaderInstructions: { draggable: t('placement.dragInstructions') },
       }}
     >
       <div className="flex flex-col gap-4 md:h-[65dvh] md:flex-row">
@@ -764,12 +769,12 @@ function Workspace({
             (placing ? (
               <div
                 role="group"
-                aria-label="Pflanze setzen"
+                aria-label={t('placement.group')}
                 className="bg-card flex flex-col gap-2 rounded-xl border p-3"
               >
                 <div className="flex gap-2">
                   <Button variant="outline" className="h-11 flex-1" onClick={cancelPlacing}>
-                    Abbrechen
+                    {t('common:cancel')}
                   </Button>
                   <Button
                     className="h-11 flex-1"
@@ -777,7 +782,7 @@ function Workspace({
                       place(placing.plant, placing.at);
                     }}
                   >
-                    Hier pflanzen
+                    {t('placement.plantHere')}
                   </Button>
                 </div>
               </div>
@@ -789,18 +794,18 @@ function Workspace({
                 }}
               >
                 <Plus aria-hidden />
-                Pflanze hinzufügen
+                {t('placement.addPlant')}
               </Button>
             ))}
           <p id={hintId} className="text-muted-foreground text-xs" aria-live="polite">
-            {hint({ placing, kind, selected: selected?.plant.name, isDesktop })}
+            {hint(t, { placing, kind, selected: selected?.plant.name, isDesktop })}
           </p>
         </div>
       </div>
       <FindingsList findings={seasonal} week={weekIso} highlighted={highlighted} onPick={pick} />
       <Sheet open={!isDesktop && paletteOpen} onOpenChange={setPaletteOpen}>
         <SheetContent aria-describedby={undefined}>
-          <SheetTitle>Pflanze hinzufügen</SheetTitle>
+          <SheetTitle>{t('placement.addPlant')}</SheetTitle>
           <PlantPalette
             plants={plants}
             sowings={offered}
@@ -820,7 +825,9 @@ function Workspace({
         <SheetContent showClose={false} aria-describedby={undefined}>
           {selected && (
             <>
-              <SheetTitle className="sr-only">{`Pflanzung ${selected.plant.name}`}</SheetTitle>
+              <SheetTitle className="sr-only">
+                {t('details.label', { plant: selected.plant.name })}
+              </SheetTitle>
               <PlantingDetails
                 key={selected.planting.id}
                 planting={selected.planting}

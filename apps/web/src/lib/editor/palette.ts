@@ -1,10 +1,7 @@
 import type { Category, Plant } from '@hochbeet/contracts';
 
-export const CATEGORIES: readonly { value: Category; label: string }[] = [
-  { value: 'GEMUESE', label: 'Gemüse' },
-  { value: 'KRAUT', label: 'Kräuter' },
-  { value: 'OBST', label: 'Obst' },
-];
+/** Categories of the palette's filter; their names are under `editor:palette.categories`. */
+export const CATEGORIES: readonly Category[] = ['GEMUESE', 'KRAUT', 'OBST'];
 
 const normalize = (text: string) => text.toLocaleLowerCase('de').trim();
 

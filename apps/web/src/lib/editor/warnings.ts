@@ -10,6 +10,8 @@ import {
   weekStart,
 } from '@hochbeet/garden-rules';
 import { getISOWeek, getISOWeekYear, parseISO, subDays } from 'date-fns';
+import { i18n } from '@/lib/i18n';
+import type { Language } from '@/lib/language';
 
 /**
  * The season containing `date`: from the last soil renewal on or before it up to the next
@@ -60,32 +62,41 @@ export function weekOfFinding(finding: Finding, week: IsoDate): IsoDate {
   return isActiveInWeek(finding.period, week) ? week : weekStart(finding.period.start);
 }
 
-const weekName = (date: Date) => `KW ${String(getISOWeek(date))}`;
-
-/** Period of a finding in weeks, e.g. "KW 15 – KW 19 2026" or "ab KW 15 2026". */
-export function formatPeriod(period: Interval): string {
+/**
+ * Period of a finding in weeks, e.g. "KW 15 – KW 19 2026" or "ab KW 15 2026"; in English
+ * "Week 15 – Week 19 2026" or "from Week 15 2026".
+ */
+export function formatPeriod(period: Interval, language: Language): string {
+  const t = i18n.getFixedT(language, 'editor');
+  const weekName = (date: Date) => t('week.name', { week: getISOWeek(date) });
   const start = parseISO(period.start);
-  if (period.end === null) return `ab ${weekName(start)} ${String(getISOWeekYear(start))}`;
+  if (period.end === null) {
+    return t('week.from', { week: weekName(start), year: getISOWeekYear(start) });
+  }
   // The end is the first day without the finding.
   const last = subDays(parseISO(period.end), 1);
   const lastYear = getISOWeekYear(last);
   if (getISOWeekYear(start) !== lastYear) {
-    return `${weekName(start)} ${String(getISOWeekYear(start))} – ${weekName(last)} ${String(lastYear)}`;
+    return t('week.rangeAcrossYears', {
+      start: weekName(start),
+      startYear: getISOWeekYear(start),
+      end: weekName(last),
+      endYear: lastYear,
+    });
   }
   return getISOWeek(start) === getISOWeek(last)
-    ? `${weekName(start)} ${String(lastYear)}`
-    : `${weekName(start)} – ${weekName(last)} ${String(lastYear)}`;
+    ? t('week.single', { week: weekName(start), year: lastYear })
+    : t('week.range', { start: weekName(start), end: weekName(last), year: lastYear });
 }
 
-const count = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
-
 /** "2 Warnungen · 1 Hinweis · 3 × gute Nachbarn", leaving out what does not occur. */
-export function findingsSummary(findings: readonly Finding[]): string {
+export function findingsSummary(findings: readonly Finding[], language: Language): string {
+  const t = i18n.getFixedT(language, 'editor');
   const of = (s: Severity) => findings.filter((f) => f.severity === s).length;
   const parts = [
-    of('WARNING') > 0 && count(of('WARNING'), 'Warnung', 'Warnungen'),
-    of('HINT') > 0 && count(of('HINT'), 'Hinweis', 'Hinweise'),
-    of('POSITIVE') > 0 && `${String(of('POSITIVE'))} × gute Nachbarn`,
+    of('WARNING') > 0 && t('findings.warnings', { count: of('WARNING') }),
+    of('HINT') > 0 && t('findings.hints', { count: of('HINT') }),
+    of('POSITIVE') > 0 && t('findings.positive', { count: of('POSITIVE') }),
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(' · ') : 'Keine Warnungen';
+  return parts.length > 0 ? parts.join(' · ') : t('findings.none');
 }

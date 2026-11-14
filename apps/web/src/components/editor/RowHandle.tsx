@@ -1,5 +1,6 @@
 import type { Bed, Plant, RowPlanting } from '@hochbeet/contracts';
 import { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GRID_CM, rowLengthTo } from '@/lib/editor/placement';
 import type { Point } from '@/lib/editor/viewport';
 
@@ -33,6 +34,7 @@ export function RowHandle({
   onDraft: (lengthCm: number | null) => void;
   onCommit: (lengthCm: number) => void;
 }) {
+  const { t } = useTranslation('editor');
   // Length at the start of a drag and the current one; `row` already shows the draft.
   const dragged = useRef<{ from: number; to: number } | null>(null);
   const horizontal = row.orientation === 'H';
@@ -80,12 +82,12 @@ export function RowHandle({
     <g
       role="slider"
       tabIndex={0}
-      aria-label={`Länge der Reihe ${plant.name}`}
+      aria-label={t('canvas.rowLength', { plant: plant.name })}
       aria-orientation={horizontal ? 'horizontal' : 'vertical'}
       aria-valuemin={GRID_CM}
       aria-valuemax={max}
       aria-valuenow={row.lengthCm}
-      aria-valuetext={`${String(row.lengthCm)} cm`}
+      aria-valuetext={t('canvas.cm', { value: row.lengthCm })}
       data-testid="row-handle"
       className={`outline-none ${horizontal ? 'cursor-ew-resize' : 'cursor-ns-resize'} [&:focus-visible>circle:last-child]:stroke-[var(--ring)]`}
       onPointerDown={onPointerDown}

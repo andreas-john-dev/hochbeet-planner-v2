@@ -6,6 +6,7 @@ import { formatISO } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import type { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,14 +24,15 @@ import { cn } from '@/lib/utils';
 import { checkRenewals } from '@/lib/soil-renewals';
 import { RowDirectionSketch } from './RowDirectionSketch';
 import { type RenewalEntry, SoilRenewalsField } from './SoilRenewalsField';
+import { useLanguage } from '@/lib/i18n';
 
 const bedFormSchema = BedFieldsSchema.omit({ soilRenewals: true });
 type BedForm = z.infer<typeof bedFormSchema>;
 
-const directions: { value: Direction; label: string; hint: string }[] = [
-  { value: 'H', label: 'Parallel zur Breite', hint: 'Reihen laufen von links nach rechts.' },
-  { value: 'V', label: 'Parallel zur Tiefe', hint: 'Reihen laufen von vorn nach hinten.' },
-];
+const directions = [
+  { value: 'H', label: 'form.directionH', hint: 'form.directionHHint' },
+  { value: 'V', label: 'form.directionV', hint: 'form.directionVHint' },
+] as const satisfies readonly { value: Direction; label: string; hint: string }[];
 
 const NEW_BED: BedForm = { name: '', widthCm: 200, depthCm: 100, mainRowDirection: 'V' };
 
@@ -47,14 +49,13 @@ export function BedFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation('beds');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{bed ? 'Beet bearbeiten' : 'Beet anlegen'}</DialogTitle>
-          <DialogDescription>
-            Maße in Zentimetern, in 5-cm-Schritten. Du kannst alles später ändern.
-          </DialogDescription>
+          <DialogTitle>{bed ? t('form.editTitle') : t('form.createTitle')}</DialogTitle>
+          <DialogDescription>{t('form.description')}</DialogDescription>
         </DialogHeader>
         {/* Mounted per opening, so every opening starts with fresh values. */}
         <BedForm
@@ -69,6 +70,8 @@ export function BedFormDialog({
 }
 
 function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) {
+  const { t } = useTranslation(['beds', 'common']);
+  const { language } = useLanguage();
   const save = useSaveBed();
   const [directionChosen, setDirectionChosen] = useState(!!bed);
   const [today] = useState(() => formatISO(new Date(), { representation: 'date' }));
@@ -92,7 +95,10 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
   }, [directionChosen, suggested, form]);
 
   const onSubmit = form.handleSubmit(async (fields) => {
-    const checked = checkRenewals(renewals.map((r) => r.value));
+    const checked = checkRenewals(
+      renewals.map((r) => r.value),
+      language,
+    );
     if ('error' in checked) {
       setRenewalError(checked.error);
       return;
@@ -110,14 +116,14 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
     >
       {save.isError && <FormMessage tone="error">{apiErrorMessage(save.error)}</FormMessage>}
       <FormField
-        label="Name"
+        label={t('form.name')}
         autoComplete="off"
         error={errors.name?.message}
         {...form.register('name')}
       />
       <div className="grid grid-cols-2 gap-3">
         <FormField
-          label="Breite (cm)"
+          label={t('form.width')}
           type="number"
           inputMode="numeric"
           min={5}
@@ -126,7 +132,7 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
           {...form.register('widthCm', { valueAsNumber: true })}
         />
         <FormField
-          label="Tiefe (cm)"
+          label={t('form.depth')}
           type="number"
           inputMode="numeric"
           min={5}
@@ -136,7 +142,7 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
         />
       </div>
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Reihenrichtung</legend>
+        <legend className="mb-1 text-sm font-medium">{t('form.rowDirection')}</legend>
         <Controller
           control={form.control}
           name="mainRowDirection"
@@ -148,7 +154,7 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
                 field.onChange(value);
               }}
               className="grid gap-2 sm:grid-cols-2"
-              aria-label="Reihenrichtung"
+              aria-label={t('form.rowDirection')}
             >
               {directions.map(({ value, label, hint }) => (
                 <Label
@@ -169,22 +175,21 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
                   <RowDirectionSketch widthCm={widthCm} depthCm={depthCm} direction={value} />
                   <span className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium">
-                      {label}
+                      {t(label)}
                       {value === suggested && (
-                        <span className="text-primary ml-1.5 text-xs font-normal">Standard</span>
+                        <span className="text-primary ml-1.5 text-xs font-normal">
+                          {t('form.default')}
+                        </span>
                       )}
                     </span>
-                    <span className="text-muted-foreground text-xs">{hint}</span>
+                    <span className="text-muted-foreground text-xs">{t(hint)}</span>
                   </span>
                 </Label>
               ))}
             </RadioGroup.Root>
           )}
         />
-        <p className="text-muted-foreground text-xs">
-          Standard ist parallel zur kürzeren Kante: Die Reihen laufen quer übers Beet, in einem 2 ×
-          1 m Beet also 1 m lang. Neue Reihen übernehmen diese Richtung.
-        </p>
+        <p className="text-muted-foreground text-xs">{t('form.directionHelp')}</p>
       </fieldset>
       <SoilRenewalsField
         entries={renewals}
@@ -194,10 +199,10 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
       />
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
-          Abbrechen
+          {t('common:cancel')}
         </Button>
         <Button type="submit" disabled={save.isPending}>
-          {bed ? 'Speichern' : 'Beet anlegen'}
+          {bed ? t('common:save') : t('form.submitCreate')}
         </Button>
       </DialogFooter>
     </form>

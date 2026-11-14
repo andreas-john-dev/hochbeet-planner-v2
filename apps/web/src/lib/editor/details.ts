@@ -1,12 +1,17 @@
 import type { IsoDate, Plant, Planting, PlantingOrigin } from '@hochbeet/contracts';
 import { effectiveEnd, plannedEnd, weekStart } from '@hochbeet/garden-rules';
 import { format, getISOWeek, parseISO } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { i18n } from '@/lib/i18n';
+import { dateLocale, type Language } from '@/lib/language';
 
-/** A date for the detail panel, e.g. "Mo., 5. Oktober 2026 (KW 41)". */
-export function formatDate(iso: IsoDate): string {
+/** A date for the detail panel, e.g. "Mo., 5. Oktober 2026 (KW 41)" or "Mon, 5 October 2026 (Week 41)". */
+export function formatDate(iso: IsoDate, language: Language): string {
+  const t = i18n.getFixedT(language, 'editor');
   const date = parseISO(iso);
-  return `${format(date, 'EEEEEE., d. MMMM yyyy', { locale: de })} (KW ${String(getISOWeek(date))})`;
+  return t('details.date', {
+    date: format(date, t('details.datePattern'), { locale: dateLocale(language) }),
+    week: t('week.name', { week: getISOWeek(date) }),
+  });
 }
 
 /** Where the end of a planting comes from, to explain it in the panel. */
@@ -68,10 +73,12 @@ export function removalDate(planting: Pick<Planting, 'startDate'>, week: Date): 
 export function checkEnd(
   planting: Pick<Planting, 'startDate'>,
   value: string,
+  language: Language,
 ): { endDate: IsoDate | null } | { error: string } {
+  const t = i18n.getFixedT(language, 'editor');
   if (value === '') return { endDate: null };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return { error: 'Bitte ein gültiges Datum angeben.' };
-  if (value <= planting.startDate) return { error: 'Ende muss nach dem Start liegen.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return { error: t('details.invalidDate') };
+  if (value <= planting.startDate) return { error: t('details.endBeforeStart') };
   return { endDate: value };
 }
 

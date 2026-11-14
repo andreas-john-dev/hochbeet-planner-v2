@@ -40,7 +40,7 @@ describe('slider weeks', () => {
   });
 
   it('labels the months where they start', () => {
-    const marks = monthMarks(sliderWeeks('2026-10-05'));
+    const marks = monthMarks(sliderWeeks('2026-10-05'), 'de');
     expect(marks.map((m) => m.label)).toEqual([
       'Jan',
       'Feb',
@@ -58,6 +58,24 @@ describe('slider weeks', () => {
     expect(marks[0]?.at).toBe(0);
     // April starts with the 14th Monday (6 April).
     expect(marks[3]?.at).toBeCloseTo(13 / 51);
+  });
+
+  it('labels the months in English', () => {
+    const marks = monthMarks(sliderWeeks('2026-10-05'), 'en');
+    expect(marks.map((m) => m.label)).toEqual([
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ]);
   });
 });
 

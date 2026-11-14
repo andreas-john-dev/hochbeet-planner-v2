@@ -1,6 +1,7 @@
 import type { Plant } from '@hochbeet/contracts';
 import { formatWeek, plantCount } from '@hochbeet/garden-rules';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,10 +24,10 @@ export interface PlantOutRequest {
   at: { x: number; y: number };
 }
 
-const KINDS: readonly { value: PlantingKind; label: string }[] = [
-  { value: 'ROW', label: 'Als Reihe' },
-  { value: 'SINGLE', label: 'Als Einzelpflanzen' },
-];
+const KINDS = [
+  { value: 'ROW', label: 'plantOut.asRow' },
+  { value: 'SINGLE', label: 'plantOut.asSingles' },
+] as const satisfies readonly { value: PlantingKind; label: string }[];
 
 /**
  * „Wie viele?“ after dropping seedlings from a sowing batch into the bed: how many (all free
@@ -47,13 +48,17 @@ export function PlantOutDialog({
   onConfirm: (kind: PlantingKind, count: number) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation('editor');
   const open = request !== null;
   const onOpenChange = (next: boolean) => {
     if (!next) onCancel();
   };
-  const title = request ? `${request.plant.name} auspflanzen` : '';
+  const title = request ? t('plantOut.title', { plant: request.plant.name }) : '';
   const description = request
-    ? `Aus der Anzucht vom ${formatWeek(request.sowing.sowDate).range}, ${String(request.sowing.free)} frei.`
+    ? t('plantOut.description', {
+        range: formatWeek(request.sowing.sowDate).range,
+        count: request.sowing.free,
+      })
     : '';
   const form = request && (
     // Mounted per request, so every drop starts with all free seedlings.
@@ -98,6 +103,7 @@ function PlantOutForm({
   onConfirm: (kind: PlantingKind, count: number) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(['editor', 'common']);
   const { plant, sowing } = request;
   const ids = { count: useId(), kind: useId(), hint: useId() };
   const [countText, setCountText] = useState(String(sowing.free));
@@ -107,10 +113,10 @@ function PlantOutForm({
   const lengthCm = valid ? rowLengthFor(count, plant.spacingInRowCm) : 0;
   const inRow = valid ? plantCount({ kind: 'ROW', lengthCm }, plant) : 0;
   const hint = !valid
-    ? `1 bis ${String(sowing.free)} Pflanzen.`
+    ? t('plantOut.invalid', { max: sowing.free })
     : kind === 'ROW'
-      ? `Reihe von ${String(lengthCm)} cm mit ${String(inRow)} ${inRow === 1 ? 'Pflanze' : 'Pflanzen'}, ${String(plant.spacingInRowCm)} cm Abstand.`
-      : `${String(count)} ${count === 1 ? 'Einzelpflanze' : 'Einzelpflanzen'} im Abstand von ${String(plant.spacingInRowCm)} cm entlang der Reihenrichtung.`;
+      ? t('plantOut.rowHint', { length: lengthCm, count: inRow, spacing: plant.spacingInRowCm })
+      : t('plantOut.singlesHint', { count, spacing: plant.spacingInRowCm });
 
   return (
     <form
@@ -122,7 +128,7 @@ function PlantOutForm({
       }}
     >
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={ids.count}>Wie viele?</Label>
+        <Label htmlFor={ids.count}>{t('plantOut.count')}</Label>
         <Input
           id={ids.count}
           type="number"
@@ -139,7 +145,7 @@ function PlantOutForm({
         />
       </div>
       <fieldset className="flex flex-col gap-2" aria-describedby={ids.hint}>
-        <legend className="sr-only">Pflanzart</legend>
+        <legend className="sr-only">{t('plantOut.kind')}</legend>
         <div className="grid grid-cols-2 gap-2">
           {KINDS.map(({ value, label }) => (
             <label
@@ -158,7 +164,7 @@ function PlantOutForm({
                   setKind(value);
                 }}
               />
-              {label}
+              {t(label)}
             </label>
           ))}
         </div>
@@ -174,10 +180,10 @@ function PlantOutForm({
       </p>
       <DialogFooter>
         <Button type="button" variant="outline" className="h-11 md:h-10" onClick={onCancel}>
-          Abbrechen
+          {t('common:cancel')}
         </Button>
         <Button type="submit" className="h-11 md:h-10" disabled={!valid}>
-          Auspflanzen
+          {t('plantOut.submit')}
         </Button>
       </DialogFooter>
     </form>

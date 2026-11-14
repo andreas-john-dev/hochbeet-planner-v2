@@ -1,19 +1,18 @@
 import type { IsoDate } from '@hochbeet/contracts';
 import { format, parseISO } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { Plus, Trash2 } from 'lucide-react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { renewalYears } from '@/lib/soil-renewals';
+import { useDateLocale } from '@/lib/i18n';
 
 /** An own renewal date while editing; `key` keeps the input stable while its value changes. */
 export interface RenewalEntry {
   key: number;
   value: string;
 }
-
-const formatDay = (date: IsoDate) => format(parseISO(date), 'd. MMMM yyyy', { locale: de });
 
 /**
  * "Erde erneuert am …" for the bed settings: which renewal applies per year (own dates or the
@@ -30,6 +29,10 @@ export function SoilRenewalsField({
   error?: string;
   onChange: (entries: RenewalEntry[]) => void;
 }) {
+  const { t } = useTranslation('beds');
+  const locale = useDateLocale();
+  // Long date of the language: "1. März 2026" or "1 March 2026".
+  const formatDay = (date: IsoDate) => format(parseISO(date), 'PPP', { locale });
   const hintId = useId();
   const nextKey = () => Math.max(0, ...entries.map((e) => e.key)) + 1;
   const add = (value: string) => {
@@ -39,8 +42,8 @@ export function SoilRenewalsField({
 
   return (
     <fieldset className="flex flex-col gap-2" aria-describedby={hintId}>
-      <legend className="mb-1 text-sm font-medium">Erde erneuert</legend>
-      <ul className="flex flex-col gap-1 text-sm" aria-label="Erneuerungen je Jahr">
+      <legend className="mb-1 text-sm font-medium">{t('renewals.legend')}</legend>
+      <ul className="flex flex-col gap-1 text-sm" aria-label={t('renewals.perYear')}>
         {renewalYears(filled, today).map(({ year, own, fallback }) => (
           <li key={year} className="flex min-h-9 items-center justify-between gap-2">
             <span>
@@ -50,7 +53,7 @@ export function SoilRenewalsField({
               ) : (
                 <>
                   {formatDay(fallback)}{' '}
-                  <span className="text-muted-foreground text-xs">(Standard)</span>
+                  <span className="text-muted-foreground text-xs">{t('renewals.default')}</span>
                 </>
               )}
             </span>
@@ -60,24 +63,24 @@ export function SoilRenewalsField({
                 variant="ghost"
                 size="sm"
                 className="h-11 md:h-9"
-                aria-label={`Erneuerung ${String(year)} anpassen`}
+                aria-label={t('renewals.adjustYear', { year })}
                 onClick={() => {
                   add(fallback);
                 }}
               >
-                Anpassen
+                {t('renewals.adjust')}
               </Button>
             )}
           </li>
         ))}
       </ul>
       {entries.length > 0 && (
-        <ul className="flex flex-col gap-2" aria-label="Eigene Termine">
+        <ul className="flex flex-col gap-2" aria-label={t('renewals.own')}>
           {entries.map((entry, index) => (
             <li key={entry.key} className="flex gap-2">
               <Input
                 type="date"
-                aria-label={`Erneuerung ${String(index + 1)}`}
+                aria-label={t('renewals.entry', { number: index + 1 })}
                 value={entry.value}
                 onChange={(event) => {
                   onChange(
@@ -91,7 +94,7 @@ export function SoilRenewalsField({
                 type="button"
                 variant="outline"
                 size="icon"
-                aria-label={`Erneuerung ${String(index + 1)} entfernen`}
+                aria-label={t('renewals.remove', { number: index + 1 })}
                 onClick={() => {
                   onChange(entries.filter((e) => e.key !== entry.key));
                 }}
@@ -111,7 +114,7 @@ export function SoilRenewalsField({
         }}
       >
         <Plus aria-hidden />
-        Erneuerung hinzufügen
+        {t('renewals.add')}
       </Button>
       {error && (
         <p role="alert" className="text-sm text-red-700 dark:text-red-400">
@@ -119,9 +122,7 @@ export function SoilRenewalsField({
         </p>
       )}
       <p id={hintId} className="text-muted-foreground text-xs">
-        Die Fruchtfolge gilt nur innerhalb einer Saison, also bis die Erde erneuert wird. Ohne
-        eigenen Termin gilt jedes Jahr der 1. März. Eigene Termine eines Jahres ersetzen den 1. März
-        dieses Jahres; soll er bleiben, trage ihn zusätzlich ein.
+        {t('renewals.help')}
       </p>
     </fieldset>
   );
