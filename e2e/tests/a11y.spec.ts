@@ -6,21 +6,24 @@ import { appPages } from './pages';
 // Every page in light and dark mode against WCAG 2.1 A/AA (contrast, names, landmarks, ...).
 for (const colorScheme of ['light', 'dark'] as const) {
   for (const appPage of appPages) {
-    test(`${appPage.id} has no WCAG A/AA violations (${colorScheme})`, async ({ page }) => {
-      await signInAs(page, appPage.access);
-      if (appPage.seed) await seedFor(page, appPage.access, appPage.seed);
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await open(page, appPage.path, appPage.heading);
-      await appPage.setup?.(page);
-      const { violations } = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze();
-      const summary = violations.map((v) => ({
-        rule: v.id,
-        impact: v.impact,
-        nodes: v.nodes.map((n) => `${n.target.join(' ')}: ${n.failureSummary ?? ''}`).slice(0, 5),
-      }));
-      expect(summary).toEqual([]);
+    test.describe(() => {
+      test.use({ language: appPage.language ?? 'de' });
+      test(`${appPage.id} has no WCAG A/AA violations (${colorScheme})`, async ({ page }) => {
+        await signInAs(page, appPage.access);
+        if (appPage.seed) await seedFor(page, appPage.access, appPage.seed);
+        await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+        await open(page, appPage.path, appPage.heading);
+        await appPage.setup?.(page);
+        const { violations } = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .analyze();
+        const summary = violations.map((v) => ({
+          rule: v.id,
+          impact: v.impact,
+          nodes: v.nodes.map((n) => `${n.target.join(' ')}: ${n.failureSummary ?? ''}`).slice(0, 5),
+        }));
+        expect(summary).toEqual([]);
+      });
     });
   }
 }

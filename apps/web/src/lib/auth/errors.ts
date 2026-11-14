@@ -1,3 +1,6 @@
+import { i18n } from '@/lib/i18n';
+import type { auth } from '@/locales/de/auth';
+
 /** Error thrown by auth adapters; `code` is the Cognito exception name. */
 export class AuthFailure extends Error {
   constructor(readonly code: string) {
@@ -6,25 +9,27 @@ export class AuthFailure extends Error {
   }
 }
 
-const messages: Record<string, string> = {
+type ErrorKey = keyof typeof auth.errors;
+
+const keys: Record<string, ErrorKey> = {
   // Same text for both, so the form does not reveal whether an account exists.
-  NotAuthorizedException: 'E-Mail oder Passwort ist falsch.',
-  UserNotFoundException: 'E-Mail oder Passwort ist falsch.',
-  UserNotConfirmedException: 'Bitte bestätige zuerst deine E-Mail-Adresse.',
-  UsernameExistsException: 'Für diese E-Mail-Adresse gibt es bereits ein Konto.',
-  CodeMismatchException: 'Der Code ist nicht richtig.',
-  ExpiredCodeException: 'Der Code ist abgelaufen. Fordere einen neuen an.',
-  InvalidPasswordException: 'Das Passwort erfüllt die Anforderungen nicht.',
-  InvalidParameterException: 'Bitte prüfe deine Eingaben.',
-  LimitExceededException: 'Zu viele Versuche. Bitte warte einen Moment.',
-  TooManyRequestsException: 'Zu viele Versuche. Bitte warte einen Moment.',
-  NetworkError: 'Keine Verbindung. Bitte prüfe deine Internetverbindung.',
+  NotAuthorizedException: 'wrongCredentials',
+  UserNotFoundException: 'wrongCredentials',
+  UserNotConfirmedException: 'notConfirmed',
+  UsernameExistsException: 'accountExists',
+  CodeMismatchException: 'codeMismatch',
+  ExpiredCodeException: 'codeExpired',
+  InvalidPasswordException: 'invalidPassword',
+  InvalidParameterException: 'invalidInput',
+  LimitExceededException: 'tooManyAttempts',
+  TooManyRequestsException: 'tooManyAttempts',
+  NetworkError: 'network',
 };
 
-/** German, user-facing message for any error thrown during sign-in, sign-up or password reset. */
+/** User-facing message in the app's language for any error of sign-in, sign-up or reset. */
 export function authErrorMessage(error: unknown): string {
   const code = error instanceof AuthFailure ? error.code : error instanceof Error ? error.name : '';
-  return messages[code] ?? 'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
+  return i18n.t(`auth:errors.${keys[code] ?? 'generic'}`);
 }
 
 export function authErrorCode(error: unknown): string | undefined {

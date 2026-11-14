@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { newPasswordSchema, signUpSchema } from './schemas';
+import { i18n } from '@/lib/i18n';
+import { newPasswordSchema, signInSchema, signUpSchema } from './schemas';
 
 describe('auth schemas', () => {
   it('accepts a password that Cognito accepts', () => {
@@ -20,5 +21,14 @@ describe('auth schemas', () => {
       passwordRepeat: 'Gemuese2!',
     });
     expect(result.error?.issues[0]?.message).toBe('Die Passwörter stimmen nicht überein.');
+  });
+
+  it('words its messages in the language of the app at the time of the check', async () => {
+    await i18n.changeLanguage('en');
+    const result = signInSchema.safeParse({ email: 'kein-mail', password: '' });
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
+      'Please enter a valid email address.',
+      'Please enter your password.',
+    ]);
   });
 });

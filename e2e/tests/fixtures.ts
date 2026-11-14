@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
-import type { Access } from './pages';
+import type { Access, Language } from './pages';
 
 /** Fixed "now" so date labels and screenshots are stable: Wednesday, 7 October 2026. */
 export const NOW = new Date('2026-10-07T10:00:00+02:00');
@@ -12,9 +12,27 @@ export const USERS = {
   admin: { email: 'admin@example.com', password: 'Gemuese1!' },
 } as const;
 
-export const test = base.extend({
-  page: async ({ page }, use) => {
+/** localStorage key of the app's language (apps/web/src/lib/language.ts). */
+export const LANGUAGE_KEY = 'hochbeet-language';
+
+export const test = base.extend<{
+  /**
+   * Language of the app, stored before the first load (`null`: none, so the app follows the
+   * browser's `locale`). Only set once, so a switch in the test sticks across reloads.
+   */
+  language: Language | null;
+}>({
+  language: ['de', { option: true }],
+  page: async ({ page, language }, use) => {
     await page.clock.setFixedTime(NOW);
+    if (language) {
+      await page.addInitScript(
+        ([key, value]) => {
+          if (!localStorage.getItem(key)) localStorage.setItem(key, value);
+        },
+        [LANGUAGE_KEY, language] as const,
+      );
+    }
     await use(page);
   },
 });

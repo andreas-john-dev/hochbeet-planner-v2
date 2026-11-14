@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { HardDrive } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,26 +15,26 @@ import { useAuth } from '@/lib/auth/context';
 
 /** Reminds guests that their data lives only in this browser; links to an account. */
 export function GuestBanner() {
+  const { t } = useTranslation('layout');
   const [ending, setEnding] = useState(false);
   return (
     <section
-      aria-label="Gastmodus"
+      aria-label={t('guestMode')}
       data-testid="guest-banner"
       className="bg-card mb-6 flex flex-col gap-3 rounded-xl border p-4 text-sm md:mb-8 md:flex-row md:items-center"
     >
       <div className="flex flex-1 items-start gap-3">
         <HardDrive aria-hidden className="text-muted-foreground mt-0.5 size-5 shrink-0" />
         <p>
-          <span className="font-medium">Du planst ohne Konto.</span> Deine Beete liegen nur in
-          diesem Browser. Mit einem Konto sind sie gesichert und auf allen Geräten da.
+          <span className="font-medium">{t('guestBanner.lead')}</span> {t('guestBanner.text')}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild size="sm">
-          <Link to="/registrieren">Konto anlegen</Link>
+          <Link to="/registrieren">{t('guestBanner.createAccount')}</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link to="/anmelden">Anmelden</Link>
+          <Link to="/anmelden">{t('guestBanner.signIn')}</Link>
         </Button>
         <Button
           size="sm"
@@ -42,7 +43,7 @@ export function GuestBanner() {
             setEnding(true);
           }}
         >
-          Gastmodus beenden
+          {t('guestBanner.end')}
         </Button>
       </div>
       <EndGuestDialog open={ending} onOpenChange={setEnding} />
@@ -58,6 +59,7 @@ function EndGuestDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation(['layout', 'common']);
   const { endGuest } = useAuth();
   const navigate = useNavigate();
   const end = (deleteData: boolean) => {
@@ -68,11 +70,8 @@ function EndGuestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent role="alertdialog">
         <DialogHeader>
-          <DialogTitle>Gastmodus beenden?</DialogTitle>
-          <DialogDescription>
-            Deine Beete, Pflanzungen und eigenen Sorten liegen nur in diesem Browser. Behalte sie
-            für später oder lösche sie jetzt. Löschen lässt sich nicht rückgängig machen.
-          </DialogDescription>
+          <DialogTitle>{t('guestBanner.endTitle')}</DialogTitle>
+          <DialogDescription>{t('guestBanner.endDescription')}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button
@@ -81,7 +80,7 @@ function EndGuestDialog({
               onOpenChange(false);
             }}
           >
-            Abbrechen
+            {t('common:cancel')}
           </Button>
           <Button
             variant="outline"
@@ -89,7 +88,7 @@ function EndGuestDialog({
               end(false);
             }}
           >
-            Daten behalten
+            {t('guestBanner.keepData')}
           </Button>
           <Button
             className="bg-red-700 text-white hover:bg-red-800 dark:bg-red-600 dark:hover:bg-red-700"
@@ -97,7 +96,7 @@ function EndGuestDialog({
               end(true);
             }}
           >
-            Daten löschen
+            {t('guestBanner.deleteData')}
           </Button>
         </DialogFooter>
       </DialogContent>

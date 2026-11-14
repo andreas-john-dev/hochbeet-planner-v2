@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { SignOutButton } from '@/components/layout/AppShell';
+import { LanguageButtons } from '@/components/layout/LanguageToggle';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AssistantMemoryCard } from '@/components/profile/AssistantMemoryCard';
 import { GardenSettingsCard } from '@/components/profile/GardenSettingsCard';
@@ -9,26 +11,24 @@ import { useAuth } from '@/lib/auth/context';
 import { isAdmin } from '@/lib/auth/types';
 import { useTheme, type Theme } from '@/lib/theme';
 
-const options: { value: Theme; label: string }[] = [
-  { value: 'light', label: 'Hell' },
-  { value: 'dark', label: 'Dunkel' },
-  { value: 'system', label: 'System' },
-];
+const themes: readonly Theme[] = ['light', 'dark', 'system'];
 
 export function ProfilePage() {
+  const { t } = useTranslation(['profile', 'layout']);
   const { theme, setTheme } = useTheme();
   const { user, guest } = useAuth();
 
   return (
     <>
-      <PageHeader title="Profil" description="Konto und Einstellungen." />
+      <PageHeader title={t('title')} description={t('description')} />
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Konto</CardTitle>
+            <CardTitle>{t('account.title')}</CardTitle>
             <CardDescription>
-              Angemeldet als <span className="text-foreground font-medium">{user?.email}</span>
-              {isAdmin(user) && ' · Admin'}
+              {t('account.signedInAs')}{' '}
+              <span className="text-foreground font-medium">{user?.email}</span>
+              {isAdmin(user) && ` · ${t('account.admin')}`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -37,14 +37,12 @@ export function ProfilePage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Darstellung</CardTitle>
-            <CardDescription>
-              Wähle Hell, Dunkel oder die Einstellung deines Geräts.
-            </CardDescription>
+            <CardTitle>{t('appearance.title')}</CardTitle>
+            <CardDescription>{t('appearance.description')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div role="group" aria-label="Farbschema" className="flex flex-wrap gap-2">
-              {options.map(({ value, label }) => (
+            <div role="group" aria-label={t('layout:theme.name')} className="flex flex-wrap gap-2">
+              {themes.map((value) => (
                 <Button
                   key={value}
                   variant={theme === value ? 'default' : 'outline'}
@@ -53,10 +51,19 @@ export function ProfilePage() {
                     setTheme(value);
                   }}
                 >
-                  {label}
+                  {t(`layout:theme.${value}`)}
                 </Button>
               ))}
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('language.title')}</CardTitle>
+            <CardDescription>{t('language.description')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LanguageButtons />
           </CardContent>
         </Card>
         <GardenSettingsCard />

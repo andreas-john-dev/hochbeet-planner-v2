@@ -98,5 +98,7 @@ test('lists every page in pages.ts once', () => {
   // of a page (with `setup`, e.g. an open panel) share its path too.
   expect(new Set(appPages.map((p) => p.id)).size).toBe(appPages.length);
   const pages = appPages.filter((p) => !p.setup);
-  expect(new Set(pages.map((p) => `${p.access} ${p.path}`)).size).toBe(pages.length);
+  expect(new Set(pages.map((p) => `${p.access} ${p.path} ${p.language ?? 'de'}`)).size).toBe(
+    pages.length,
+  );
 });

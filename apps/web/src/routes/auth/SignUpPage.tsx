@@ -2,12 +2,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
 import { authErrorMessage } from '@/lib/auth/errors';
-import { confirmSchema, PASSWORD_HINT, signUpSchema } from '@/lib/auth/schemas';
+import { confirmSchema, signUpSchema } from '@/lib/auth/schemas';
 import { AuthHeading } from './AuthLayout';
 import { TryWithoutAccount } from './TryWithoutAccount';
 import { parseSignUpSearch } from './search';
@@ -18,6 +19,7 @@ export function SignUpPage() {
 }
 
 function SignUpForm() {
+  const { t } = useTranslation('auth');
   const { adapter } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string>();
@@ -39,42 +41,39 @@ function SignUpForm() {
 
   return (
     <>
-      <AuthHeading
-        title="Registrieren"
-        description="Lege ein Konto an, um deine Beete zu planen."
-      />
+      <AuthHeading title={t('signUp.title')} description={t('signUp.description')} />
       <form onSubmit={(e) => void onSubmit(e)} noValidate className="flex flex-col gap-4">
         {error && <FormMessage tone="error">{error}</FormMessage>}
         <FormField
-          label="E-Mail"
+          label={t('fields.email')}
           type="email"
           autoComplete="email"
           error={errors.email?.message}
           {...form.register('email')}
         />
         <FormField
-          label="Passwort"
+          label={t('fields.password')}
           type="password"
           autoComplete="new-password"
-          hint={PASSWORD_HINT}
+          hint={t('passwordHint')}
           error={errors.password?.message}
           {...form.register('password')}
         />
         <FormField
-          label="Passwort wiederholen"
+          label={t('fields.passwordRepeat')}
           type="password"
           autoComplete="new-password"
           error={errors.passwordRepeat?.message}
           {...form.register('passwordRepeat')}
         />
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Registrieren …' : 'Registrieren'}
+          {isSubmitting ? t('signUp.submitting') : t('signUp.submit')}
         </Button>
       </form>
       <p className="text-muted-foreground mt-6 text-center text-sm">
-        Schon ein Konto?{' '}
+        {t('signUp.haveAccount')}{' '}
         <Link to="/anmelden" className="text-primary font-medium hover:underline">
-          Anmelden
+          {t('signUp.signIn')}
         </Link>
       </p>
       <TryWithoutAccount />
@@ -83,6 +82,7 @@ function SignUpForm() {
 }
 
 function ConfirmSignUp({ email }: { email: string }) {
+  const { t } = useTranslation('auth');
   const { adapter } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string>();
@@ -106,7 +106,7 @@ function ConfirmSignUp({ email }: { email: string }) {
     setError(undefined);
     try {
       await adapter.resendSignUpCode(email);
-      setNotice('Wir haben dir einen neuen Code geschickt.');
+      setNotice(t('confirm.resent'));
     } catch (e) {
       setError(authErrorMessage(e));
     }
@@ -114,25 +114,22 @@ function ConfirmSignUp({ email }: { email: string }) {
 
   return (
     <>
-      <AuthHeading
-        title="E-Mail bestätigen"
-        description={`Wir haben einen 6-stelligen Code an ${email} geschickt.`}
-      />
+      <AuthHeading title={t('confirm.title')} description={t('confirm.description', { email })} />
       <form onSubmit={(e) => void onSubmit(e)} noValidate className="flex flex-col gap-4">
         {error && <FormMessage tone="error">{error}</FormMessage>}
         {notice && <FormMessage tone="success">{notice}</FormMessage>}
         <FormField
-          label="Bestätigungscode"
+          label={t('fields.confirmationCode')}
           inputMode="numeric"
           autoComplete="one-time-code"
           error={form.formState.errors.code?.message}
           {...form.register('code')}
         />
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          Bestätigen
+          {t('confirm.submit')}
         </Button>
         <Button type="button" variant="ghost" onClick={() => void resend()}>
-          Code erneut senden
+          {t('confirm.resend')}
         </Button>
       </form>
     </>

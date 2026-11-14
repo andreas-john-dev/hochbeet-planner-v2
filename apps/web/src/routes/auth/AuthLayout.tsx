@@ -1,8 +1,9 @@
 import { Link, Outlet } from '@tanstack/react-router';
 import { Logo } from '@/components/layout/Logo';
+import { LanguageToggle } from '@/components/layout/LanguageToggle';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
-/** Centered card layout for sign-in, sign-up and password reset. */
+/** Centered card layout for sign-in, sign-up and password reset, with language and theme. */
 export function AuthLayout() {
   return (
     <div className="flex min-h-dvh flex-col">
@@ -10,7 +11,10 @@ export function AuthLayout() {
         <Link to="/anmelden">
           <Logo />
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
       </header>
       <main className="flex flex-1 items-start justify-center px-4 pt-6 pb-12 md:items-center md:pt-0">
         <div className="bg-card w-full max-w-sm rounded-xl border p-6 shadow-xs md:p-8">

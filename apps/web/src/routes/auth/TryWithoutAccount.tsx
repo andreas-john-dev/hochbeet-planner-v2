@@ -1,4 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
 
@@ -7,6 +8,7 @@ import { useAuth } from '@/lib/auth/context';
  * in can go back to their beds instead.
  */
 export function TryWithoutAccount() {
+  const { t } = useTranslation('auth');
   const { guest, startGuest } = useAuth();
   const navigate = useNavigate();
   return (
@@ -18,12 +20,10 @@ export function TryWithoutAccount() {
           void navigate({ to: '/beete' });
         }}
       >
-        {guest ? 'Weiter ohne Konto' : 'Ohne Konto ausprobieren'}
+        {guest ? t('guest.continue') : t('guest.start')}
       </Button>
       <p className="text-muted-foreground text-center text-xs">
-        {guest
-          ? 'Deine Beete liegen weiter nur in diesem Browser.'
-          : 'Deine Beete bleiben dann nur in diesem Browser.'}
+        {guest ? t('guest.continueHint') : t('guest.startHint')}
       </p>
     </div>
   );

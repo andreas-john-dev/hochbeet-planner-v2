@@ -1,6 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 /** Bottom sheet for phones: a dialog that slides up from the bottom edge. */
@@ -12,6 +13,7 @@ export function SheetContent({
   showClose = true,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content> & { showClose?: boolean }) {
+  const { t } = useTranslation();
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="animate-fade fixed inset-0 z-50 bg-black/30" />
@@ -30,7 +32,7 @@ export function SheetContent({
         {showClose && (
           <DialogPrimitive.Close className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute top-2 right-2 grid size-11 place-items-center rounded-md outline-none focus-visible:ring-[3px]">
             <XIcon className="size-5" aria-hidden />
-            <span className="sr-only">Schließen</span>
+            <span className="sr-only">{t('close')}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>

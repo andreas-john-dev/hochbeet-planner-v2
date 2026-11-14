@@ -2,12 +2,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
 import { FormField, FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
 import { authErrorMessage } from '@/lib/auth/errors';
-import { PASSWORD_HINT, resetConfirmSchema, resetRequestSchema } from '@/lib/auth/schemas';
+import { resetConfirmSchema, resetRequestSchema } from '@/lib/auth/schemas';
 import { AuthHeading } from './AuthLayout';
 
 export function ForgotPasswordPage() {
@@ -16,6 +17,7 @@ export function ForgotPasswordPage() {
 }
 
 function RequestCode({ onSent }: { onSent: (email: string) => void }) {
+  const { t } = useTranslation('auth');
   const { adapter } = useAuth();
   const [error, setError] = useState<string>();
   const form = useForm<z.infer<typeof resetRequestSchema>>({
@@ -36,25 +38,25 @@ function RequestCode({ onSent }: { onSent: (email: string) => void }) {
   return (
     <>
       <AuthHeading
-        title="Passwort vergessen"
-        description="Wir schicken dir einen Code, mit dem du ein neues Passwort setzt."
+        title={t('forgotPassword.title')}
+        description={t('forgotPassword.description')}
       />
       <form onSubmit={(e) => void onSubmit(e)} noValidate className="flex flex-col gap-4">
         {error && <FormMessage tone="error">{error}</FormMessage>}
         <FormField
-          label="E-Mail"
+          label={t('fields.email')}
           type="email"
           autoComplete="email"
           error={form.formState.errors.email?.message}
           {...form.register('email')}
         />
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          Code senden
+          {t('forgotPassword.submit')}
         </Button>
       </form>
       <p className="text-muted-foreground mt-6 text-center text-sm">
         <Link to="/anmelden" className="text-primary font-medium hover:underline">
-          Zurück zur Anmeldung
+          {t('forgotPassword.backToSignIn')}
         </Link>
       </p>
     </>
@@ -62,6 +64,7 @@ function RequestCode({ onSent }: { onSent: (email: string) => void }) {
 }
 
 function ResetPassword({ email }: { email: string }) {
+  const { t } = useTranslation('auth');
   const { adapter } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string>();
@@ -84,28 +87,28 @@ function ResetPassword({ email }: { email: string }) {
   return (
     <>
       <AuthHeading
-        title="Neues Passwort"
-        description={`Gib den Code ein, den wir an ${email} geschickt haben.`}
+        title={t('resetPassword.title')}
+        description={t('resetPassword.description', { email })}
       />
       <form onSubmit={(e) => void onSubmit(e)} noValidate className="flex flex-col gap-4">
         {error && <FormMessage tone="error">{error}</FormMessage>}
         <FormField
-          label="Code"
+          label={t('fields.code')}
           inputMode="numeric"
           autoComplete="one-time-code"
           error={errors.code?.message}
           {...form.register('code')}
         />
         <FormField
-          label="Neues Passwort"
+          label={t('fields.newPassword')}
           type="password"
           autoComplete="new-password"
-          hint={PASSWORD_HINT}
+          hint={t('passwordHint')}
           error={errors.password?.message}
           {...form.register('password')}
         />
         <Button type="submit" disabled={isSubmitting}>
-          Passwort speichern
+          {t('resetPassword.submit')}
         </Button>
       </form>
     </>

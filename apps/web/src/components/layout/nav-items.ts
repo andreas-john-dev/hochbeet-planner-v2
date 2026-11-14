@@ -1,8 +1,10 @@
 import { Bean, Leaf, ShieldCheck, Sprout, UserRound, type LucideIcon } from 'lucide-react';
+import type { layout } from '@/locales/de/layout';
 
 export interface NavItem {
   to: '/beete' | '/anzucht' | '/katalog' | '/profil' | '/admin';
-  label: string;
+  /** Text key under `layout:nav`. */
+  label: Exclude<keyof typeof layout.nav, 'label'>;
   icon: LucideIcon;
   /** Only shown to members of the Cognito group `admins`. */
   adminOnly?: boolean;
@@ -11,9 +13,9 @@ export interface NavItem {
 }
 
 export const navItems: readonly NavItem[] = [
-  { to: '/beete', label: 'Beete', icon: Sprout },
-  { to: '/anzucht', label: 'Anzucht', icon: Bean },
-  { to: '/katalog', label: 'Katalog', icon: Leaf },
-  { to: '/profil', label: 'Profil', icon: UserRound, accountOnly: true },
-  { to: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true, accountOnly: true },
+  { to: '/beete', label: 'beds', icon: Sprout },
+  { to: '/anzucht', label: 'sowings', icon: Bean },
+  { to: '/katalog', label: 'catalog', icon: Leaf },
+  { to: '/profil', label: 'profile', icon: UserRound, accountOnly: true },
+  { to: '/admin', label: 'admin', icon: ShieldCheck, adminOnly: true, accountOnly: true },
 ];

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 /** Grey placeholder in the shape of content that is still loading. */
@@ -10,21 +11,22 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** Placeholder list while data loads; screen readers hear the label once. */
+/** Placeholder list while data loads; screen readers hear the label (default: loading) once. */
 export function SkeletonList({
   label,
   count = 6,
   itemClassName = 'h-16 rounded-xl',
   className = 'grid gap-2 sm:grid-cols-2 lg:grid-cols-3',
 }: {
-  label: string;
+  label?: string;
   count?: number;
   itemClassName?: string;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className={className} aria-busy="true" role="status">
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{label ?? t('loading')}</span>
       {Array.from({ length: count }, (_, i) => (
         <Skeleton key={i} className={itemClassName} />
       ))}
