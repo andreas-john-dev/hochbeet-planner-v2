@@ -1,8 +1,9 @@
 import type { SowingMethod } from '@hochbeet/contracts';
+import { weekHint } from '@hochbeet/garden-rules';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { FormField } from '@/components/FormField';
-import { SOWING_METHOD_LABEL, weekHint } from '@/lib/sowing';
+import { SOWING_METHOD_LABEL } from '@/lib/sowing';
 import { type SowingErrors, type SowingForm, usesField } from '@/lib/sowing-form';
 import { cn } from '@/lib/utils';
 

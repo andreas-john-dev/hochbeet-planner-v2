@@ -43,3 +43,28 @@ def test_the_assistant_answers_in_the_language_of_the_question() -> None:
     from bed_assistant.prompt import SYSTEM_PROMPT
 
     assert "in der Sprache der Frage" in SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize(
+    "tool", ["list_beds", "get_bed", "find_plants", "list_sowings", "evaluate_bed"]
+)
+def test_the_prompt_names_every_gateway_tool(tool: str) -> None:
+    from bed_assistant.prompt import SYSTEM_PROMPT
+
+    assert f"{tool}:" in SYSTEM_PROMPT
+
+
+def test_the_prompt_explains_raising_with_the_users_last_frost() -> None:
+    from bed_assistant.prompt import SYSTEM_PROMPT
+
+    assert "Anzucht-Chargen" in SYSTEM_PROMPT
+    assert "letzter Frosttermin" in SYSTEM_PROMPT
+    assert "nach dem letzten Frost des Users" in SYSTEM_PROMPT
+    # The assistant only reads batches; the user creates them.
+    assert "Chargen legt er auf der Seite Anzucht an" in SYSTEM_PROMPT
+
+
+def test_suggestions_still_see_only_find_plants() -> None:
+    from bed_assistant.suggest import SUGGESTION_TOOLS
+
+    assert SUGGESTION_TOOLS == ("find_plants",)
