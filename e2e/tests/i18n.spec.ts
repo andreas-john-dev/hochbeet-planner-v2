@@ -15,7 +15,7 @@ test('switching to English in the profile changes the navigation and survives a 
   await expect(nav.getByRole('link', { name: 'Beds' })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Seedlings' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page).toHaveTitle('Raised Bed Planner');
+  await expect(page).toHaveTitle('Hochbeet-Planer');
 
   await page.reload();
   await expect(page.getByRole('heading', { level: 1, name: 'Profile' })).toBeVisible();

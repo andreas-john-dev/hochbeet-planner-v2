@@ -13,7 +13,7 @@ export const auth: typeof de = {
     'At least 8 characters with upper and lower case letters, a digit and a special character.',
   signIn: {
     title: 'Sign in',
-    description: 'Welcome back to the Raised Bed Planner.',
+    description: 'Welcome back to Hochbeet-Planer.',
     forgotPassword: 'Forgot password?',
     submit: 'Sign in',
     submitting: 'Signing in …',

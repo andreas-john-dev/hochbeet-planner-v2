@@ -1,7 +1,7 @@
 import type { common as de } from '../de/common';
 
 export const common: typeof de = {
-  appName: 'Raised Bed Planner',
+  appName: 'Hochbeet-Planer',
   cancel: 'Cancel',
   close: 'Close',
   save: 'Save',

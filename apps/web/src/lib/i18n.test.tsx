@@ -31,7 +31,7 @@ describe('useLanguage', () => {
     expect(screen.getByRole('button')).toHaveTextContent('en en-GB');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en');
     expect(document.documentElement.lang).toBe('en');
-    expect(document.title).toBe('Raised Bed Planner');
+    expect(document.title).toBe('Hochbeet-Planer');
     expect(i18n.t('layout:nav.beds')).toBe('Beds');
     // Zod's own messages follow as well.
     expect(z.string().safeParse(1).error?.issues[0]?.message).toMatch(/^Invalid input/);
