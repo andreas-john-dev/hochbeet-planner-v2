@@ -694,6 +694,102 @@
     }
   },
   {
+    "id": "anzucht-plan",
+    "path": "/anzucht",
+    "heading": "Anzucht",
+    "access": "user",
+    "seed": {
+      "beds": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0S2A",
+          "name": "Beet Mai",
+          "widthCm": 200,
+          "depthCm": 120,
+          "mainRowDirection": "H",
+          "soilRenewals": []
+        }
+      ],
+      "plantings": [
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0U01",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S2A",
+          "plantId": "01M49THV00QS1SEJEM64991JH5",
+          "origin": "TRANSPLANT",
+          "kind": "SINGLE",
+          "x": 30,
+          "y": 30,
+          "startDate": "2027-05-17",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0U02",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S2A",
+          "plantId": "01M49THV00QS1SEJEM64991JH5",
+          "origin": "TRANSPLANT",
+          "kind": "SINGLE",
+          "x": 90,
+          "y": 30,
+          "startDate": "2027-05-17",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0U03",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S2A",
+          "plantId": "01M49THV00QS1SEJEM64991JH5",
+          "origin": "TRANSPLANT",
+          "kind": "SINGLE",
+          "x": 150,
+          "y": 30,
+          "startDate": "2027-05-17",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0U04",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S2A",
+          "plantId": "01M49THV00QS1SEJEM64991JH5",
+          "origin": "TRANSPLANT",
+          "kind": "SINGLE",
+          "x": 170,
+          "y": 95,
+          "startDate": "2027-05-17",
+          "endDate": null,
+          "removedDate": null
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0U05",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S2A",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "origin": "TRANSPLANT",
+          "kind": "ROW",
+          "x": 15,
+          "y": 70,
+          "startDate": "2027-05-17",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 125
+        },
+        {
+          "id": "01J9ZQ3W8D6V2K5M7N8P9R0U06",
+          "bedId": "01J9ZQ3W8D6V2K5M7N8P9R0S2A",
+          "plantId": "01M49THV00RK9E9PC83NEE87CJ",
+          "origin": "TRANSPLANT",
+          "kind": "ROW",
+          "x": 15,
+          "y": 100,
+          "startDate": "2027-05-17",
+          "endDate": null,
+          "removedDate": null,
+          "orientation": "H",
+          "lengthCm": 125
+        }
+      ]
+    }
+  },
+  {
     "id": "katalog",
     "path": "/katalog",
     "heading": "Pflanzenkatalog",
