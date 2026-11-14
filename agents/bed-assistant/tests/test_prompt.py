@@ -68,3 +68,11 @@ def test_suggestions_still_see_only_find_plants() -> None:
     from bed_assistant.suggest import SUGGESTION_TOOLS
 
     assert SUGGESTION_TOOLS == ("find_plants",)
+
+
+def test_the_prompt_asks_for_the_markdown_the_app_renders() -> None:
+    from bed_assistant.prompt import SYSTEM_PROMPT
+
+    # apps/web renders bold, italic, code and lists (src/lib/markdown.ts), nothing more.
+    assert "Markdown" in SYSTEM_PROMPT
+    assert "Keine Tabellen, Links, Bilder oder Überschriften" in SYSTEM_PROMPT

@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { FormMessage } from '@/components/FormField';
+import { Markdown } from '@/components/Markdown';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { apiErrorMessage } from '@/lib/api';
@@ -148,14 +149,15 @@ export function AssistantChat({
               key={index}
               data-role={m.role}
               className={cn(
-                'max-w-[90%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap',
+                'max-w-[90%] rounded-lg px-3 py-2 text-sm',
                 m.role === 'user'
-                  ? 'bg-primary text-primary-foreground self-end'
+                  ? 'bg-primary text-primary-foreground self-end whitespace-pre-wrap'
                   : 'bg-muted self-start',
               )}
             >
               <span className="sr-only">{m.role === 'user' ? 'Du: ' : 'Assistent: '}</span>
-              {m.text}
+              {/* The assistant answers in simple Markdown; the user's question stays as typed. */}
+              {m.role === 'user' ? m.text : <Markdown text={m.text} />}
             </div>
           ))
         )}
