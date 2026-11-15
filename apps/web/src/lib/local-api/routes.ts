@@ -19,6 +19,7 @@ import {
   SaveSowingRequestSchema,
   type SowingBatch,
   type SowingPlanting,
+  messageKey,
 } from '@hochbeet/contracts';
 import { ulid } from 'ulid';
 import { error, json, noContent, parseJson, route, type Route } from './router';
@@ -32,9 +33,9 @@ export interface LocalApiOptions {
 }
 
 const byName = (a: Bed, b: Bed) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id);
-const BED_NOT_FOUND = 'Dieses Beet gibt es nicht.';
-const PLANTING_NOT_FOUND = 'Diese Pflanzung gibt es nicht.';
-const SOWING_NOT_FOUND = 'Diese Anzucht gibt es nicht.';
+const BED_NOT_FOUND = 'bedNotFound';
+const PLANTING_NOT_FOUND = 'plantingNotFound';
+const SOWING_NOT_FOUND = 'sowingNotFound';
 
 /** The fields of a planting a batch lists, like the garden service. */
 const sowingPlanting = (planting: Planting): SowingPlanting => {
@@ -46,8 +47,8 @@ const sowingPlanting = (planting: Planting): SowingPlanting => {
 
 const bySowDate = (a: SowingBatch, b: SowingBatch) =>
   a.sowDate.localeCompare(b.sowDate) || a.id.localeCompare(b.id);
-export const PLANT_NOT_FOUND = 'Diese Sorte gibt es nicht.';
-export const GLOBAL_NEIGHBORS_ONLY = 'Globale Sorten dürfen nur auf globale Sorten verweisen.';
+export const PLANT_NOT_FOUND = 'plantNotFound';
+export const GLOBAL_NEIGHBORS_ONLY = messageKey('neighborGlobalOnly');
 
 /** A global plant as the user sees it, like the catalog service's effective catalogue. */
 export function effective(plant: Plant, override: PlantOverride | undefined): CatalogPlant {
@@ -66,8 +67,7 @@ export function neighborIssues(
   return (['goodNeighbors', 'badNeighbors'] as const).flatMap((list) =>
     fields[list].flatMap((neighborId, index) => {
       const path = `${list}.${String(index)}`;
-      if (neighborId === selfId)
-        return [{ path, message: 'Eine Sorte kann nicht ihr eigener Nachbar sein.' }];
+      if (neighborId === selfId) return [{ path, message: messageKey('neighborSelf') }];
       return known.has(neighborId) ? [] : [{ path, message: unknown }];
     }),
   );
@@ -120,9 +120,9 @@ export function localRoutes({ repo, globals, newId = () => ulid() }: LocalApiOpt
         parsed.data,
         id,
         ownKnown(await globals(), garden),
-        'Unbekannte Sorte.',
+        messageKey('neighborUnknown'),
       );
-      if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+      if (issues.length > 0) return error('checkNeighbors', 400, issues);
       const plant: CatalogPlant = {
         ...parsed.data,
         id,
@@ -144,9 +144,9 @@ export function localRoutes({ repo, globals, newId = () => ulid() }: LocalApiOpt
         parsed.data,
         existing.id,
         ownKnown(await globals(), garden),
-        'Unbekannte Sorte.',
+        messageKey('neighborUnknown'),
       );
-      if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+      if (issues.length > 0) return error('checkNeighbors', 400, issues);
       // Publication state is not part of the fields; it changes only through the workflow.
       // The fields replace the old ones, so optional fields left out are removed.
       const { source, overridden, publication, archived, requestedAt } = existing;

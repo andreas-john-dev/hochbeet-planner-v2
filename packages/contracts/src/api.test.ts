@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { localizeIssues, localizeMessage } from './messages';
 import {
   ApprovePublicationRequestSchema,
   AssistantEventSchema,
@@ -73,7 +74,9 @@ describe('garden API contracts', () => {
       expect(GardenSettingsSchema.safeParse({ lastFrost }).success).toBe(true);
     }
     const message = (lastFrost: string) =>
-      GardenSettingsSchema.safeParse({ lastFrost }).error?.issues[0]?.message;
+      localizeMessage(
+        GardenSettingsSchema.safeParse({ lastFrost }).error?.issues[0]?.message ?? '',
+      );
     expect(message('02-29')).toBe('Diesen Tag gibt es nicht in jedem Jahr.');
     expect(message('04-31')).toBe('Diesen Tag gibt es nicht in jedem Jahr.');
     expect(message('13-01')).toBe('Diesen Tag gibt es nicht in jedem Jahr.');
@@ -122,12 +125,16 @@ describe('import contracts', () => {
     };
     expect(ImportGardenRequestSchema.parse(body)).toEqual(body);
     const twice = ImportGardenRequestSchema.safeParse({ ...body, sowings: [sowing, sowing] });
-    expect(twice.error?.issues.map((i) => i.message)).toEqual(['Anzucht doppelt.']);
+    expect(twice.error?.issues.map((i) => localizeMessage(i.message))).toEqual([
+      'Anzucht doppelt.',
+    ]);
     const many = ImportGardenRequestSchema.safeParse({
       ...body,
       sowings: Array.from({ length: 201 }, () => sowing),
     });
-    expect(many.error?.issues[0]?.message).toBe('Höchstens 200 Anzuchten auf einmal.');
+    expect(localizeMessage(many.error?.issues[0]?.message ?? '')).toBe(
+      'Höchstens 200 Anzuchten auf einmal.',
+    );
   });
 
   it('refuses plantings of beds outside the import and duplicate beds', () => {
@@ -136,7 +143,7 @@ describe('import contracts', () => {
       beds: [bed, bed],
       plantings: [{ ...singlePlanting, bedId: ID.tomato }],
     });
-    expect(result.error?.issues.map((i) => [i.path.join('.'), i.message])).toEqual([
+    expect(result.error && localizeIssues(result.error).map((i) => [i.path, i.message])).toEqual([
       ['beds', 'Beet doppelt.'],
       ['plantings.0.bedId', 'Dieses Beet fehlt im Import.'],
     ]);
@@ -145,7 +152,9 @@ describe('import contracts', () => {
   it('limits the size of an import', () => {
     const beds = Array.from({ length: 51 }, () => bed);
     const result = ImportGardenRequestSchema.safeParse({ importId, beds, plantings: [] });
-    expect(result.error?.issues[0]?.message).toBe('Höchstens 50 Beete auf einmal.');
+    expect(localizeMessage(result.error?.issues[0]?.message ?? '')).toBe(
+      'Höchstens 50 Beete auf einmal.',
+    );
   });
 
   it('imports own plants, optionally archived, and adjustments', () => {
@@ -185,12 +194,12 @@ describe('assistant contracts', () => {
   });
 
   it('refuses empty and too long questions in German', () => {
-    expect(AssistantRequestSchema.safeParse({ message: '   ' }).error?.issues[0]?.message).toBe(
-      'Bitte schreib eine Frage an den Assistenten.',
-    );
-    expect(
-      AssistantRequestSchema.safeParse({ message: 'x'.repeat(2001) }).error?.issues[0]?.message,
-    ).toMatch(/höchstens 2000 Zeichen/);
+    const message = (value: string) =>
+      localizeMessage(
+        AssistantRequestSchema.safeParse({ message: value }).error?.issues[0]?.message ?? '',
+      );
+    expect(message('   ')).toBe('Bitte schreib eine Frage an den Assistenten.');
+    expect(message('x'.repeat(2001))).toMatch(/höchstens 2000 Zeichen/);
   });
 
   it('lists or forgets the remembered preferences', () => {
@@ -214,7 +223,7 @@ describe('assistant contracts', () => {
 });
 
 describe('error responses', () => {
-  it('carry a German message and optional field issues', () => {
+  it('carry a message and optional field issues', () => {
     const body = { message: 'Ungültige Eingabe.', issues: [{ path: 'x', message: 'Zu groß.' }] };
     expect(ErrorResponseSchema.parse(body)).toEqual(body);
   });

@@ -81,11 +81,13 @@ describe('sowing form', () => {
         germinationTempMax: '0 bis 40 °C angeben.',
       },
     });
-    // Own messages in English; those of the schema follow in T-70.
-    expect(parseSowingForm(form, 'en')).toMatchObject({
+    expect(parseSowingForm(form, 'en')).toEqual({
       errors: {
         presowTo: 'Please enter both values.',
+        propagationMax: 'The “to” value must be at least the “from” value.',
         prickOutWeeks: 'Please enter a whole number.',
+        directFrom: 'Enter a week from 1 to 53.',
+        germinationTempMax: 'Enter 0 to 40 °C.',
       },
     });
   });

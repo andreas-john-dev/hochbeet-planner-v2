@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { localizeIssues, localizeMessage } from './messages';
 import {
   BedSchema,
   CatalogPlantSchema,
@@ -70,8 +71,8 @@ describe('PlantingSchema', () => {
 
   it('rejects an end before the start', () => {
     const result = PlantingSchema.safeParse({ ...singlePlanting, endDate: '2026-05-04' });
-    expect(result.error?.issues[0]).toMatchObject({
-      path: ['endDate'],
+    expect(result.error && localizeIssues(result.error)[0]).toEqual({
+      path: 'endDate',
       message: 'Ende muss nach dem Start liegen.',
     });
   });
@@ -89,11 +90,8 @@ describe('PlantingSchema with a sowing batch', () => {
 
   it('refuses a batch for direct sowing and ids that are no ULID', () => {
     const sown = PlantingSchema.safeParse({ ...singlePlanting, origin: 'DIRECT_SOW', sowingId });
-    expect(sown.error?.issues).toEqual([
-      expect.objectContaining({
-        path: ['sowingId'],
-        message: 'Nur gepflanzte Pflanzungen stammen aus einer Anzucht.',
-      }),
+    expect(sown.error && localizeIssues(sown.error)).toEqual([
+      { path: 'sowingId', message: 'Nur gepflanzte Pflanzungen stammen aus einer Anzucht.' },
     ]);
     expect(PlantingSchema.safeParse({ ...singlePlanting, sowingId: 'batch' }).success).toBe(false);
   });
@@ -112,7 +110,10 @@ describe('SowingBatchSchema', () => {
     notes: 'Zwei Sorten gemischt',
   } as const;
   const issues = (value: unknown) =>
-    SowingBatchSchema.safeParse(value).error?.issues.map((i) => [i.path.join('.'), i.message]);
+    SowingBatchSchema.safeParse(value).error?.issues.map((i) => [
+      i.path.join('.'),
+      localizeMessage(i.message),
+    ]);
 
   it('accepts a full batch and one with only the required fields', () => {
     expect(SowingBatchSchema.parse(batch)).toEqual(batch);
@@ -206,7 +207,10 @@ describe('SowingSchema', () => {
     directSowExtraWeeks: 2,
   } as const;
   const issues = (value: unknown) =>
-    SowingSchema.safeParse(value).error?.issues.map((i) => [i.path.join('.'), i.message]);
+    SowingSchema.safeParse(value).error?.issues.map((i) => [
+      i.path.join('.'),
+      localizeMessage(i.message),
+    ]);
 
   it('accepts presowing, direct sowing and both', () => {
     expect(SowingSchema.parse(presow)).toEqual(presow);

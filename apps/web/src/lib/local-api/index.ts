@@ -3,9 +3,6 @@ import { localRoutes, type LocalApiOptions } from './routes';
 import { error, handle, LocalApiError, route, toRequest } from './router';
 import { createGuestRepository } from './store';
 
-const CATALOG_UNAVAILABLE =
-  'Der Katalog ist gerade nicht erreichbar. Prüfe deine Internetverbindung und versuche es noch einmal.';
-
 /**
  * The global catalogue from the public route, loaded once per session and shared by all local
  * requests. A failed load is not kept, so the next request tries again.
@@ -14,11 +11,11 @@ export function publicCatalog(baseFetch: typeof fetch): () => Promise<readonly P
   let loading: Promise<readonly Plant[]> | undefined;
   const load = async () => {
     const response = await baseFetch('/api/catalog/public/plants').catch(() => undefined);
-    if (!response?.ok) throw new LocalApiError(503, CATALOG_UNAVAILABLE);
+    if (!response?.ok) throw new LocalApiError(503, 'catalogUnavailable');
     const parsed = ListPublicPlantsResponseSchema.safeParse(
       await response.json().catch(() => null),
     );
-    if (!parsed.success) throw new LocalApiError(503, CATALOG_UNAVAILABLE);
+    if (!parsed.success) throw new LocalApiError(503, 'catalogUnavailable');
     return parsed.data.plants;
   };
   return () => {
@@ -44,9 +41,7 @@ export function createLocalFetch({
 }: Omit<LocalApiOptions, 'repo'> & { repo?: LocalApiOptions['repo'] }): typeof fetch {
   const routes = [
     ...localRoutes({ repo, ...options }),
-    route('POST', '/api/catalog/plants/:id/publication', () =>
-      error('Melde dich an, um eine Sorte für alle vorzuschlagen.', 403),
-    ),
+    route('POST', '/api/catalog/plants/:id/publication', () => error('guestPublish', 403)),
   ];
   return async (input, init) => {
     const request = toRequest(input, init);

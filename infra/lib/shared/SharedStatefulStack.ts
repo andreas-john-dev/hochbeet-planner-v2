@@ -20,6 +20,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import { ssmParameters } from '../config/ssm';
 import { AI_TESTERS_GROUP, type StageConfig } from '../config/stages';
+import { VERIFICATION_EMAIL } from './verification-email';
 
 /**
  * Handler of Custom::SmokeUserPassword. Runs with the SDK of the Lambda runtime and answers
@@ -87,6 +88,12 @@ export class SharedStatefulStack extends Stack {
         requireSymbols: true,
       },
       email: cognito.UserPoolEmail.withCognito(),
+      // Sign-up and forgotten password share this code template; German above, English below.
+      userVerification: {
+        emailStyle: cognito.VerificationEmailStyle.CODE,
+        emailSubject: VERIFICATION_EMAIL.subject,
+        emailBody: VERIFICATION_EMAIL.body,
+      },
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });

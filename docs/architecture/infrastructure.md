@@ -16,7 +16,7 @@ Eine CDK-App in TypeScript deployt acht Stacks nach `eu-central-1` und den Zerti
 | `Prod-Certificate` | ACM-Zertifikat für die Domain, per DNS in Route 53 validiert; liegt in `us-east-1`, weil CloudFront es dort erwartet | – |
 | `Prod-Frontend` | Privater S3-Bucket mit OAC, CloudFront mit eigener Domain (TLS ≥ 1.2), A/AAAA-Alias in Route 53, `config.json`, Deployment des Builds; `/api/assistant/*` zur AgentCore Runtime | User Pool, API-URLs, Runtime-ARN; Zertifikat per Cross-Region-Referenz |
 
-CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP API und alles andere auf den Bucket. Damit gibt es nur eine Origin und keine CORS-Konfiguration. Die Origin-Request-Policy reicht den `Authorization`-Header durch, für `/api/*` ist Caching aus. Einzige Ausnahme ist der öffentliche Katalog unter `/api/catalog/public/*`: Er wird ohne Viewer-Header weitergereicht und 5 Minuten gecacht.
+CloudFront routet `/api/catalog/*` und `/api/garden/*` auf die jeweilige HTTP API und alles andere auf den Bucket. Damit gibt es nur eine Origin und keine CORS-Konfiguration. Die Origin-Request-Policy (`ALL_VIEWER_EXCEPT_HOST_HEADER`) reicht `Authorization` und `Accept-Language` durch; die HTTP API gibt beide an die Lambda weiter. Mit `Accept-Language` antworten die Services in der Sprache der App (T-70). Für `/api/*` ist Caching aus. Einzige Ausnahme ist der öffentliche Katalog unter `/api/catalog/public/*`: Er wird ohne Viewer-Header weitergereicht und 5 Minuten gecacht. Seine Antwort ist in jeder Sprache gleich, deshalb gehört die Sprache nicht in den Cache-Key; seltene Fehler kommen dort auf Deutsch.
 
 ## Frontend-Stack
 
@@ -60,6 +60,7 @@ Die Namen stehen zentral in `infra/lib/config/ssm.ts`; `<stage>` ist der Stage-N
 - Feature-Plan **Lite**: E-Mail-Login, Selbstregistrierung und SRP sind enthalten, Kosten im Leerlauf nahe null.
 - Passwortrichtlinie: mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Ziffer und Sonderzeichen.
 - Kontowiederherstellung nur per E-Mail; der SPA-Client verhindert Hinweise darauf, ob ein Konto existiert.
+- **E-Mails** (T-70): Den Code für die Registrierung und für „Passwort vergessen“ verschickt Cognito mit derselben Code-Vorlage (Verification Message, Stil `CODE`; laut AWS-Doku nutzen Passwort-Reset und Änderungen von Attributen immer die Code-Vorlage). Ein zweisprachiger Text über `userVerification` reicht deshalb, Deutsch oben, Englisch darunter, der Code nur einmal (`infra/lib/shared/verification-email.ts`). Ein `CustomMessage`-Trigger mit der Sprache aus `clientMetadata` ist nicht nötig.
 - Löschschutz am User Pool, `RETAIN` und Termination Protection am Stack.
 
 ## cdk-nag

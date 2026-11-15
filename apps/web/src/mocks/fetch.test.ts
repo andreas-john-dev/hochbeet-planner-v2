@@ -53,6 +53,8 @@ describe('mock API', () => {
     const response = await fetchFn('/api/garden/beds');
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ message: 'Bitte melde dich an.' });
+    const english = await fetchFn('/api/garden/beds', { headers: { 'Accept-Language': 'en' } });
+    expect(await english.json()).toEqual({ message: 'Please sign in.' });
   });
 
   it('serves the global catalogue without token, like the public catalog route', async () => {
@@ -82,6 +84,28 @@ describe('mock API', () => {
       message: 'Bitte prüfe deine Eingaben.',
       issues: [{ path: 'widthCm', message: 'Muss ein Vielfaches von 5 cm sein.' }],
     });
+  });
+
+  it('answers in English with Accept-Language: en, like the services', async () => {
+    const headers = { ...auth('a@example.com'), ...json, 'Accept-Language': 'en' };
+    const response = await fetchFn('/api/garden/beds', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...bedFields(' '), widthCm: 203 }),
+    });
+    expect(await response.json()).toEqual({
+      message: 'Please check your entries.',
+      issues: [
+        { path: 'name', message: 'Please enter a name.' },
+        { path: 'widthCm', message: 'Must be a multiple of 5 cm.' },
+      ],
+    });
+    const missing = await fetchFn('/api/catalog/plants/01J9ZQ3W8D6V2K5M7N8P9R0S1T/publication', {
+      method: 'POST',
+      headers,
+    });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ message: 'This plant does not exist.' });
   });
 
   it('renames a bed and deletes it with its plantings', async () => {

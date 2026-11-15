@@ -1,5 +1,7 @@
 import {
+  localizeMessage,
   type PlantFields,
+  safeParseIn,
   type Sowing,
   type SowingMethod,
   SowingSchema,
@@ -100,7 +102,7 @@ export function usesField(method: SowingMethod | null, key: NumberKey): boolean 
 
 /**
  * Checks the form; returns frost sensitivity and sowing details or messages per field in
- * `language` (those of the schema in the language Zod speaks).
+ * `language`, those of the schema included.
  * Both keys are always set: `frostSensitive` as boolean so that an adjustment can switch it
  * off again, `sowing` as undefined when there are no details.
  */
@@ -136,13 +138,13 @@ export function parseSowingForm(
     if (numbers[key] !== undefined) sowing[key] = numbers[key];
   }
 
-  const parsed = SowingSchema.safeParse(sowing);
+  const parsed = safeParseIn(SowingSchema, sowing, language);
   for (const issue of parsed.error?.issues ?? []) {
     // A missing pair that is half filled already has "Bitte beide Werte angeben."
     const pair = PAIRS[issue.path[0] as keyof typeof PAIRS] as Pair | undefined;
     if (issue.path.length === 1 && pair && (errors[pair[0]] || errors[pair[1]])) continue;
     const key = formKey(issue.path);
-    if (key && !errors[key]) errors[key] = issue.message;
+    if (key && !errors[key]) errors[key] = localizeMessage(issue.message, language);
   }
   if (Object.keys(errors).length > 0 || !parsed.success) return { errors };
   return { fields: { frostSensitive: form.frostSensitive, sowing: parsed.data } };

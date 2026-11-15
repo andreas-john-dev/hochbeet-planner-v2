@@ -1,0 +1,82 @@
+import type { ImportKind, Messages, Unit } from './types';
+
+const UNITS: Record<Unit, string> = {
+  weeks: 'Wochen',
+  days: 'Tage',
+  celsius: '°C',
+  pieces: 'Stück',
+};
+
+const IMPORTS: Record<ImportKind, string> = {
+  beds: 'Beete',
+  plantings: 'Pflanzungen',
+  sowings: 'Anzuchten',
+  plants: 'eigene Sorten',
+  overrides: 'Anpassungen',
+};
+
+export const de: Messages = {
+  validation: {
+    nameRequired: 'Bitte einen Namen angeben.',
+    gridMultiple: ({ step }) => `Muss ein Vielfaches von ${String(step)} cm sein.`,
+    minCm: ({ min }) => `Mindestens ${String(min)} cm.`,
+    ulid: 'Keine gültige ULID.',
+    dateFormat: 'Datum im Format JJJJ-MM-TT erwartet.',
+    dateInvalid: 'Kein gültiges Datum.',
+    monday: 'Muss ein Montag sein.',
+    weekWhole: 'Kalenderwoche als ganze Zahl angeben.',
+    weekRange: 'Kalenderwoche 1 bis 53 angeben.',
+    dateDuplicate: 'Datum doppelt.',
+    sowingOnlyTransplant: 'Nur gepflanzte Pflanzungen stammen aus einer Anzucht.',
+    endAfterStart: 'Ende muss nach dem Start liegen.',
+    removedAfterStart: 'Entfernen darf nicht vor dem Start liegen.',
+    whole: ({ unit }) => `Ganze ${UNITS[unit]} angeben.`,
+    range: ({ min, max, unit }) => `${String(min)} bis ${String(max)} ${UNITS[unit]} angeben.`,
+    maxChars: ({ max }) => `Höchstens ${String(max)} Zeichen.`,
+    transplantAfterSowing: 'Auspflanzen muss nach der Aussaat liegen.',
+    rangeOrder: 'Bis-Wert muss mindestens so groß sein wie der Von-Wert.',
+    presowWeeksRequired: 'Bitte die Wochen für die Vorkultur angeben.',
+    propagationWeeksRequired: 'Bitte die Dauer der Vorkultur angeben.',
+    presowOnly: 'Nur bei Vorkultur möglich.',
+    directSowWeeksRequired: 'Bitte die Wochen für die Direktsaat angeben.',
+    directOnly: 'Nur bei Direktsaat möglich.',
+    color: 'Farbe als #rrggbb erwartet.',
+    icon: 'Unbekanntes Icon.',
+    overrideEmpty: 'Keine Änderung angegeben.',
+    monthDayFormat: 'Datum als MM-TT angeben.',
+    monthDayEveryYear: 'Diesen Tag gibt es nicht in jedem Jahr.',
+    importMax: ({ max, kind }) => `Höchstens ${String(max)} ${IMPORTS[kind]} auf einmal.`,
+    bedDuplicate: 'Beet doppelt.',
+    sowingDuplicate: 'Anzucht doppelt.',
+    bedMissing: 'Dieses Beet fehlt im Import.',
+    rejectionComment: 'Bitte begründe die Ablehnung.',
+    questionRequired: 'Bitte schreib eine Frage an den Assistenten.',
+    questionTooLong: ({ max }) =>
+      `Deine Frage ist zu lang. Bitte fasse dich kürzer (höchstens ${String(max)} Zeichen).`,
+    neighborSelf: 'Eine Sorte kann nicht ihr eigener Nachbar sein.',
+    neighborUnknown: 'Unbekannte Sorte.',
+    neighborGlobalOnly: 'Globale Sorten dürfen nur auf globale Sorten verweisen.',
+  },
+  errors: {
+    signIn: 'Bitte melde dich an.',
+    unknownPath: 'Diese Adresse gibt es nicht.',
+    invalidJson: 'Die Anfrage ist kein gültiges JSON.',
+    checkInput: 'Bitte prüfe deine Eingaben.',
+    server: 'Da ist etwas schiefgegangen. Bitte versuche es später erneut.',
+    bedNotFound: 'Dieses Beet gibt es nicht.',
+    plantingNotFound: 'Diese Pflanzung gibt es nicht.',
+    sowingNotFound: 'Diese Anzucht gibt es nicht.',
+    plantNotFound: 'Diese Sorte gibt es nicht.',
+    adminOnly: 'Dieser Bereich ist nur für Admins.',
+    alreadyHandled: 'Die Anfrage wurde bereits bearbeitet.',
+    noOpenRequest: 'Für diese Sorte gibt es keine offene Anfrage.',
+    alreadyPublished: 'Diese Sorte ist bereits veröffentlicht.',
+    checkNeighbors: 'Bitte prüfe die Nachbarn.',
+    guestPublish: 'Melde dich an, um eine Sorte für alle vorzuschlagen.',
+    storageFull:
+      'Der Speicher deines Browsers ist voll. Lösche alte Beete und versuche es noch einmal.',
+    localFailed: 'Das hat nicht geklappt. Bitte versuche es noch einmal.',
+    catalogUnavailable:
+      'Der Katalog ist gerade nicht erreichbar. Prüfe deine Internetverbindung und versuche es noch einmal.',
+  },
+};

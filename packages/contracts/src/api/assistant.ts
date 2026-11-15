@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { messageKey } from '../messages';
 import {
   CategorySchema,
   FeederSchema,
@@ -43,10 +44,10 @@ export const AssistantRequestSchema = z.object({
   message: z
     .string()
     .trim()
-    .min(1, 'Bitte schreib eine Frage an den Assistenten.')
+    .min(1, messageKey('questionRequired'))
     .max(
       MAX_ASSISTANT_MESSAGE_CHARS,
-      `Deine Frage ist zu lang. Bitte fasse dich kürzer (höchstens ${String(MAX_ASSISTANT_MESSAGE_CHARS)} Zeichen).`,
+      messageKey('questionTooLong', { max: MAX_ASSISTANT_MESSAGE_CHARS }),
     ),
   bedId: UlidSchema.optional(),
   /** Asks for checked planting suggestions for `bedId` instead of a plain answer. */

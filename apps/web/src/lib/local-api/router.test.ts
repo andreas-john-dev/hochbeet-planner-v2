@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
-import { handle, json, parseJson, route } from './router';
+import { messageKey } from '@hochbeet/contracts';
+import { error, errorText, handle, json, parseJson, route } from './router';
 
 const request = (path: string, init?: RequestInit) =>
   new Request(new URL(path, 'http://localhost'), init);
@@ -36,6 +37,38 @@ describe('handle', () => {
     }
   });
 
+  it('answers in the language of Accept-Language, like the services', async () => {
+    const english = { headers: { 'Accept-Language': 'en-GB,en;q=0.9' } };
+    const unknown = await handle(routes, request('/api/garden/beds', english));
+    expect(await unknown.json()).toEqual({ message: 'This address does not exist.' });
+    const failed = await handle(routes, request('/api/fails', english));
+    expect(await failed.json()).toEqual({ message: 'That did not work. Please try again.' });
+    const neighbors = [
+      route('GET', '/api/n', () =>
+        error('checkNeighbors', 400, [
+          { path: 'badNeighbors.0', message: messageKey('neighborSelf') },
+        ]),
+      ),
+      route('GET', '/api/fixed', () =>
+        errorText('Für Pflanzvorschläge brauche ich ein Beet.', 400),
+      ),
+    ];
+    expect(await (await handle(neighbors, request('/api/n', english))).json()).toEqual({
+      message: 'Please check the neighbours.',
+      issues: [{ path: 'badNeighbors.0', message: 'A plant cannot be its own neighbour.' }],
+    });
+    expect(await (await handle(neighbors, request('/api/n'))).json()).toEqual({
+      message: 'Bitte prüfe die Nachbarn.',
+      issues: [
+        { path: 'badNeighbors.0', message: 'Eine Sorte kann nicht ihr eigener Nachbar sein.' },
+      ],
+    });
+    // Fixed texts, e.g. those of the assistant, stay as they are.
+    expect(await (await handle(neighbors, request('/api/fixed', english))).json()).toEqual({
+      message: 'Für Pflanzvorschläge brauche ich ein Beet.',
+    });
+  });
+
   it('turns a full browser storage into 507 and other errors into 500', async () => {
     const full = await handle(routes, request('/api/full'));
     expect(full.status).toBe(507);
@@ -60,5 +93,24 @@ describe('parseJson', () => {
       expect(body.message).toBe('Bitte prüfe deine Eingaben.');
       expect(body.issues).toHaveLength(1);
     }
+  });
+
+  it('names the issues in English, own messages and Zod defaults', async () => {
+    const english = z.object({ name: z.string().max(3, messageKey('maxChars', { max: 3 })) });
+    const result = await parseJson(
+      request('/api/x', {
+        method: 'POST',
+        body: '{"name":"Hochbeet","extra":1}',
+        headers: { 'Accept-Language': 'en' },
+      }),
+      english.strict(),
+    );
+    expect(await result.response?.json()).toEqual({
+      message: 'Please check your entries.',
+      issues: [
+        { path: 'name', message: 'At most 3 characters.' },
+        { path: '', message: expect.stringMatching(/^Unrecognized key/) as string },
+      ],
+    });
   });
 });

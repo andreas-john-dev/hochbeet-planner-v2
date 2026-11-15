@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { messageKey } from './messages';
 
 /** Edge length of a grid cell in cm. Positions and lengths are multiples of it. */
 export const GRID_CM = 5;
@@ -8,10 +9,10 @@ export const GridCmSchema = z
   .number()
   .int()
   .nonnegative()
-  .multipleOf(GRID_CM, `Muss ein Vielfaches von ${String(GRID_CM)} cm sein.`);
+  .multipleOf(GRID_CM, messageKey('gridMultiple', { step: GRID_CM }));
 
 /** ULID in Crockford base32, e.g. 01J9ZQ3W8D6V2K5M7N8P9R0S1T. */
-export const UlidSchema = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/, 'Keine gültige ULID.');
+export const UlidSchema = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/, messageKey('ulid'));
 export type Ulid = z.infer<typeof UlidSchema>;
 
 function parseIsoDate(value: string): Date | undefined {
@@ -24,14 +25,14 @@ function parseIsoDate(value: string): Date | undefined {
 /** Calendar date as ISO string `YYYY-MM-DD`. */
 export const IsoDateSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum im Format JJJJ-MM-TT erwartet.')
-  .refine((value) => parseIsoDate(value) !== undefined, 'Kein gültiges Datum.');
+  .regex(/^\d{4}-\d{2}-\d{2}$/, messageKey('dateFormat'))
+  .refine((value) => parseIsoDate(value) !== undefined, messageKey('dateInvalid'));
 export type IsoDate = z.infer<typeof IsoDateSchema>;
 
 /** ISO date that falls on a Monday: plantings start and end with whole ISO weeks. */
 export const MondaySchema = IsoDateSchema.refine(
   (value) => parseIsoDate(value)?.getUTCDay() === 1,
-  'Muss ein Montag sein.',
+  messageKey('monday'),
 );
 
 /** `H` = parallel to the bed width (x axis), `V` = parallel to the bed depth (y axis). */
@@ -41,9 +42,9 @@ export type Direction = z.infer<typeof DirectionSchema>;
 /** ISO-8601 calendar week number. */
 export const IsoWeekSchema = z
   .number()
-  .int('Kalenderwoche als ganze Zahl angeben.')
-  .min(1, 'Kalenderwoche 1 bis 53 angeben.')
-  .max(53, 'Kalenderwoche 1 bis 53 angeben.');
+  .int(messageKey('weekWhole'))
+  .min(1, messageKey('weekRange'))
+  .max(53, messageKey('weekRange'));
 
 /**
  * Recurring window of ISO weeks, both ends included, e.g. sowing from week 10 to 14.

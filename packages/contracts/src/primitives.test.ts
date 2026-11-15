@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { localizeMessage } from './messages';
 import {
   GridCmSchema,
   IsoDateSchema,
@@ -35,9 +36,9 @@ describe('primitives', () => {
   it('accepts only Mondays as week dates', () => {
     expect(ok(MondaySchema, '2026-10-05')).toBe(true);
     expect(ok(MondaySchema, '2026-10-07')).toBe(false);
-    expect(MondaySchema.safeParse('2026-10-07').error?.issues[0]?.message).toBe(
-      'Muss ein Montag sein.',
-    );
+    const issue = MondaySchema.safeParse('2026-10-07').error?.issues[0];
+    expect(localizeMessage(issue?.message ?? '')).toBe('Muss ein Montag sein.');
+    expect(localizeMessage(issue?.message ?? '', 'en')).toBe('Must be a Monday.');
   });
 
   it('accepts week windows with ISO weeks 1 to 53', () => {

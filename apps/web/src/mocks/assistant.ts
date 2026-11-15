@@ -8,7 +8,7 @@ import {
   AssistantRequestSchema,
   type Suggestion,
 } from '@hochbeet/contracts';
-import { error, json, parseJson, route, type Route } from '@/lib/local-api/router';
+import { errorText, json, parseJson, route, type Route } from '@/lib/local-api/router';
 import { ASSISTANT_PATH } from '@/lib/assistant';
 import type { MockUser } from './handlers';
 import type { MockStore } from './store';
@@ -89,7 +89,7 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
   return [
     route('POST', ASSISTANT_PATH, async ({ request }) => {
       if (!user.groups.some((g) => (ASSISTANT_GROUPS as readonly string[]).includes(g))) {
-        return error('Der Assistent ist noch nicht für dein Konto freigeschaltet.', 403);
+        return errorText('Der Assistent ist noch nicht für dein Konto freigeschaltet.', 403);
       }
       const raw: unknown = await request
         .clone()
@@ -106,7 +106,7 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
       const parsed = await parseJson(request, AssistantRequestSchema);
       if (parsed.response) return parsed.response;
       if (parsed.data.suggest && !parsed.data.bedId) {
-        return error('Für Pflanzvorschläge brauche ich ein Beet.', 400);
+        return errorText('Für Pflanzvorschläge brauche ich ein Beet.', 400);
       }
       const remaining = store.takeAssistantQuestion(
         user.id,
@@ -114,7 +114,7 @@ export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
         MOCK_ASSISTANT_DAILY_LIMIT,
       );
       if (remaining === undefined) {
-        return error(
+        return errorText(
           `Du hast heute schon ${String(MOCK_ASSISTANT_DAILY_LIMIT)} Fragen gestellt. Morgen geht es weiter.`,
           429,
         );

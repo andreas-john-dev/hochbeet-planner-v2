@@ -42,7 +42,7 @@ export function userOf(request: Request): MockUser | undefined {
   return { id, admin: groups.includes('admins'), groups };
 }
 
-const NO_REQUEST = 'Für diese Sorte gibt es keine offene Anfrage.';
+const NO_REQUEST = 'noOpenRequest';
 /** The plant fields of an own plant, without id and catalogue metadata. */
 const fieldsOf = (plant: OwnPlant): PlantFields => SavePlantRequestSchema.parse(plant);
 
@@ -70,7 +70,7 @@ export function mockRoutes(
   const admin =
     (handler: Route['handler']): Route['handler'] =>
     (args) =>
-      user.admin ? handler(args) : error('Dieser Bereich ist nur für Admins.', 403);
+      user.admin ? handler(args) : error('adminOnly', 403);
   const pendingRequest = (plantId: string | undefined) => {
     for (const [userId, garden] of store.users()) {
       const plant = garden.ownPlants?.find(
@@ -93,7 +93,7 @@ export function mockRoutes(
       const existing = garden.ownPlants?.find((p) => p.id === params.id && !p.archived);
       if (!existing) return error(PLANT_NOT_FOUND, 404);
       const status = existing.publication?.status;
-      if (status === 'PUBLISHED') return error('Diese Sorte ist bereits veröffentlicht.', 409);
+      if (status === 'PUBLISHED') return error('alreadyPublished', 409);
       if (status === 'PENDING') return json<CatalogPlant>(listed(existing));
       const issues = neighborIssues(
         existing,
@@ -101,7 +101,7 @@ export function mockRoutes(
         idsOf(store.readCatalog()),
         GLOBAL_NEIGHBORS_ONLY,
       );
-      if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+      if (issues.length > 0) return error('checkNeighbors', 400, issues);
       const plant: OwnPlant = {
         ...existing,
         publication: { status: 'PENDING' },
@@ -225,7 +225,7 @@ export function mockRoutes(
         };
         const globals = store.readCatalog();
         const issues = neighborIssues(plant, plant.id, idsOf(globals), GLOBAL_NEIGHBORS_ONLY);
-        if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+        if (issues.length > 0) return error('checkNeighbors', 400, issues);
         // Same id as before: plantings that use the plant keep working.
         store.writeCatalog([...globals, plant]);
         const { requestedAt: _requestedAt, ...rest } = pending.plant;
@@ -263,7 +263,7 @@ export function mockRoutes(
         const globals = store.readCatalog();
         const plant: Plant = { ...parsed.data, id: newId() };
         const issues = neighborIssues(plant, plant.id, idsOf(globals), GLOBAL_NEIGHBORS_ONLY);
-        if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+        if (issues.length > 0) return error('checkNeighbors', 400, issues);
         store.writeCatalog([...globals, plant]);
         return json<Plant>(plant, 201);
       }),
@@ -279,7 +279,7 @@ export function mockRoutes(
         if (!globals.some((p) => p.id === params.id)) return error(PLANT_NOT_FOUND, 404);
         const plant: Plant = { ...parsed.data, id: params.id ?? '' };
         const issues = neighborIssues(plant, plant.id, idsOf(globals), GLOBAL_NEIGHBORS_ONLY);
-        if (issues.length > 0) return error('Bitte prüfe die Nachbarn.', 400, issues);
+        if (issues.length > 0) return error('checkNeighbors', 400, issues);
         store.writeCatalog(globals.map((p) => (p.id === plant.id ? plant : p)));
         return json<Plant>(plant);
       }),

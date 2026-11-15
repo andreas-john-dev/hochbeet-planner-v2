@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { messageKey } from '../messages';
 import { CatalogPlantSchema, PlantFieldsSchema, PlantOverrideSchema, PlantSchema } from '../domain';
 import { IsoDateSchema, UlidSchema } from '../primitives';
 
@@ -44,7 +45,7 @@ export type ApprovePublicationRequest = z.infer<typeof ApprovePublicationRequest
 
 /** POST /catalog/admin/publications/{id}/reject */
 export const RejectPublicationRequestSchema = z.object({
-  comment: z.string().trim().min(1, 'Bitte begründe die Ablehnung.').max(500),
+  comment: z.string().trim().min(1, messageKey('rejectionComment')).max(500),
 });
 export type RejectPublicationRequest = z.infer<typeof RejectPublicationRequestSchema>;
 
@@ -62,10 +63,10 @@ export const ImportCatalogRequestSchema = z.object({
   importId: UlidSchema,
   ownPlants: z
     .array(PlantSchema.extend({ archived: z.boolean().optional() }))
-    .max(MAX_IMPORT_PLANTS, `Höchstens ${String(MAX_IMPORT_PLANTS)} eigene Sorten auf einmal.`),
+    .max(MAX_IMPORT_PLANTS, messageKey('importMax', { max: MAX_IMPORT_PLANTS, kind: 'plants' })),
   overrides: z
     .array(z.object({ plantId: UlidSchema, fields: PlantOverrideSchema }))
-    .max(MAX_IMPORT_PLANTS, `Höchstens ${String(MAX_IMPORT_PLANTS)} Anpassungen auf einmal.`),
+    .max(MAX_IMPORT_PLANTS, messageKey('importMax', { max: MAX_IMPORT_PLANTS, kind: 'overrides' })),
 });
 export type ImportCatalogRequest = z.infer<typeof ImportCatalogRequestSchema>;
 

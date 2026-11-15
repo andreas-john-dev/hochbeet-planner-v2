@@ -1,5 +1,5 @@
 import { localRoutes } from '@/lib/local-api/routes';
-import { error, handle, toRequest } from '@/lib/local-api/router';
+import { error, handle, localizeResponse, requestLocale, toRequest } from '@/lib/local-api/router';
 import { assistantRoutes } from './assistant';
 import { mockRoutes, publicRoutes, userOf } from './handlers';
 import { MockStore } from './store';
@@ -18,7 +18,7 @@ export function createMockFetch(store = new MockStore()): typeof fetch {
     if (new URL(request.url).pathname.startsWith('/api/catalog/public/')) {
       return handle(publicRoutes(store), request);
     }
-    if (!user) return error('Bitte melde dich an.', 401);
+    if (!user) return localizeResponse(error('signIn', 401), requestLocale(request));
     const routes = [
       ...localRoutes({ repo: store.repository(user.id), globals: () => store.readCatalog() }),
       ...mockRoutes(store, user),
