@@ -2,6 +2,8 @@ import {
   type CatalogPlant,
   DEFAULT_LAST_FROST,
   type SowingBatch,
+  localizeMessage,
+  safeParseIn,
   SowingBatchFieldsSchema,
   type SowingStage,
 } from '@hochbeet/contracts';
@@ -147,13 +149,15 @@ function SowingForm({
       ...(form.plannedTransplantDate ? { plannedTransplantDate: form.plannedTransplantDate } : {}),
       ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
     };
-    const parsed = SowingBatchFieldsSchema.safeParse(fields);
+    const parsed = safeParseIn(SowingBatchFieldsSchema, fields, language);
     if (!parsed.success) {
       setErrors(
         Object.fromEntries(
           parsed.error.issues.map((issue) => [
             String(issue.path[0]),
-            issue.path[0] === 'plantId' ? t('form.plantRequired') : issue.message,
+            issue.path[0] === 'plantId'
+              ? t('form.plantRequired')
+              : localizeMessage(issue.message, language),
           ]),
         ),
       );

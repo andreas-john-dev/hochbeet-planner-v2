@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { messageKey } from '../messages';
 import {
   BedFieldsSchema,
   BedSchema,
@@ -67,11 +68,11 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 /** A day of the year without year, `MM-DD`, e.g. `05-15`; 29 February is refused. */
 export const MonthDaySchema = z
   .string()
-  .regex(/^\d{2}-\d{2}$/, 'Datum als MM-TT angeben.')
+  .regex(/^\d{2}-\d{2}$/, messageKey('monthDayFormat'))
   .refine((value) => {
     const [month = 0, day = 0] = value.split('-').map(Number);
     return month >= 1 && month <= 12 && day >= 1 && day <= (DAYS_IN_MONTH[month - 1] ?? 0);
-  }, 'Diesen Tag gibt es nicht in jedem Jahr.');
+  }, messageKey('monthDayEveryYear'));
 
 /** GET and PUT /garden/settings: the user's settings for all beds. */
 export const GardenSettingsSchema = z.object({
@@ -99,33 +100,36 @@ export const ImportGardenRequestSchema = z
     importId: UlidSchema,
     beds: z
       .array(BedSchema)
-      .max(MAX_IMPORT_BEDS, `Höchstens ${String(MAX_IMPORT_BEDS)} Beete auf einmal.`),
+      .max(MAX_IMPORT_BEDS, messageKey('importMax', { max: MAX_IMPORT_BEDS, kind: 'beds' })),
     plantings: z
       .array(PlantingSchema)
       .max(
         MAX_IMPORT_PLANTINGS,
-        `Höchstens ${String(MAX_IMPORT_PLANTINGS)} Pflanzungen auf einmal.`,
+        messageKey('importMax', { max: MAX_IMPORT_PLANTINGS, kind: 'plantings' }),
       ),
     /** Missing in requests of app versions before sowing batches. */
     sowings: z
       .array(SowingBatchSchema)
-      .max(MAX_IMPORT_SOWINGS, `Höchstens ${String(MAX_IMPORT_SOWINGS)} Anzuchten auf einmal.`)
+      .max(
+        MAX_IMPORT_SOWINGS,
+        messageKey('importMax', { max: MAX_IMPORT_SOWINGS, kind: 'sowings' }),
+      )
       .default([]),
   })
   .superRefine(({ beds, plantings, sowings }, ctx) => {
     const bedIds = new Set(beds.map((b) => b.id));
     if (bedIds.size !== beds.length) {
-      ctx.addIssue({ code: 'custom', path: ['beds'], message: 'Beet doppelt.' });
+      ctx.addIssue({ code: 'custom', path: ['beds'], message: messageKey('bedDuplicate') });
     }
     if (new Set(sowings.map((s) => s.id)).size !== sowings.length) {
-      ctx.addIssue({ code: 'custom', path: ['sowings'], message: 'Anzucht doppelt.' });
+      ctx.addIssue({ code: 'custom', path: ['sowings'], message: messageKey('sowingDuplicate') });
     }
     plantings.forEach((planting, index) => {
       if (!bedIds.has(planting.bedId)) {
         ctx.addIssue({
           code: 'custom',
           path: ['plantings', index, 'bedId'],
-          message: 'Dieses Beet fehlt im Import.',
+          message: messageKey('bedMissing'),
         });
       }
     });

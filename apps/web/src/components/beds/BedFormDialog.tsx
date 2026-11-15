@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { apiErrorMessage } from '@/lib/api';
+import { withContractMessages } from '@/lib/form-errors';
 import { useSaveBed } from '@/lib/garden';
 import { cn } from '@/lib/utils';
 import { checkRenewals } from '@/lib/soil-renewals';
@@ -80,7 +81,7 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
   );
   const [renewalError, setRenewalError] = useState<string | undefined>();
   const form = useForm<BedForm>({
-    resolver: zodResolver(bedFormSchema),
+    resolver: withContractMessages(zodResolver(bedFormSchema), language),
     defaultValues: bed ?? NEW_BED,
   });
   const { errors } = form.formState;

@@ -1,5 +1,6 @@
 import {
   type ApprovePublicationRequest,
+  type ErrorKey,
   type Plant,
   type PlantFields,
   PlantSchema,
@@ -15,7 +16,7 @@ import {
   PLANT_NOT_FOUND,
 } from './service';
 
-const NO_REQUEST = 'Für diese Sorte gibt es keine offene Anfrage.';
+const NO_REQUEST = 'noOpenRequest' satisfies ErrorKey;
 
 /** Admin use cases: the publication queue and the maintenance of global plants. */
 export class AdminService {
@@ -48,7 +49,7 @@ export class AdminService {
     const plant: Plant = { ...fieldsOf(pending.plant), ...request.corrections, id: plantId };
     await this.checkGlobalNeighbors(plant);
     if (!(await this.store.approvePublication(pending.userId, plant))) {
-      throw new ConflictError('Die Anfrage wurde bereits bearbeitet.');
+      throw new ConflictError('alreadyHandled');
     }
     return plant;
   }
@@ -59,7 +60,7 @@ export class AdminService {
     );
     if (!pending) throw new NotFoundError(NO_REQUEST);
     if (!(await this.store.rejectPublication(pending.userId, plantId, comment))) {
-      throw new ConflictError('Die Anfrage wurde bereits bearbeitet.');
+      throw new ConflictError('alreadyHandled');
     }
   }
 

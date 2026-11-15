@@ -7,8 +7,13 @@ import {
   SaveOverrideRequestSchema,
   SavePlantRequestSchema,
 } from '@hochbeet/contracts';
-import { createServiceApp, isAdmin, type Logger, parseBody } from '@hochbeet/service-kit';
-import { HTTPException } from 'hono/http-exception';
+import {
+  createServiceApp,
+  ForbiddenError,
+  isAdmin,
+  type Logger,
+  parseBody,
+} from '@hochbeet/service-kit';
 import { ulid } from 'ulid';
 import { AdminService } from './catalog/admin';
 import { importCatalog } from './catalog/import';
@@ -87,7 +92,7 @@ export function createApp({ store, logger, now, newId = () => ulid() }: AppDeps)
   // Admin area: members of the Cognito group `admins` only.
   app.use('/admin/*', async (c, next) => {
     if (!isAdmin(c.get('user'))) {
-      throw new HTTPException(403, { message: 'Dieser Bereich ist nur für Admins.' });
+      throw new ForbiddenError('adminOnly');
     }
     await next();
   });

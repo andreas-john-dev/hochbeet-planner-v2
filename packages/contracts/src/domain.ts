@@ -7,11 +7,12 @@ import {
   UlidSchema,
   WeekWindowSchema,
 } from './primitives';
+import { messageKey, type Unit } from './messages';
 
-const NameSchema = z.string().trim().min(1, 'Bitte einen Namen angeben.').max(60);
+const NameSchema = z.string().trim().min(1, messageKey('nameRequired')).max(60);
 
 /** Positive grid length, e.g. bed size or row length. */
-export const PositiveGridCmSchema = GridCmSchema.min(5, 'Mindestens 5 cm.');
+export const PositiveGridCmSchema = GridCmSchema.min(5, messageKey('minCm', { min: 5 }));
 
 // ---------------------------------------------------------------------------
 // Bed
@@ -25,7 +26,7 @@ export const BedFieldsSchema = z.object({
   /** Dates the soil was renewed; each resets crop rotation. Default: 1 March every year. */
   soilRenewals: z
     .array(IsoDateSchema)
-    .refine((dates) => new Set(dates).size === dates.length, 'Datum doppelt.'),
+    .refine((dates) => new Set(dates).size === dates.length, messageKey('dateDuplicate')),
 });
 
 export const BedSchema = BedFieldsSchema.extend({ id: UlidSchema });
@@ -85,21 +86,21 @@ function checkPlanting(
     ctx.addIssue({
       code: 'custom',
       path: ['sowingId'],
-      message: 'Nur gepflanzte Pflanzungen stammen aus einer Anzucht.',
+      message: messageKey('sowingOnlyTransplant'),
     });
   }
   if (planting.endDate !== null && planting.endDate <= planting.startDate) {
     ctx.addIssue({
       code: 'custom',
       path: ['endDate'],
-      message: 'Ende muss nach dem Start liegen.',
+      message: messageKey('endAfterStart'),
     });
   }
   if (planting.removedDate !== null && planting.removedDate < planting.startDate) {
     ctx.addIssue({
       code: 'custom',
       path: ['removedDate'],
-      message: 'Entfernen darf nicht vor dem Start liegen.',
+      message: messageKey('removedAfterStart'),
     });
   }
 }
@@ -141,12 +142,16 @@ export type SowingStage = z.infer<typeof SowingStageSchema>;
 /** Seeds or seedlings of a batch; more than any hobby gardener raises of one plant. */
 export const MAX_SOWING_COUNT = 9999;
 
-const countOf = (min: number) =>
-  z
+/** Whole number from `min` to `max` with an own message. */
+function intBetween(min: number, max: number, unit: Unit) {
+  return z
     .number()
-    .int('Ganze Stück angeben.')
-    .min(min, `${String(min)} bis ${String(MAX_SOWING_COUNT)} Stück angeben.`)
-    .max(MAX_SOWING_COUNT, `${String(min)} bis ${String(MAX_SOWING_COUNT)} Stück angeben.`);
+    .int(messageKey('whole', { unit }))
+    .min(min, messageKey('range', { min, max, unit }))
+    .max(max, messageKey('range', { min, max, unit }));
+}
+
+const countOf = (min: number) => intBetween(min, MAX_SOWING_COUNT, 'pieces');
 
 const SowingBatchObjectSchema = z.object({
   plantId: UlidSchema,
@@ -157,10 +162,18 @@ const SowingBatchObjectSchema = z.object({
   aliveCount: countOf(0),
   stage: SowingStageSchema,
   /** Where the batch stands, e.g. "Fensterbank Küche". */
-  location: z.string().trim().max(60, 'Höchstens 60 Zeichen.').optional(),
+  location: z
+    .string()
+    .trim()
+    .max(60, messageKey('maxChars', { max: 60 }))
+    .optional(),
   /** Monday of the week the seedlings are meant to go into the bed. */
   plannedTransplantDate: MondaySchema.optional(),
-  notes: z.string().trim().max(500, 'Höchstens 500 Zeichen.').optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(500, messageKey('maxChars', { max: 500 }))
+    .optional(),
 });
 
 function checkSowingBatch(
@@ -171,7 +184,7 @@ function checkSowingBatch(
     ctx.addIssue({
       code: 'custom',
       path: ['plannedTransplantDate'],
-      message: 'Auspflanzen muss nach der Aussaat liegen.',
+      message: messageKey('transplantAfterSowing'),
     });
   }
 }
@@ -216,19 +229,11 @@ const SpacingCmSchema = z.number().int().min(1).max(300);
 export const SowingMethodSchema = z.enum(['DIRECT', 'PRESOW', 'BOTH']);
 export type SowingMethod = z.infer<typeof SowingMethodSchema>;
 
-/** Whole number from `min` to `max` with a German message. */
-const intBetween = (min: number, max: number, unit: string) =>
-  z
-    .number()
-    .int(`Ganze ${unit} angeben.`)
-    .min(min, `${String(min)} bis ${String(max)} ${unit} angeben.`)
-    .max(max, `${String(min)} bis ${String(max)} ${unit} angeben.`);
-
 /** Range with `min <= max`, e.g. 6–8 weeks. */
 const rangeOf = (value: z.ZodNumber) =>
   z.object({ min: value, max: value }).refine((range) => range.min <= range.max, {
     path: ['max'],
-    message: 'Bis-Wert muss mindestens so groß sein wie der Von-Wert.',
+    message: messageKey('rangeOrder'),
   });
 
 const PRESOW_ONLY = ['presowWeeks', 'propagationWeeks', 'prickOutWeeks'] as const;
@@ -245,15 +250,15 @@ export const SowingSchema = z
     /** When seedlings can be started indoors; required for PRESOW and BOTH. */
     presowWeeks: WeekWindowSchema.optional(),
     /** Weeks from sowing to planting out; required for PRESOW and BOTH. */
-    propagationWeeks: rangeOf(intBetween(1, 26, 'Wochen')).optional(),
+    propagationWeeks: rangeOf(intBetween(1, 26, 'weeks')).optional(),
     /** Pricking out after this many weeks. */
-    prickOutWeeks: intBetween(1, 12, 'Wochen').optional(),
+    prickOutWeeks: intBetween(1, 12, 'weeks').optional(),
     /** When it can be sown into the bed; required for DIRECT and BOTH. */
     directSowWeeks: WeekWindowSchema.optional(),
     /** Added to the lifecycle of direct sown plantings; missing means 0. */
-    directSowExtraWeeks: intBetween(0, 26, 'Wochen').optional(),
-    germinationDays: rangeOf(intBetween(1, 60, 'Tage')).optional(),
-    germinationTempC: rangeOf(intBetween(0, 40, '°C')).optional(),
+    directSowExtraWeeks: intBetween(0, 26, 'weeks').optional(),
+    germinationDays: rangeOf(intBetween(1, 60, 'days')).optional(),
+    germinationTempC: rangeOf(intBetween(0, 40, 'celsius')).optional(),
   })
   .superRefine((sowing, ctx) => {
     const presow = sowing.method !== 'DIRECT';
@@ -267,15 +272,15 @@ export const SowingSchema = z
       }
     };
     if (presow) {
-      required('presowWeeks', 'Bitte die Wochen für die Vorkultur angeben.');
-      required('propagationWeeks', 'Bitte die Dauer der Vorkultur angeben.');
+      required('presowWeeks', messageKey('presowWeeksRequired'));
+      required('propagationWeeks', messageKey('propagationWeeksRequired'));
     } else {
-      forbidden(PRESOW_ONLY, 'Nur bei Vorkultur möglich.');
+      forbidden(PRESOW_ONLY, messageKey('presowOnly'));
     }
     if (direct) {
-      required('directSowWeeks', 'Bitte die Wochen für die Direktsaat angeben.');
+      required('directSowWeeks', messageKey('directSowWeeksRequired'));
     } else {
-      forbidden(DIRECT_ONLY, 'Nur bei Direktsaat möglich.');
+      forbidden(DIRECT_ONLY, messageKey('directOnly'));
     }
   });
 export type Sowing = z.infer<typeof SowingSchema>;
@@ -292,9 +297,9 @@ export const PlantFieldsSchema = z.object({
   goodNeighbors: z.array(UlidSchema),
   badNeighbors: z.array(UlidSchema),
   /** Colour of the footprint in the bed editor. */
-  color: z.string().regex(/^#[0-9a-f]{6}$/i, 'Farbe als #rrggbb erwartet.'),
+  color: z.string().regex(/^#[0-9a-f]{6}$/i, messageKey('color')),
   /** Key of an icon in packages/plant-icons. */
-  icon: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Unbekanntes Icon.'),
+  icon: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, messageKey('icon')),
   /** Does not stand frost: goes outside only after the last frost. Missing means false. */
   frostSensitive: z.boolean().optional(),
   /** Sowing and raising; missing for plants without these details. */
@@ -308,7 +313,7 @@ export type Plant = z.infer<typeof PlantSchema>;
 /** Personal adjustment of a global plant: effective plant = { ...global, ...override }. */
 export const PlantOverrideSchema = PlantFieldsSchema.partial()
   .strict()
-  .refine((override) => Object.keys(override).length > 0, 'Keine Änderung angegeben.');
+  .refine((override) => Object.keys(override).length > 0, messageKey('overrideEmpty'));
 export type PlantOverride = z.infer<typeof PlantOverrideSchema>;
 
 export const PublicationStatusSchema = z.enum(['PRIVATE', 'PENDING', 'PUBLISHED']);

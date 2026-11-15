@@ -4,6 +4,8 @@ import {
   type PlantFields,
   PlantFieldsSchema,
   type PlantOverride,
+  type ErrorKey,
+  messageKey,
 } from '@hochbeet/contracts';
 import { ulid } from 'ulid';
 import { ConflictError, type Issue, NotFoundError, ValidationError } from '@hochbeet/service-kit';
@@ -30,8 +32,8 @@ export type CatalogStore = Pick<
 const NEIGHBOR_LISTS = ['goodNeighbors', 'badNeighbors'] as const;
 type Neighbors = Partial<Pick<PlantFields, (typeof NEIGHBOR_LISTS)[number]>>;
 
-export const PLANT_NOT_FOUND = 'Diese Sorte gibt es nicht.';
-export const GLOBAL_NEIGHBORS_ONLY = 'Globale Sorten dürfen nur auf globale Sorten verweisen.';
+export const PLANT_NOT_FOUND = 'plantNotFound' satisfies ErrorKey;
+export const GLOBAL_NEIGHBORS_ONLY = messageKey('neighborGlobalOnly');
 
 /** Use cases of the catalog for one user: list, own plants and personal overrides. */
 export class CatalogService {
@@ -117,7 +119,7 @@ export class CatalogService {
     const existing = await this.store.getOwnPlant(userId, id);
     if (!existing || existing.archived) throw new NotFoundError(PLANT_NOT_FOUND);
     if (existing.publicationStatus === 'PUBLISHED') {
-      throw new ConflictError('Diese Sorte ist bereits veröffentlicht.');
+      throw new ConflictError('alreadyPublished');
     }
     if (existing.publicationStatus === 'PENDING') return toCatalogPlant(existing);
     const globalIds = new Set((await this.store.listGlobalPlants()).map((p) => p.id));
@@ -167,7 +169,7 @@ export class CatalogService {
       ...own.filter((p) => !p.archived).map((p) => p.id),
       id,
     ]);
-    checkNeighbors(fields, id, known, 'Unbekannte Sorte.');
+    checkNeighbors(fields, id, known, messageKey('neighborUnknown'));
   }
 }
 
@@ -180,12 +182,11 @@ export function checkNeighbors(
   const issues: Issue[] = NEIGHBOR_LISTS.flatMap((list) =>
     (fields[list] ?? []).flatMap((neighborId, index): Issue[] => {
       const path = `${list}.${String(index)}`;
-      if (neighborId === selfId)
-        return [{ path, message: 'Eine Sorte kann nicht ihr eigener Nachbar sein.' }];
+      if (neighborId === selfId) return [{ path, message: messageKey('neighborSelf') }];
       return known.has(neighborId) ? [] : [{ path, message: unknown }];
     }),
   );
-  if (issues.length > 0) throw new ValidationError('Bitte prüfe die Nachbarn.', issues);
+  if (issues.length > 0) throw new ValidationError('checkNeighbors', issues);
 }
 
 /** Plant fields of a stored own plant, without id and storage attributes. */

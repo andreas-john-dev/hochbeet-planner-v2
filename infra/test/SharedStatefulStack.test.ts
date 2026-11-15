@@ -1,6 +1,7 @@
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SharedStatefulStack } from '../lib/shared/SharedStatefulStack';
+import { VERIFICATION_EMAIL } from '../lib/shared/verification-email';
 import { createApp, env, stage, synthAndCollectNagViolations } from './helpers';
 
 describe('SharedStatefulStack', () => {
@@ -36,6 +37,24 @@ describe('SharedStatefulStack', () => {
         UserPoolTier: 'LITE',
       }),
     });
+  });
+
+  it('sends the code for sign-up and a forgotten password in German and English', () => {
+    template.hasResourceProperties('AWS::Cognito::UserPool', {
+      VerificationMessageTemplate: {
+        DefaultEmailOption: 'CONFIRM_WITH_CODE',
+        EmailSubject: 'Dein Code für den Hochbeet-Planer / Your Hochbeet-Planer code',
+        EmailMessage: Match.stringLikeRegexp(
+          'Dein Code für den Hochbeet-Planer: <strong>\\{####\\}</strong>[\\s\\S]*Your Hochbeet-Planer code',
+        ),
+      },
+      // Without a trigger: both emails use the same code template.
+      LambdaConfig: Match.absent(),
+    });
+    // The code appears exactly once; German comes first.
+    const message = VERIFICATION_EMAIL.body;
+    expect(message.split('{####}')).toHaveLength(2);
+    expect(message.indexOf('Dein Code')).toBeLessThan(message.indexOf('Your'));
   });
 
   it('creates a SPA client without secret that uses SRP', () => {

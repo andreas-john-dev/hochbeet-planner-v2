@@ -52,6 +52,7 @@ describe('FrontendStack', () => {
     const catalog = new HttpOrigin('catalog.example.com');
     stack.addPublicApiBehavior('/api/catalog/public/*', catalog, Duration.minutes(5));
     stack.addApiBehavior('/api/catalog/*', catalog);
+    stack.addApiBehavior('/api/garden/*', new HttpOrigin('garden.example.com'));
     stack.addAssistantBehavior(
       'arn:aws:bedrock-agentcore:eu-central-1:123456789012:runtime/prod_bed_assistant-Ab1',
     );
@@ -180,13 +181,19 @@ describe('FrontendStack', () => {
     expect(deployments).toContain('SsmParameterValuehochbeetprodshareduserpoolclientid');
   });
 
-  it('routes API paths with Authorization header and without caching', () => {
-    const api = behavior('/api/catalog/*');
-    expect(api?.CachePolicyId).toBe(CACHING_DISABLED);
-    expect(api?.OriginRequestPolicyId).toBe(ALL_VIEWER_EXCEPT_HOST_HEADER);
-    expect(api?.AllowedMethods).toContain('POST');
+  it('routes API paths with Authorization and Accept-Language and without caching', () => {
+    // The managed policy forwards all viewer headers but Host, so the services see the
+    // Authorization header and the app's language (Accept-Language) for their messages.
+    for (const path of ['/api/catalog/*', '/api/garden/*']) {
+      const api = behavior(path);
+      expect(api?.CachePolicyId).toBe(CACHING_DISABLED);
+      expect(api?.OriginRequestPolicyId).toBe(ALL_VIEWER_EXCEPT_HOST_HEADER);
+      expect(api?.AllowedMethods).toContain('POST');
+    }
   });
 
+  // The public catalogue is the same in every language, so Accept-Language stays out of the
+  // cache key; its rare errors come in German.
   it('caches the public catalogue for five minutes, shared by all viewers', () => {
     const paths = behaviors().map((b) => b.PathPattern);
     // CloudFront takes the first match, so the public path must come before the API.

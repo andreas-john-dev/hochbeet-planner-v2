@@ -2,6 +2,7 @@ import {
   type Bed,
   type BedWithPlantingsResponse,
   DEFAULT_GARDEN_SETTINGS,
+  type ErrorKey,
   type GardenSettings,
   GardenSettingsSchema,
   ImportGardenRequestSchema,
@@ -47,9 +48,9 @@ export interface AppDeps {
 /** API routes are served under /api/garden: CloudFront forwards the full path. */
 export const BASE_PATH = '/api/garden';
 
-const BED_NOT_FOUND = 'Dieses Beet gibt es nicht.';
-const PLANTING_NOT_FOUND = 'Diese Pflanzung gibt es nicht.';
-const SOWING_NOT_FOUND = 'Diese Anzucht gibt es nicht.';
+const BED_NOT_FOUND = 'bedNotFound' satisfies ErrorKey;
+const PLANTING_NOT_FOUND = 'plantingNotFound' satisfies ErrorKey;
+const SOWING_NOT_FOUND = 'sowingNotFound' satisfies ErrorKey;
 
 const byName = (a: Bed, b: Bed) => a.name.localeCompare(b.name, 'de') || a.id.localeCompare(b.id);
 

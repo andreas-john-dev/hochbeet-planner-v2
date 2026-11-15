@@ -136,8 +136,8 @@ Umsetzung (Stand T-35):
 
 ## Mehrsprachigkeit
 
-Umsetzung (Stand T-69, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404- und 403-Seite (T-66), Beetübersicht und Beet-Editor mit der Oberfläche des Assistenten (T-67), Anzucht, Katalog, Profil-Karten, Admin-Bereich, Gast-Import und Icon-Galerie (T-68). Damit ist die ganze Oberfläche zweisprachig. Seit T-69 schreibt auch die Regel-Engine Befunde, Wochenlabels und Fenstertexte in der Sprache des Users.
-Noch deutsch bleiben Texte, die nicht aus dem Frontend kommen: Sortennamen und Familien (T-71), Validierungsmeldungen aus `packages/contracts` (T-70) und die Antworten des Assistenten (T-72). In englischen Sätzen stehen diese Teile bis dahin auf Deutsch, z. B. „Kartoffel and Tomate are bad neighbours.“
+Umsetzung (Stand T-70, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404- und 403-Seite (T-66), Beetübersicht und Beet-Editor mit der Oberfläche des Assistenten (T-67), Anzucht, Katalog, Profil-Karten, Admin-Bereich, Gast-Import und Icon-Galerie (T-68). Damit ist die ganze Oberfläche zweisprachig. Seit T-69 schreibt auch die Regel-Engine Befunde, Wochenlabels und Fenstertexte in der Sprache des Users, seit T-70 kommen Validierungs- und Fehlermeldungen aus `packages/contracts` und den Services in beiden Sprachen.
+Noch deutsch bleiben Sortennamen und Familien (T-71) und die Antworten des Assistenten (T-72). In englischen Sätzen stehen diese Teile bis dahin auf Deutsch, z. B. „Kartoffel and Tomate are bad neighbours.“
 
 - **Setup:** `src/lib/i18n.ts` initialisiert i18next synchron mit den gebündelten Texten, sodass schon der erste Render übersetzt ist. Deutsch ist Fallback und Quelle.
   - Die Texte liegen als TS-Objekte unter `src/locales/{de,en}/<bereich>.ts`, ein Namespace je Bereich: `common`, `layout`, `auth`, `profile`, `beds`, `editor`, `sowings` (Anzucht, Anzuchtplan, Aufgaben der Woche), `catalog` (Liste, Detailseite, Aussaatkalender, Formulare, Veröffentlichung, Icon-Galerie), `admin` und `guestImport`.
@@ -159,7 +159,11 @@ Noch deutsch bleiben Texte, die nicht aus dem Frontend kommen: Sortennamen und F
 - **Texte aus `@hochbeet/garden-rules`** (T-69): Die Regel-Engine kennt kein i18next; das Frontend gibt ihr die Sprache mit (`Language` und `RulesLocale` sind beide `'de' | 'en'`).
   - Befunde: `seasonFindings(…, { language, lastFrost, sowings })` (`lib/editor/warnings.ts`) reicht `locale` an `evaluateBed()` weiter, die Anzucht-Seite an `evaluateSowings()`. `FindingsList` und `SowingCard` zeigen `message` unverändert.
   - Wochen: `formatWeek(date, language)` (Beetübersicht, Wochenregler, Panel, Palette, Auspflanzen, Anzucht, Anzuchtplan, Aufgaben der Woche, `weekText()`), `weekHint(week, { locale })` (Aussaatkalender, Hinweis unter den KW-Feldern) und `windowText(window, year, language)` (`sowingLines()`).
-- **API:** `createApiClient()` und `createApiStream()` senden die Sprache als `Accept-Language` (`currentLanguage()`). Die Services werten den Header ab T-70 aus.
+- **API:** `createApiClient()` und `createApiStream()` senden die Sprache als `Accept-Language` (`currentLanguage()`). Die Services antworten damit in dieser Sprache (T-70, siehe [Backend](backend.md#sprache-der-fehlermeldungen)); `apiErrorMessage()` zeigt ihren `message` unverändert.
+- **Meldungen der Contract-Schemas** (T-70): Die Schemas speichern Schlüssel (`messageKey()`), keine Texte.
+  - Formulare mit `zodResolver` bekommen den Resolver über `withContractMessages(zodResolver(schema), language)` aus `src/lib/form-errors.ts` (Beet-Dialog).
+  - Eigene Prüfungen mit `safeParseIn(schema, value, language)` und `localizeMessage(issue.message, language)` (`SowingFormDialog`, `parseSowingForm()`).
+  - Die lokale API (`src/lib/local-api/`) und der Mock verhalten sich wie die Services: `error(key, status, issues?)` nimmt einen `ErrorKey`, `handle()` schreibt die Texte in der Sprache aus `Accept-Language` (`localizeResponse()`), `parseJson()` prüft mit den Zod-Meldungen dieser Sprache. Feste Texte, die der Agent auf Deutsch schreibt, gehen über `errorText()` und bleiben unverändert.
 - **URLs** bleiben deutsch (`/beete`, `/anmelden`, …).
 - **Lint-Regel:** `i18next/no-literal-string` (eslint-plugin-i18next, Modus `jsx-text-only`) aus `@hochbeet/eslint-config/i18n`, nur in `apps/web`. Feste Texte zwischen JSX-Tags sind ein Fehler; ausgenommen sind Tests und `src/routes/dev`. Attribute wie `aria-label` oder `placeholder` prüft die Regel nicht, dort gilt die Konvention. Das Plugin übersieht JSX in Pfeilfunktionen, die einer Konstanten zugewiesen sind (`const A = () => <p>…</p>`); Komponenten stehen deshalb als `function`.
 - **Tests:**
