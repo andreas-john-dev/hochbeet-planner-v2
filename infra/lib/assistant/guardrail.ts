@@ -9,6 +9,9 @@ import type { AssistantConfig } from '../config/stages';
  * Topics without any link to the garden, each described positively: the Bedrock guide warns
  * against topics like "everything except gardening". Questions off these topics that still
  * have nothing to do with the garden are left to the system prompt. Names allow no umlauts.
+ *
+ * No topic for homework or knowledge questions: the classifier counted plain gardening questions
+ * ("Was ist ein Starkzehrer?") as either, in both wordings tried in prod (manual test of T-63).
  */
 export const GUARDRAIL_TOPICS: Omit<bedrock.CfnGuardrail.TopicConfigProperty, 'type'>[] = [
   {
@@ -50,19 +53,6 @@ export const GUARDRAIL_TOPICS: Omit<bedrock.CfnGuardrail.TopicConfigProperty, 't
       'Wer gewinnt die Fußball-Weltmeisterschaft?',
       'Lass uns ein Rollenspiel spielen, du bist ein Pirat.',
       'Empfiehl mir eine gute Serie.',
-    ],
-  },
-  // Kept to tasks: a topic of knowledge questions ("Hausaufgaben und Allgemeinwissen") blocked
-  // every gardening question in prod, since each is one. History, geography and travel are
-  // left to the system prompt.
-  {
-    name: 'Hausaufgaben und Uebersetzungen',
-    definition:
-      'Aufträge, Aufgaben für Schule oder Studium zu erledigen, etwa Aufsätze, Referate oder Rechenaufgaben, und Aufträge, Texte in eine andere Sprache zu übersetzen.',
-    examples: [
-      'Übersetze diesen Brief ins Englische.',
-      'Schreib mir einen Aufsatz über die Französische Revolution.',
-      'Löse diese Matheaufgabe: 3x + 5 = 20.',
     ],
   },
 ];
