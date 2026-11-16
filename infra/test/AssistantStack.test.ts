@@ -228,6 +228,8 @@ describe('AssistantStack', () => {
     // Bedrock's limits: names without umlauts, short definitions, at most five examples of at
     // most 100 characters.
     for (const topic of topics) {
+      // Knowledge questions as a topic blocked every gardening question (each is one).
+      expect(`${topic.Name} ${topic.Definition}`).not.toMatch(/wissen/i);
       expect(topic.Name).toMatch(/^[0-9a-zA-Z-_ !?.]{1,100}$/);
       expect(topic.Definition.length).toBeLessThanOrEqual(200);
       expect(topic.Examples.length).toBeLessThanOrEqual(5);

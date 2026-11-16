@@ -52,14 +52,17 @@ export const GUARDRAIL_TOPICS: Omit<bedrock.CfnGuardrail.TopicConfigProperty, 't
       'Empfiehl mir eine gute Serie.',
     ],
   },
+  // Kept to tasks: a topic of knowledge questions ("Hausaufgaben und Allgemeinwissen") blocked
+  // every gardening question in prod, since each is one. History, geography and travel are
+  // left to the system prompt.
   {
-    name: 'Hausaufgaben und Allgemeinwissen',
+    name: 'Hausaufgaben und Uebersetzungen',
     definition:
-      'Schulaufgaben, Übersetzungen von Texten und Wissensfragen zu Geschichte, Geografie, Reisen und Persönlichkeiten.',
+      'Aufträge, Aufgaben für Schule oder Studium zu erledigen, etwa Aufsätze, Referate oder Rechenaufgaben, und Aufträge, Texte in eine andere Sprache zu übersetzen.',
     examples: [
       'Übersetze diesen Brief ins Englische.',
-      'Wann begann der Dreißigjährige Krieg?',
-      'Was sollte ich in Rom unbedingt besichtigen?',
+      'Schreib mir einen Aufsatz über die Französische Revolution.',
+      'Löse diese Matheaufgabe: 3x + 5 = 20.',
     ],
   },
 ];
