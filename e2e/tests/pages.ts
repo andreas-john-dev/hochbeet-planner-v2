@@ -226,7 +226,7 @@ export const appPages: readonly AppPage[] = [
   {
     id: 'en-katalog-sorte',
     path: '/katalog/01M49THV00RK9E9PC83NEE87CJ',
-    heading: 'Kopfsalat',
+    heading: 'Lettuce',
     access: 'user',
     language: 'en',
   },

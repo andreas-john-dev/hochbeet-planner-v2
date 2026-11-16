@@ -96,8 +96,8 @@ test('creates and changes a global plant', async ({ page }) => {
   await expect(
     page.getByRole('heading', { level: 1, name: 'Globale Sorte anlegen' }),
   ).toBeVisible();
-  await page.getByLabel('Name').fill('Yacon');
-  await page.getByLabel('Familie').fill('Korbblütler');
+  await page.getByLabel('Name', { exact: true }).fill('Yacon');
+  await page.getByLabel('Familie', { exact: true }).fill('Korbblütler');
   await page.getByLabel('Abstand in der Reihe (cm)').fill('60');
   await page.getByLabel('Reihenabstand (cm)').fill('80');
   await page.getByLabel('Kulturdauer (Wochen)').fill('26');
@@ -108,8 +108,8 @@ test('creates and changes a global plant', async ({ page }) => {
   await expect(
     page.getByRole('heading', { level: 1, name: 'Globale Sorte bearbeiten' }),
   ).toBeVisible();
-  await expect(page.getByLabel('Name')).toHaveValue('Yacon');
-  await page.getByLabel('Name').fill('Yacón');
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Yacon');
+  await page.getByLabel('Name', { exact: true }).fill('Yacón');
   await page.getByRole('button', { name: 'Speichern' }).click();
   await expect(globals.getByRole('link', { name: /Yacón/ })).toBeVisible();
 
