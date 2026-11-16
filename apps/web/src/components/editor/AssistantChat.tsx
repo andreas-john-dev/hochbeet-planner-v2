@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { apiErrorMessage } from '@/lib/api';
 import { useApiStream } from '@/lib/api-context';
 import { askAssistant, newSessionId } from '@/lib/assistant';
+import { useLanguage } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -48,6 +49,8 @@ export function AssistantChat({
   className?: string;
 }) {
   const { t } = useTranslation(['editor', 'common']);
+  // The assistant answers in the app's language (unless the question is clearly in another).
+  const { language } = useLanguage();
   const stream = useApiStream();
   const [sessionId, setSessionId] = useState(newSessionId);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -93,6 +96,7 @@ export function AssistantChat({
       const result = await askAssistant(stream, {
         message,
         bedId,
+        language,
         sessionId,
         signal: controller.signal,
         onText: appendToAnswer,

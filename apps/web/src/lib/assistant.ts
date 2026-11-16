@@ -8,11 +8,10 @@ import {
 } from '@hochbeet/contracts';
 import { ApiError, type ApiStream } from './api';
 import type { AuthUser } from './auth/types';
+import { currentLanguage, i18n } from './i18n';
 
 /** Path of the assistant on the app's domain; CloudFront maps it to the AgentCore Runtime. */
 export const ASSISTANT_PATH = '/api/assistant/invocations';
-
-const INTERRUPTED = 'Die Antwort wurde unterbrochen. Bitte versuche es noch einmal.';
 
 /** Only signed-in members of the allowed groups see the chat; guests never do. */
 export function canUseAssistant(user: AuthUser | null, guest: boolean): boolean {
@@ -84,21 +83,38 @@ export interface AskOptions extends AssistantRequest {
 }
 
 /**
- * Asks the assistant and streams the answer into `onText`. Resolves with the questions left
- * today; throws `ApiError` (German `message`) for refusals such as 429 and for an answer that
- * failed or broke off midway, and an `AbortError` when `signal` aborts.
+ * Asks the assistant in `language` (the app's language by default) and streams the answer
+ * into `onText`. Resolves with the questions left today; throws `ApiError` (`message` in that
+ * language) for refusals such as 429 and for an answer that failed or broke off midway, and an
+ * `AbortError` when `signal` aborts.
  */
 export async function askAssistant(
   stream: ApiStream,
-  { message, bedId, suggest, sessionId, signal, onText, onSuggestions }: AskOptions,
+  {
+    message,
+    bedId,
+    suggest,
+    language = currentLanguage(),
+    sessionId,
+    signal,
+    onText,
+    onSuggestions,
+  }: AskOptions,
 ): Promise<{ remaining: number }> {
+  const interrupted = () =>
+    new ApiError(502, { message: i18n.getFixedT(language, 'editor')('assistant.interrupted') });
   const response = await stream(ASSISTANT_PATH, {
     method: 'POST',
     headers: { [ASSISTANT_SESSION_HEADER]: sessionId, Accept: 'text/event-stream' },
-    body: JSON.stringify({ message, ...(bedId ? { bedId } : {}), ...(suggest ? { suggest } : {}) }),
+    body: JSON.stringify({
+      message,
+      ...(bedId ? { bedId } : {}),
+      ...(suggest ? { suggest } : {}),
+      language,
+    }),
     ...(signal ? { signal } : {}),
   });
-  if (!response.body) throw new ApiError(502, { message: INTERRUPTED });
+  if (!response.body) throw interrupted();
   for await (const event of assistantEvents(response.body, signal)) {
     signal?.throwIfAborted();
     if ('text' in event) onText(event.text);
@@ -107,5 +123,5 @@ export async function askAssistant(
     else return { remaining: event.remaining };
   }
   signal?.throwIfAborted();
-  throw new ApiError(502, { message: INTERRUPTED });
+  throw interrupted();
 }

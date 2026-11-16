@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
+from bed_assistant.messages import MESSAGES, Language
 from bed_assistant.suggest import (
-    TIMEOUT_MESSAGE,
     Bed,
     McpGardenTools,
     SuggestionError,
@@ -15,6 +15,8 @@ from bed_assistant.suggest import (
     snap,
     suggest,
 )
+
+TIMEOUT_MESSAGE = MESSAGES["de"]["timeout"]
 
 TOMATO = "01M49THV00QS1SEJEM64991JH5"
 BASIL = "01M49THV0081S9TVW6N7P7AW3Q"
@@ -136,7 +138,13 @@ class SlowModel(FakeModel):
         return await super().__call__(prompt)
 
 
-async def run(model: FakeModel, tools: FakeTools, rounds: int = 3, seconds: float = 50) -> Any:
+async def run(
+    model: FakeModel,
+    tools: FakeTools,
+    rounds: int = 3,
+    seconds: float = 50,
+    language: Language = "de",
+) -> Any:
     return await suggest(
         model,
         tools,
@@ -145,6 +153,7 @@ async def run(model: FakeModel, tools: FakeTools, rounds: int = 3, seconds: floa
         rounds=rounds,
         today=date(2026, 5, 1),
         seconds=seconds,
+        language=language,
     )
 
 
@@ -179,6 +188,23 @@ async def test_a_first_round_past_the_deadline_ends_with_a_german_message() -> N
     with pytest.raises(SuggestionError) as failed:
         await run(model, FakeTools(), seconds=0.2)
     assert str(failed.value) == TIMEOUT_MESSAGE
+
+
+async def test_asks_for_english_reasons_and_fails_in_english_for_an_english_app() -> None:
+    model = FakeModel({"suggestions": [item(x=150, reason="")], "summary": "One tomato."})
+    result = await run(model, FakeTools(), language="en")
+    assert "Begründungen und Zusammenfassung auf Englisch (britisch)" in model.prompts[0]
+    assert result.suggestions[0]["reason"] == "Suggested by the assistant."
+    german = FakeModel({"suggestions": [item(x=150)], "summary": "Eine Tomate."})
+    await run(german, FakeTools())
+    assert "Begründungen und Zusammenfassung auf Deutsch" in german.prompts[0]
+
+    slow = SlowModel({"suggestions": [item(x=150)], "summary": "Too late."}, slow={1})
+    with pytest.raises(SuggestionError) as failed:
+        await run(slow, FakeTools(), seconds=0.2, language="en")
+    assert str(failed.value) == MESSAGES["en"]["timeout"]
+    with pytest.raises(SuggestionError, match="The bed could not be read"):
+        Bed.from_tool({}, "en")
 
 
 async def test_a_later_round_past_the_deadline_keeps_the_last_checked_round() -> None:
@@ -256,3 +282,5 @@ async def test_calls_the_gateway_tools_directly_and_turns_errors_into_german_mes
     broken = FakeClient({"status": "error", "content": [{"text": "boom"}]})
     with pytest.raises(SuggestionError, match="nicht erreichbar"):
         await McpGardenTools(broken).call("get_bed", {"bedId": BED_ID})
+    with pytest.raises(SuggestionError, match="cannot be reached"):
+        await McpGardenTools(broken, "en").call("get_bed", {"bedId": BED_ID})

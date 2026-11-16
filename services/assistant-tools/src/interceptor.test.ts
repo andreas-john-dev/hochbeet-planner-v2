@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bearerToken, interceptRequest, TOKEN_ARGUMENT } from './interceptor';
+import { bearerToken, interceptRequest, LANGUAGE_ARGUMENT, TOKEN_ARGUMENT } from './interceptor';
 import { tokenFor } from './test-utils';
 
 const token = tokenFor('user-a');
@@ -49,6 +49,25 @@ describe('request interceptor', () => {
       event(toolCall({ bedId: 'B1', [TOKEN_ARGUMENT]: tokenFor('user-b') })),
     );
     expect(result.mcp.transformedGatewayRequest).toEqual({ body: toolCall({ bedId: 'B1' }) });
+  });
+
+  it('hands the agent’s language to the tools and replaces the model’s', () => {
+    const result = interceptRequest(
+      event(toolCall({ bedId: 'B1', [LANGUAGE_ARGUMENT]: 'de' }), {
+        Authorization: `Bearer ${token}`,
+        'accept-language': 'en-GB,en;q=0.9',
+      }),
+    );
+    expect(result.mcp.transformedGatewayRequest.body).toEqual(
+      toolCall({ bedId: 'B1', [TOKEN_ARGUMENT]: token, [LANGUAGE_ARGUMENT]: 'en' }),
+    );
+    // Unknown languages fall back to German, like the services.
+    const french = interceptRequest(
+      event(toolCall({}), { Authorization: `Bearer ${token}`, 'Accept-Language': 'fr' }),
+    );
+    expect(french.mcp.transformedGatewayRequest.body).toEqual(
+      toolCall({ [TOKEN_ARGUMENT]: token, [LANGUAGE_ARGUMENT]: 'de' }),
+    );
   });
 
   it('leaves other MCP requests unchanged', () => {

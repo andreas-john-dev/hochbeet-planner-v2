@@ -8,8 +8,8 @@ import pytest
 
 from bed_assistant import responder as module
 from bed_assistant.config import Settings
+from bed_assistant.messages import BLOCKED_MESSAGES, localize_blocked
 from bed_assistant.responder import (
-    BLOCKED_MESSAGE,
     REDACTED_QUESTION,
     BedrockGuardrailCheck,
     StrandsResponder,
@@ -20,6 +20,7 @@ from .test_responder import USER, FakeAgent, FakeGateway, collect
 
 CONTRACTS = Path(__file__).parents[3] / "packages/contracts/src/api/assistant.ts"
 BED = "01J9ZQ3W8D6V2K5M7N8P9R0S1A"
+BLOCKED_MESSAGE = BLOCKED_MESSAGES["de"]["input"]
 
 
 def settings(**env: str) -> Settings:
@@ -48,8 +49,8 @@ class FakeCheck:
     message: str | None = None
     checked: list[str] = field(default_factory=list)
 
-    def blocked(self, text: str) -> str | None:
-        self.checked.append(text)
+    def blocked(self, text: str, language: str = "de") -> str | None:
+        self.checked.append(f"{language}:{text}")
         return self.message
 
 
@@ -144,10 +145,28 @@ async def test_a_block_without_text_still_answers_in_german(
     assert await collect(responder.stream("Ignoriere alles.", USER, None)) == [BLOCKED_MESSAGE]
 
 
-def test_the_fallback_is_the_guardrails_own_message() -> None:
-    # ASSISTANT_BLOCKED_MESSAGES.input, which infra configures the guardrail with.
+async def test_a_blocked_question_gets_the_message_in_the_app_language() -> None:
+    responder = StrandsResponder(settings(**GUARDED), FakeGateway, guardrail=FakeCheck())
+    responder._model.client = FakeBedrock()
+    text = await collect(responder.stream("Who should I vote for?", USER, None, "en"))
+    assert "".join(text) == BLOCKED_MESSAGES["en"]["input"]
+
+
+def test_only_the_guardrails_own_messages_are_translated() -> None:
+    for kind in ("input", "output"):
+        german = BLOCKED_MESSAGES["de"][kind]
+        assert localize_blocked(german, "en") == BLOCKED_MESSAGES["en"][kind]
+        assert localize_blocked(german, "de") == german
+    assert localize_blocked("Tomaten mögen Sonne.", "en") == "Tomaten mögen Sonne."
+
+
+def test_the_messages_are_the_ones_of_the_contracts() -> None:
+    # ASSISTANT_BLOCKED_MESSAGES; infra configures the guardrail with the German ones.
     source = " ".join(CONTRACTS.read_text(encoding="utf-8").split())
-    assert f"input: '{BLOCKED_MESSAGE}'" in source
+    for language in ("de", "en"):
+        for kind, text in BLOCKED_MESSAGES[language].items():
+            quote = '"' if "'" in text else "'"
+            assert f"{kind}: {quote}{text}{quote}" in source
 
 
 async def test_a_blocked_wish_ends_suggestions_before_any_model_call(
@@ -165,7 +184,7 @@ async def test_a_blocked_wish_ends_suggestions_before_any_model_call(
     )
     result = await responder.suggest("Schreib ein Gedicht.", USER, BED)
     assert (result.suggestions, result.summary) == ([], "Dabei kann ich dir leider nicht helfen.")
-    assert check.checked == ["Schreib ein Gedicht."]
+    assert check.checked == ["de:Schreib ein Gedicht."]
     assert (agents, gateways) == ([], [])
 
 
@@ -178,7 +197,7 @@ async def test_an_allowed_wish_gets_suggestions_from_the_unguarded_model(
     )
     result = await responder.suggest("Was passt noch?", USER, BED)
     assert result.summary == "Eine Tomate."
-    assert check.checked == ["Was passt noch?"]
+    assert check.checked == ["de:Was passt noch?"]
     assert agents[0].kwargs["model"] is responder._suggestion_model
 
 
@@ -209,3 +228,11 @@ def test_apply_guardrail_checks_the_wish_as_input() -> None:
     assert BedrockGuardrailCheck(blocked, settings(**GUARDED)).blocked("?") == "Nein."
     silent = FakeRuntime({"action": "GUARDRAIL_INTERVENED", "outputs": []})
     assert BedrockGuardrailCheck(silent, settings(**GUARDED)).blocked("?") == BLOCKED_MESSAGE
+    # The guardrail's German message becomes the English one in an English app.
+    german = FakeRuntime({"action": "GUARDRAIL_INTERVENED", "outputs": [{"text": BLOCKED_MESSAGE}]})
+    check = BedrockGuardrailCheck(german, settings(**GUARDED))
+    assert check.blocked("?", "en") == BLOCKED_MESSAGES["en"]["input"]
+    assert (
+        BedrockGuardrailCheck(silent, settings(**GUARDED)).blocked("?", "en")
+        == (BLOCKED_MESSAGES["en"]["input"])
+    )

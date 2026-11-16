@@ -39,23 +39,53 @@ def test_refuses_a_bed_id_that_is_no_ulid() -> None:
         parse_request({"message": "Hi", "bedId": "../admin"}, 100)
 
 
-def test_the_assistant_answers_in_the_language_of_the_question() -> None:
-    from bed_assistant.prompt import SYSTEM_PROMPT
+def test_the_language_of_the_request_lands_in_the_prompt() -> None:
+    from bed_assistant.prompt import system_prompt
 
-    assert "in der Sprache der Frage" in SYSTEM_PROMPT
+    english = parse_request({"message": "What fits?", "language": "en"}, 100)
+    assert english.language == "en"
+    prompt = system_prompt(english.language)
+    assert "Die App ist auf Englisch: Antworte auf Englisch (britisches Englisch)" in prompt
+    # Unless the user clearly writes German; English names come from find_plants.
+    assert "außer der User\n  schreibt erkennbar auf Deutsch" in prompt
+    assert "nameEn, familyEn" in prompt
+    assert "{" not in prompt
+
+
+def test_without_a_language_the_assistant_answers_in_german() -> None:
+    from bed_assistant.prompt import system_prompt
+
+    request = parse_request({"message": "Was passt?"}, 100)
+    assert request.language == "de"
+    assert system_prompt() == system_prompt(request.language)
+    assert "Die App ist auf Deutsch: Antworte auf Deutsch" in system_prompt()
+    assert "Englisch" not in system_prompt()
+
+
+def test_refuses_an_unknown_language_and_answers_refusals_in_english() -> None:
+    with pytest.raises(InvalidRequestError, match="Bitte schreib eine Frage"):
+        parse_request({"message": "Salut", "language": "fr"}, 100)
+    with pytest.raises(InvalidRequestError, match="Please write a question"):
+        parse_request({"message": " ", "language": "en"}, 100)
+    with pytest.raises(InvalidRequestError, match="at most 10 characters"):
+        parse_request({"message": "x" * 11, "language": "en"}, 10)
 
 
 @pytest.mark.parametrize(
     "tool", ["list_beds", "get_bed", "find_plants", "list_sowings", "evaluate_bed"]
 )
 def test_the_prompt_names_every_gateway_tool(tool: str) -> None:
-    from bed_assistant.prompt import SYSTEM_PROMPT
+    from bed_assistant.prompt import system_prompt
+
+    SYSTEM_PROMPT = system_prompt()
 
     assert f"{tool}:" in SYSTEM_PROMPT
 
 
 def test_the_prompt_explains_raising_with_the_users_last_frost() -> None:
-    from bed_assistant.prompt import SYSTEM_PROMPT
+    from bed_assistant.prompt import system_prompt
+
+    SYSTEM_PROMPT = system_prompt()
 
     assert "Anzucht-Chargen" in SYSTEM_PROMPT
     assert "letzter Frosttermin" in SYSTEM_PROMPT
@@ -71,7 +101,9 @@ def test_suggestions_still_see_only_find_plants() -> None:
 
 
 def test_the_prompt_asks_for_the_markdown_the_app_renders() -> None:
-    from bed_assistant.prompt import SYSTEM_PROMPT
+    from bed_assistant.prompt import system_prompt
+
+    SYSTEM_PROMPT = system_prompt()
 
     # apps/web renders bold, italic, code and lists (src/lib/markdown.ts), nothing more.
     assert "Markdown" in SYSTEM_PROMPT

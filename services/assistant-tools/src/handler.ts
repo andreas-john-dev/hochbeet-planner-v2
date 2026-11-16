@@ -1,8 +1,9 @@
-import type { ToolError } from '@hochbeet/contracts';
+import { LOCALES, type Locale, type ToolError } from '@hochbeet/contracts';
 import type { Logger } from '@hochbeet/service-kit';
 import type { Context } from 'aws-lambda';
 import { createApiReader, type GardenReader } from './api';
-import { bearerToken, TOKEN_ARGUMENT } from './interceptor';
+import { bearerToken, LANGUAGE_ARGUMENT, TOKEN_ARGUMENT } from './interceptor';
+import { toolMessage } from './messages';
 import { isToolName, runTool, type ToolOutput } from './tools';
 
 /** Separator between target and tool name in the names the gateway gives its tools. */
@@ -41,6 +42,12 @@ export function tokenOf(
   return undefined;
 }
 
+/** Language of the tools' texts from the interceptor's argument; German without one. */
+export function localeOf(event: Record<string, unknown>): Locale {
+  const language = event[LANGUAGE_ARGUMENT];
+  return (LOCALES as readonly unknown[]).includes(language) ? (language as Locale) : 'de';
+}
+
 export interface ToolHandlerDeps {
   apiBaseUrl: string;
   logger: Logger;
@@ -55,21 +62,23 @@ export function createToolHandler({ apiBaseUrl, logger, reader }: ToolHandlerDep
     context: Pick<Context, 'clientContext'>,
   ): Promise<ToolOutput | ToolError> => {
     const tool = toolNameOf(context);
+    const locale = localeOf(event);
     if (!tool || !isToolName(tool)) {
       logger.warn('unknown tool', { tool });
-      return { error: 'Dieses Werkzeug gibt es nicht.' };
+      return { error: toolMessage('unknownTool', locale) };
     }
     const token = tokenOf(event, context);
     if (!token) {
       logger.warn('tool call without token', { tool });
-      return { error: 'Bitte melde dich an.' };
+      return { error: toolMessage('signIn', locale) };
     }
-    const { [TOKEN_ARGUMENT]: _token, ...args } = event;
+    const { [TOKEN_ARGUMENT]: _token, [LANGUAGE_ARGUMENT]: _language, ...args } = event;
     const started = Date.now();
-    const result = await runTool(tool, args, readerFor(token));
-    // Only the tool and the outcome; arguments and token stay out of the logs.
+    const result = await runTool(tool, args, readerFor(token), locale);
+    // Only the tool, language and outcome; arguments and token stay out of the logs.
     logger.info('tool call', {
       tool,
+      locale,
       ok: !('error' in result),
       durationMs: Date.now() - started,
     });

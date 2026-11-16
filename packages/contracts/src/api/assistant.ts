@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { messageKey } from '../messages';
+import { LOCALES, type Locale, messageKey } from '../messages';
 import {
   CategorySchema,
   FeederSchema,
@@ -26,15 +26,27 @@ export const MAX_ASSISTANT_MESSAGE_CHARS = 2000;
 
 /**
  * What the assistant answers when its guardrail blocks a question (`input`, also the agent's
- * fallback) or an answer (`output`); infra configures the guardrail with them, the mock
- * answers with `input`.
+ * fallback) or an answer (`output`). The guardrail itself knows one text per case: infra
+ * configures it with the German ones, and the agent replaces them with the request's language.
+ * The mock answers with `input`.
  */
 export const ASSISTANT_BLOCKED_MESSAGES = {
-  input:
-    'Dabei kann ich dir leider nicht helfen. Frag mich gern etwas zu deinen Beeten, Pflanzen oder zur Anzucht.',
-  output:
-    'Diese Antwort kann ich dir leider nicht geben. Frag mich gern etwas anderes zu deinen Beeten und Pflanzen.',
-} as const;
+  de: {
+    input:
+      'Dabei kann ich dir leider nicht helfen. Frag mich gern etwas zu deinen Beeten, Pflanzen oder zur Anzucht.',
+    output:
+      'Diese Antwort kann ich dir leider nicht geben. Frag mich gern etwas anderes zu deinen Beeten und Pflanzen.',
+  },
+  en: {
+    input:
+      "Sorry, I can't help you with that. Feel free to ask me about your beds, plants or raising seedlings.",
+    output:
+      "Sorry, I can't give you that answer. Feel free to ask me something else about your beds and plants.",
+  },
+} as const satisfies Record<Locale, { input: string; output: string }>;
+
+/** Language of the assistant's answers and messages: the app's language, German by default. */
+export const AssistantLanguageSchema = z.enum(LOCALES);
 
 /**
  * Body of a request to the runtime: the question, optionally with the bed the user is looking
@@ -52,6 +64,11 @@ export const AssistantRequestSchema = z.object({
   bedId: UlidSchema.optional(),
   /** Asks for checked planting suggestions for `bedId` instead of a plain answer. */
   suggest: z.boolean().optional(),
+  /**
+   * The app's language: the assistant answers in it unless the user clearly writes in the
+   * other one, and its messages, suggestions and tool texts use it. German without it.
+   */
+  language: AssistantLanguageSchema.optional(),
 });
 export type AssistantRequest = z.infer<typeof AssistantRequestSchema>;
 
@@ -66,7 +83,11 @@ export const ASSISTANT_CONVERSATION_DAYS = 7;
  * questions: `list` returns the user's remembered preferences, `forget` deletes everything the
  * assistant has stored about the user. Neither counts against the daily quota.
  */
-export const AssistantMemoryRequestSchema = z.object({ memory: z.enum(['list', 'forget']) });
+export const AssistantMemoryRequestSchema = z.object({
+  memory: z.enum(['list', 'forget']),
+  /** Language of the runtime's error messages; German without it. */
+  language: AssistantLanguageSchema.optional(),
+});
 export type AssistantMemoryRequest = z.infer<typeof AssistantMemoryRequestSchema>;
 
 /** One preference the assistant remembers, as AgentCore Memory extracted it. */
@@ -107,20 +128,24 @@ export const SuggestionSchema = z.object({
   lengthCm: PositiveGridCmSchema.optional().describe('Nur für Reihen: Länge in cm.'),
   orientation: DirectionSchema.optional().describe('Nur für Reihen: H waagerecht, V senkrecht.'),
   startDate: IsoDateSchema.describe('Montag der Pflanzwoche (JJJJ-MM-TT).'),
-  reason: z.string().min(1).max(300).describe('Kurze Begründung auf Deutsch.'),
+  reason: z.string().min(1).max(300).describe('Kurze Begründung in der Antwortsprache.'),
 });
 export type Suggestion = z.infer<typeof SuggestionSchema>;
 
 /** The structured answer of the suggestion mode. */
 export const SuggestionListSchema = z.object({
   suggestions: z.array(SuggestionSchema).max(MAX_SUGGESTIONS),
-  summary: z.string().max(800).describe('Kurze Zusammenfassung der Vorschläge auf Deutsch.'),
+  summary: z
+    .string()
+    .max(800)
+    .describe('Kurze Zusammenfassung der Vorschläge in der Antwortsprache.'),
 });
 export type SuggestionList = z.infer<typeof SuggestionListSchema>;
 
 /**
  * One server-sent event of the answer stream (`data: <json>`): text chunks, then `done` with
- * the questions left today, or `error` with a German message if the model failed midway.
+ * the questions left today, or `error` with a message in the request's language if the model
+ * failed midway.
  */
 export const AssistantEventSchema = z.union([
   z.object({ text: z.string() }),
@@ -295,7 +320,10 @@ export const ListSowingsToolOutputSchema = z.object({
   more: z.number().int().min(0),
 });
 
-/** What a tool returns when it cannot answer: a German message the agent passes on. */
+/**
+ * What a tool returns when it cannot answer: a message in the request's language (from the
+ * agent's `Accept-Language`, see services/assistant-tools) that the agent passes on.
+ */
 export const ToolErrorSchema = z.object({ error: z.string() });
 
 export type ListBedsToolOutput = z.infer<typeof ListBedsToolOutputSchema>;

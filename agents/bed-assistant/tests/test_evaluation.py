@@ -110,6 +110,10 @@ def test_the_test_set() -> None:
     labels = {check.label for check in checks_for(english)}
     assert "auf Englisch" in labels
     assert "auf Deutsch" not in labels
+    # T-72: an English app, with English names and English suggestions.
+    english_app = [c for c in CASES if c.language == "en" and c.id != "englisch"]
+    assert {c.suggest for c in english_app} == {False, True}
+    assert all("auf Englisch" in {k.label for k in checks_for(c)} for c in english_app)
 
 
 class FakeAgent:
@@ -126,18 +130,23 @@ class FakeResponder:
         self.answer = answer
         self.fail = fail
         self.prompts: list[str] = []
+        self.languages: list[str] = []
 
     async def stream(
-        self, prompt: str, caller: Caller, session_id: str | None
+        self, prompt: str, caller: Caller, session_id: str | None, language: str = "de"
     ) -> AsyncIterator[str]:
         self.prompts.append(prompt)
+        self.languages.append(language)
         if self.fail:
             raise RuntimeError("Bedrock down")
         self.observe(FakeAgent((1000, 200), {"garden___get_bed": 1, "garden___evaluate_bed": 1}))
         for word in self.answer.split(" "):
             yield word + " "
 
-    async def suggest(self, question: str, caller: Caller, bed_id: str) -> SuggestionResult:
+    async def suggest(
+        self, question: str, caller: Caller, bed_id: str, language: str = "de"
+    ) -> SuggestionResult:
+        self.languages.append(language)
         self.observe(FakeAgent((5000, 400), {"garden___find_plants": 2, "SuggestionList": 2}))
         suggestion = {"plantId": "S", "kind": "SINGLE", "x": 100, "y": 50, "reason": "r"}
         return SuggestionResult([suggestion], [], "Ein Vorschlag.", 1)

@@ -6,8 +6,8 @@ import {
   MOCK_ASSISTANT_DAILY_LIMIT,
   MOCK_BLOCKED_WORD,
   MOCK_SUGGESTION_SUMMARY,
-  MOCK_SUGGESTIONS,
   mockAnswer,
+  mockSuggestions,
 } from '@/mocks/assistant';
 import { ApiError, apiErrorMessage, createApiClient, createApiStream } from './api';
 import {
@@ -106,7 +106,12 @@ describe('askAssistant', () => {
     const headers = new Headers(init.headers);
     expect(headers.get('Authorization')).toBe('Bearer tok');
     expect(headers.get(ASSISTANT_SESSION_HEADER)).toBe('s'.repeat(40));
-    expect(JSON.parse(init.body as string)).toEqual({ message: 'Hallo', bedId: BED });
+    // The app's language goes with every question (German in the tests).
+    expect(JSON.parse(init.body as string)).toEqual({
+      message: 'Hallo',
+      bedId: BED,
+      language: 'de',
+    });
   });
 
   it('turns refusals and failures into German messages', async () => {
@@ -139,6 +144,17 @@ describe('askAssistant', () => {
         onText: () => undefined,
       }).catch(apiErrorMessage),
     ).resolves.toMatch(/unterbrochen/);
+  });
+
+  it('reports a broken off answer in the language of the question', async () => {
+    await expect(
+      askAssistant(streamOf(sse({ text: 'Part' })), {
+        message: 'Hi',
+        language: 'en',
+        sessionId: 'x',
+        onText: () => undefined,
+      }).catch(apiErrorMessage),
+    ).resolves.toBe('The answer was interrupted. Please try again.');
   });
 
   it('a 429 without message still explains itself', () => {
@@ -196,8 +212,8 @@ describe('mock assistant', () => {
         onSuggestions: (suggestions, warnings) => received.push({ suggestions, warnings }),
       },
     );
-    expect(chunks).toEqual([MOCK_SUGGESTION_SUMMARY]);
-    expect(received).toEqual([{ suggestions: MOCK_SUGGESTIONS, warnings: [] }]);
+    expect(chunks).toEqual([MOCK_SUGGESTION_SUMMARY.de]);
+    expect(received).toEqual([{ suggestions: mockSuggestions(), warnings: [] }]);
     expect(result.remaining).toBe(MOCK_ASSISTANT_DAILY_LIMIT - 1);
   });
 
@@ -217,11 +233,41 @@ describe('mock assistant', () => {
           onSuggestions: (suggestions) => received.push(suggestions),
         },
       );
-      expect(chunks).toEqual([ASSISTANT_BLOCKED_MESSAGES.input]);
+      expect(chunks).toEqual([ASSISTANT_BLOCKED_MESSAGES.de.input]);
       expect(received).toEqual(suggest ? [[]] : []);
       // Blocked questions still count, as in the agent.
       expect(result.remaining).toBe(MOCK_ASSISTANT_DAILY_LIMIT - (suggest ? 2 : 1));
     }
+  });
+
+  it('answers, suggests and refuses in English for an English app', async () => {
+    const fetchFn = createMockFetch(new MockStore(new MemoryStorage()));
+    const english = (groups: string, suggest = false) => {
+      const chunks: string[] = [];
+      const received: unknown[] = [];
+      return askAssistant(
+        createApiStream(() => Promise.resolve(token(groups)), fetchFn),
+        {
+          message: 'What goes with tomatoes?',
+          bedId: BED,
+          suggest,
+          language: 'en',
+          sessionId: newSessionId(),
+          onText: (t) => chunks.push(t),
+          onSuggestions: (suggestions) => received.push(suggestions),
+        },
+      ).then(() => ({ text: chunks.join(''), received }));
+    };
+    expect((await english('|admins')).text).toBe(
+      'Happy to help! I have looked at your bed. Tomatoes get on well with **Basil**, but keep 50 cm between the plants.',
+    );
+    const suggested = await english('|admins', true);
+    expect(suggested.text).toBe(MOCK_SUGGESTION_SUMMARY.en);
+    expect(suggested.received).toEqual([mockSuggestions('en')]);
+    expect(mockSuggestions('en')[0]?.reason).toMatch(/^Lettuce grows quickly/);
+    await expect(english('|others').catch(apiErrorMessage)).resolves.toBe(
+      'The assistant has not been enabled for your account yet.',
+    );
   });
 
   it('stops streaming when the question is cancelled', async () => {

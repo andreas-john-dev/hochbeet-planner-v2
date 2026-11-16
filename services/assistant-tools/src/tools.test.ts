@@ -8,8 +8,8 @@ import {
 import type { Logger } from '@hochbeet/service-kit';
 import { describe, expect, it, vi } from 'vitest';
 import { createApiReader } from './api';
-import { createToolHandler, tokenOf, toolNameOf } from './handler';
-import { interceptRequest, TOKEN_ARGUMENT } from './interceptor';
+import { createToolHandler, localeOf, tokenOf, toolNameOf } from './handler';
+import { interceptRequest, LANGUAGE_ARGUMENT, TOKEN_ARGUMENT } from './interceptor';
 import { bed, catalog, fakeApi, planting, plantId, sowing, tokenFor } from './test-utils';
 import { MAX_PLANTS, MAX_SOWINGS, runTool, toolInputJsonSchemas, TOOL_DEFINITIONS } from './tools';
 
@@ -68,19 +68,24 @@ const silent: Logger = {
 
 /**
  * The path of a tool call through the gateway: the interceptor adds the token of the signed-in
- * user, the gateway invokes the Lambda with the arguments and the tool name in the client
- * context, and the Lambda reads through the (fake) services with that token.
+ * user (and the agent's language, if given), the gateway invokes the Lambda with the arguments
+ * and the tool name in the client context, and the Lambda reads through the (fake) services
+ * with that token.
  */
 async function callAsUser(
   user: string,
   tool: string,
   args: Record<string, unknown>,
   api = fakeApi(gardens),
+  acceptLanguage?: string,
 ) {
   const intercepted = interceptRequest({
     mcp: {
       gatewayRequest: {
-        headers: { Authorization: `Bearer ${tokenFor(user)}` },
+        headers: {
+          Authorization: `Bearer ${tokenFor(user)}`,
+          ...(acceptLanguage ? { 'Accept-Language': acceptLanguage } : {}),
+        },
         body: { method: 'tools/call', params: { name: `garden___${tool}`, arguments: args } },
       },
     },
@@ -357,6 +362,108 @@ describe('tools through the gateway path', () => {
   });
 });
 
+describe('tools in English (Accept-Language of the agent)', () => {
+  const english = (tool: string, args: Record<string, unknown>, api = fakeApi(gardens)) =>
+    callAsUser('user-a', tool, args, api, 'en');
+
+  it('names the plants of a bed in English', async () => {
+    const { result } = await english('get_bed', { bedId: BED_A });
+    expect(GetBedToolOutputSchema.parse(result).plantings.map((p) => p.plant)).toEqual([
+      'Tomato',
+      'Tomato',
+    ]);
+  });
+
+  it('evaluates a bed with English findings and plant names', async () => {
+    const { result } = await english('evaluate_bed', { bedId: BED_A, week: '2026-06-10' });
+    const { findings } = EvaluateBedToolOutputSchema.parse(result);
+    const spacing = findings.find((f) => f.severity === 'WARNING');
+    expect(spacing?.plants).toEqual(['Tomato', 'Tomato']);
+    expect(spacing?.message).toMatch(/Tomato/);
+    expect(spacing?.message).not.toMatch(/Tomate|Abstand/);
+  });
+
+  it('names English families in the crop rotation warning', async () => {
+    const BED_C = '01J9ZQ3W8D6V2K5M7N8P9R0S1C';
+    const rotation = {
+      'user-a': {
+        beds: [bed(BED_C, 'Kohlbeet')],
+        plantings: [
+          {
+            ...planting('01J9ZQ3W8D6V2K5M7N8P9R0T11', BED_C, 'Brokkoli', { x: 30, y: 40 }),
+            startDate: '2026-04-06',
+            endDate: '2026-06-15',
+          },
+          // Same season: crop rotation only warns without a soil renewal in between.
+          {
+            ...planting('01J9ZQ3W8D6V2K5M7N8P9R0T12', BED_C, 'Grünkohl', { x: 30, y: 40 }),
+            startDate: '2026-06-22',
+            endDate: '2026-11-30',
+          },
+        ],
+        sowings: [],
+      },
+    };
+    const { result } = await english('evaluate_bed', { bedId: BED_C }, fakeApi(rotation));
+    const messages = EvaluateBedToolOutputSchema.parse(result).findings.map((f) => f.message);
+    expect(messages.join(' ')).toMatch(/Brassicas/);
+  });
+
+  it('gives neighbours, raising windows and batches in English', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-07T10:00:00'));
+    try {
+      const { result } = await english('find_plants', { query: 'Tomato' });
+      const tomato = FindPlantsToolOutputSchema.parse(result).plants.find(
+        (p) => p.nameEn === 'Tomato',
+      );
+      // Stored name for comparing, English name and neighbours for the answer.
+      expect(tomato).toMatchObject({ name: 'Tomate', nameEn: 'Tomato' });
+      expect(tomato?.goodNeighbors).toContain('Basil');
+      expect(tomato?.sowing?.presow).toBe('weeks 11–16 (early March to mid April)');
+    } finally {
+      vi.useRealTimers();
+    }
+    const sowings = ListSowingsToolOutputSchema.parse(
+      (await english('list_sowings', { query: 'lettuce' })).result,
+    );
+    expect(sowings.sowings.map((s) => s.plant)).toEqual(['Lettuce']);
+  });
+
+  it('answers wrong input and unreachable services in English', async () => {
+    expect((await english('get_bed', { bedId: '../admin' })).result).toEqual({
+      error: 'Please give a valid bed ID.',
+    });
+    const broken = {
+      calls: [],
+      fetch: () => Promise.resolve(new Response('boom', { status: 502 })),
+    };
+    expect((await english('list_beds', {}, broken)).result).toEqual({
+      error: 'The garden data cannot be reached right now.',
+    });
+  });
+
+  it('never takes the language from the model', () => {
+    const intercepted = interceptRequest({
+      mcp: {
+        gatewayRequest: {
+          headers: { Authorization: `Bearer ${tokenFor('user-a')}` },
+          body: {
+            method: 'tools/call',
+            params: { name: 'garden___list_beds', arguments: { [LANGUAGE_ARGUMENT]: 'en' } },
+          },
+        },
+      },
+    });
+    const body = intercepted.mcp.transformedGatewayRequest.body as {
+      params: { arguments: Record<string, unknown> };
+    };
+    expect(body.params.arguments).not.toHaveProperty(LANGUAGE_ARGUMENT);
+    expect(localeOf(body.params.arguments)).toBe('de');
+    expect(localeOf({ [LANGUAGE_ARGUMENT]: 'fr' })).toBe('de');
+  });
+});
+
 describe('tool handler', () => {
   const handler = createToolHandler({
     apiBaseUrl: 'https://hochbeet.example',
@@ -371,6 +478,9 @@ describe('tool handler', () => {
     expect(await handler({}, context as never)).toEqual({ error: 'Bitte melde dich an.' });
     expect(await handler({}, { clientContext: undefined })).toEqual({
       error: 'Dieses Werkzeug gibt es nicht.',
+    });
+    expect(await handler({ [LANGUAGE_ARGUMENT]: 'en' }, context as never)).toEqual({
+      error: 'Please sign in.',
     });
   });
 

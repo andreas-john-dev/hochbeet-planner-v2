@@ -3,11 +3,19 @@
  * Cognito ID token (inbound JWT authorizer). Before every tool call this hands that token to
  * the tool Lambda, which calls the service APIs with it, so the services keep taking the
  * userId from `sub`. Whatever the model put into the token argument is replaced; the token is
- * never logged.
+ * never logged. The same way it hands over the language of the agent's request
+ * (`Accept-Language`, set by the agent from the app's language) for the tools' texts.
  */
+import { localeFromHeader } from '@hochbeet/contracts';
 
 /** Tool argument that carries the caller's bearer token; set here, never by the model. */
 export const TOKEN_ARGUMENT = '__userToken';
+
+/**
+ * Tool argument with the language of the tools' texts (`de`/`en`); set here from the agent's
+ * `Accept-Language`, never by the model. Missing means German.
+ */
+export const LANGUAGE_ARGUMENT = '__language';
 
 export interface InterceptorEvent {
   interceptorInputVersion?: string;
@@ -46,24 +54,42 @@ export function bearerToken(authorization: string | undefined): string | undefin
   return token.split('.').length === 3 ? token : undefined;
 }
 
-/** A `tools/call` request with the token argument set (or removed when there is no token). */
-function withToken(body: JsonObject, token: string | undefined): JsonObject {
+/** What the interceptor sets on every tool call; missing values are removed instead. */
+interface Injected {
+  token: string | undefined;
+  language: string | undefined;
+}
+
+/**
+ * A `tools/call` request with the token and language arguments set from the request, or
+ * removed when the request carries none: the model's own values never get through.
+ */
+function withInjected(body: JsonObject, { token, language }: Injected): JsonObject {
   if (body.method !== 'tools/call' || !isObject(body.params)) return body;
-  const { [TOKEN_ARGUMENT]: _fromModel, ...args } = isObject(body.params.arguments)
-    ? body.params.arguments
-    : {};
+  const {
+    [TOKEN_ARGUMENT]: _token,
+    [LANGUAGE_ARGUMENT]: _language,
+    ...args
+  } = isObject(body.params.arguments) ? body.params.arguments : {};
   return {
     ...body,
-    params: { ...body.params, arguments: token ? { ...args, [TOKEN_ARGUMENT]: token } : args },
+    params: {
+      ...body.params,
+      arguments: {
+        ...args,
+        ...(token ? { [TOKEN_ARGUMENT]: token } : {}),
+        ...(language ? { [LANGUAGE_ARGUMENT]: language } : {}),
+      },
+    },
   };
 }
 
-function transformBody(body: unknown, token: string | undefined): unknown {
-  if (isObject(body)) return withToken(body, token);
+function transformBody(body: unknown, injected: Injected): unknown {
+  if (isObject(body)) return withInjected(body, injected);
   if (typeof body === 'string') {
     try {
       const parsed: unknown = JSON.parse(body);
-      return isObject(parsed) ? JSON.stringify(withToken(parsed, token)) : body;
+      return isObject(parsed) ? JSON.stringify(withInjected(parsed, injected)) : body;
     } catch {
       return body;
     }
@@ -73,8 +99,10 @@ function transformBody(body: unknown, token: string | undefined): unknown {
 
 export function interceptRequest(event: InterceptorEvent): InterceptorResult {
   const request = event.mcp?.gatewayRequest ?? {};
-  const authorization = header(request.headers ?? {}, 'Authorization');
-  const token = bearerToken(authorization);
+  const headers = request.headers ?? {};
+  const token = bearerToken(header(headers, 'Authorization'));
+  const acceptLanguage = header(headers, 'Accept-Language');
+  const language = acceptLanguage ? localeFromHeader(acceptLanguage) : undefined;
   return {
     interceptorOutputVersion: '1.0',
     mcp: {
@@ -82,7 +110,7 @@ export function interceptRequest(event: InterceptorEvent): InterceptorResult {
         // Also forwarded as header; the Lambda reads it from the client context if the
         // gateway passes it on (header propagation), the argument is the primary path.
         ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
-        body: transformBody(request.body, token),
+        body: transformBody(request.body, { token, language }),
       },
     },
   };

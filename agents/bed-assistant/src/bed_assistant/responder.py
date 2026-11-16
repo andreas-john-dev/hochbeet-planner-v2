@@ -24,7 +24,8 @@ from strands.tools.mcp import MCPClient
 from .auth import Caller
 from .config import Settings
 from .memory import PREFERENCE_NAMESPACE, MemoryStore, memory_session_id
-from .prompt import SYSTEM_PROMPT
+from .messages import BLOCKED_MESSAGES, DEFAULT_LANGUAGE, Language, localize_blocked, message
+from .prompt import system_prompt
 from .schema_model import suggestion_list_model
 from .suggest import (
     SUGGESTION_TOOLS,
@@ -41,13 +42,6 @@ logger = logging.getLogger("bed_assistant")
 RECALL_TOP_K = 5
 RECALL_MIN_SCORE = 0.3
 
-#: Shown when the guardrail blocks and Bedrock sends no text of its own. The guardrail answers
-#: with the same text: ASSISTANT_BLOCKED_MESSAGES.input in packages/contracts.
-BLOCKED_MESSAGE = (
-    "Dabei kann ich dir leider nicht helfen. Frag mich gern etwas zu deinen Beeten, Pflanzen "
-    "oder zur Anzucht."
-)
-
 #: Replaces a blocked question in the conversation, so it is neither kept nor sent again.
 REDACTED_QUESTION = "[Vom Schutzfilter entfernte Frage]"
 
@@ -59,14 +53,22 @@ TOOL_LIMIT_MESSAGE = (
 
 
 class Responder(Protocol):
-    def stream(self, prompt: str, caller: Caller, session_id: str | None) -> AsyncIterator[str]: ...
+    def stream(
+        self,
+        prompt: str,
+        caller: Caller,
+        session_id: str | None,
+        language: Language = DEFAULT_LANGUAGE,
+    ) -> AsyncIterator[str]: ...
 
-    async def suggest(self, question: str, caller: Caller, bed_id: str) -> SuggestionResult: ...
+    async def suggest(
+        self, question: str, caller: Caller, bed_id: str, language: Language = DEFAULT_LANGUAGE
+    ) -> SuggestionResult: ...
 
 
 class GuardrailCheck(Protocol):
-    def blocked(self, text: str) -> str | None:
-        """The German message if the guardrail blocks `text` as user input, else None."""
+    def blocked(self, text: str, language: Language = DEFAULT_LANGUAGE) -> str | None:
+        """The message in `language` if the guardrail blocks `text` as user input, else None."""
         ...
 
 
@@ -77,7 +79,7 @@ class BedrockGuardrailCheck:
         self._client = client
         self._settings = settings
 
-    def blocked(self, text: str) -> str | None:
+    def blocked(self, text: str, language: Language = DEFAULT_LANGUAGE) -> str | None:
         response = self._client.apply_guardrail(
             guardrailIdentifier=self._settings.guardrail_id,
             guardrailVersion=self._settings.guardrail_version,
@@ -87,8 +89,9 @@ class BedrockGuardrailCheck:
         # Without masking filters (PII), every intervention is a block.
         if response.get("action") != "GUARDRAIL_INTERVENED":
             return None
-        message = "".join(str(o.get("text", "")) for o in response.get("outputs") or [])
-        return message.strip() or BLOCKED_MESSAGE
+        # The guardrail answers with its German message; the user gets it in `language`.
+        text = "".join(str(o.get("text", "")) for o in response.get("outputs") or [])
+        return localize_blocked(text, language).strip() or BLOCKED_MESSAGES[language]["input"]
 
 
 def guardrail_config(settings: Settings) -> dict[str, Any]:
@@ -132,14 +135,21 @@ class ToolCallLimit(HookProvider):
             event.cancel_tool = TOOL_LIMIT_MESSAGE
 
 
-def gateway_client(url: str, token: str, tools: Sequence[str] | None = None) -> MCPClient:
+def gateway_client(
+    url: str,
+    token: str,
+    tools: Sequence[str] | None = None,
+    language: Language = DEFAULT_LANGUAGE,
+) -> MCPClient:
     """
     MCP client for the gateway, authenticated with the caller's own ID token. With `tools`,
     the model only sees these gateway tools; the code can still call all of them directly.
+    `Accept-Language` sets the language of the tools' texts: the gateway's request interceptor
+    hands it to the tool Lambda, so it comes from the request, not from the model.
     """
     return MCPClient(
         url=url,
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", "Accept-Language": language},
         tool_filters=(
             {"allowed": [f"{TOOLS_TARGET}___{tool}" for tool in tools]} if tools else None
         ),
@@ -216,14 +226,17 @@ class StrandsResponder:
         client: Any = None,
         session_id: str | None = None,
         model: BedrockModel | None = None,
+        language: Language = DEFAULT_LANGUAGE,
     ) -> Agent:
         if client is None and self._settings.gateway_url:
-            client = self._client_factory(self._settings.gateway_url, caller.token)
+            client = self._client_factory(
+                self._settings.gateway_url, caller.token, language=language
+            )
         tools = [client] if client is not None else []
         session = memory_session_id(session_id) if self._settings.memory_id else None
         return Agent(
             model=model or self._model,
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=system_prompt(language),
             tools=tools,
             hooks=[ToolCallLimit(self._settings.max_tool_calls)],
             # One gateway call at a time: parallel calls closed the MCP session (T-48 evaluation).
@@ -240,10 +253,19 @@ class StrandsResponder:
         )
 
     async def stream(
-        self, prompt: str, caller: Caller, session_id: str | None
+        self,
+        prompt: str,
+        caller: Caller,
+        session_id: str | None,
+        language: Language = DEFAULT_LANGUAGE,
     ) -> AsyncIterator[str]:
+        """
+        The answer in chunks. The guardrail's messages are German (one text per guardrail); a
+        chunk that is one of them is replaced with the message in `language`. Bedrock sends the
+        message as one chunk of its own.
+        """
         # Restoring the conversation reads AgentCore Memory synchronously: off the event loop.
-        agent = await asyncio.to_thread(self.agent, caller, None, session_id)
+        agent = await asyncio.to_thread(self.agent, caller, None, session_id, None, language)
         try:
             used_tool = False
             emitted = False
@@ -261,32 +283,37 @@ class StrandsResponder:
                         text = "\n\n" + text.lstrip()
                     used_tool = False
                     emitted = True
-                    yield text
+                    yield localize_blocked(text, language)
             if blocked:
                 # Counted without content: the question stays out of the logs.
                 logger.info("guardrail intervened")
                 if not emitted:
-                    yield BLOCKED_MESSAGE
+                    yield BLOCKED_MESSAGES[language]["input"]
         finally:
             self._done(agent)
 
-    async def suggest(self, question: str, caller: Caller, bed_id: str) -> SuggestionResult:
+    async def suggest(
+        self, question: str, caller: Caller, bed_id: str, language: Language = DEFAULT_LANGUAGE
+    ) -> SuggestionResult:
         """
         Checked planting suggestions; one agent and gateway session for all rounds. The model
         only looks up plants (`SUGGESTION_TOOLS`); the bed and the checks come from the code.
         The rounds are not stored as conversation, but the caller's fitting preferences go into
         the prompt. The whole request ends after `suggestion_seconds`. A wish the guardrail
-        blocks ends before any model call, with its message as the summary.
+        blocks ends before any model call, with its message as the summary. Reasons, summary,
+        warnings and errors are in `language`.
         """
         if not self._settings.gateway_url:
-            raise SuggestionError("Pflanzvorschläge sind gerade nicht verfügbar.")
+            raise SuggestionError(message(language, "suggestions_unavailable"))
         if self._guardrail is not None:
-            blocked = await asyncio.to_thread(self._guardrail.blocked, question)
+            blocked = await asyncio.to_thread(self._guardrail.blocked, question, language)
             if blocked:
                 logger.info("guardrail intervened")
                 return SuggestionResult([], [], blocked, 0)
-        client = self._client_factory(self._settings.gateway_url, caller.token, SUGGESTION_TOOLS)
-        agent = self.agent(caller, client, model=self._suggestion_model)
+        client = self._client_factory(
+            self._settings.gateway_url, caller.token, SUGGESTION_TOOLS, language=language
+        )
+        agent = self.agent(caller, client, model=self._suggestion_model, language=language)
         model = suggestion_list_model()
         preferences = await self.recall(caller, question)
 
@@ -298,13 +325,14 @@ class StrandsResponder:
         try:
             return await suggest(
                 ask,
-                McpGardenTools(client),
+                McpGardenTools(client, language),
                 bed_id=bed_id,
                 question=question,
                 rounds=self._settings.suggestion_rounds,
                 today=date.today(),
                 preferences=preferences,
                 seconds=self._settings.suggestion_seconds,
+                language=language,
             )
         finally:
             self._done(agent)

@@ -39,6 +39,8 @@ class FakeGateway:
     #: Gateway tools the model may see; None means all.
     tools: tuple[str, ...] | None = None
     calls: list[str] = field(default_factory=list)
+    #: Accept-Language of the client: the language of the tools' texts.
+    language: str = "de"
 
     async def call_tool_async(self, _id: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
         self.calls.append(name)
@@ -222,7 +224,10 @@ def test_the_gateway_client_sends_the_token_as_bearer(monkeypatch: pytest.Monkey
     monkeypatch.setattr(module, "MCPClient", fake_client)
     gateway_client("https://gw.example/mcp", USER_TOKEN)
     gateway_client("https://gw.example/mcp", USER_TOKEN, ("find_plants",))
-    headers = {"Authorization": f"Bearer {USER_TOKEN}"}
+    gateway_client("https://gw.example/mcp", USER_TOKEN, language="en")
+    # Accept-Language: the interceptor hands it to the tools as the language of their texts.
+    headers = {"Authorization": f"Bearer {USER_TOKEN}", "Accept-Language": "de"}
+    english = {"Authorization": f"Bearer {USER_TOKEN}", "Accept-Language": "en"}
     assert built == [
         {"url": "https://gw.example/mcp", "headers": headers, "tool_filters": None},
         # Suggestions: the model only sees find_plants.
@@ -231,7 +236,24 @@ def test_the_gateway_client_sends_the_token_as_bearer(monkeypatch: pytest.Monkey
             "headers": headers,
             "tool_filters": {"allowed": ["garden___find_plants"]},
         },
+        {"url": "https://gw.example/mcp", "headers": english, "tool_filters": None},
     ]
+
+
+async def test_answers_and_suggests_in_the_language_of_the_request(
+    agents: list[FakeAgent],
+) -> None:
+    responder = StrandsResponder(settings(GATEWAY_URL="https://gw.example/mcp"), FakeGateway)
+    await collect(responder.stream("Which warnings?", USER, None, "en"))
+    await responder.suggest("What fits?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A", "en")
+    await collect(responder.stream("Welche Warnungen?", USER, None))
+    chat, suggestions, german = agents
+    assert chat.kwargs["tools"][0].language == "en"
+    assert "Die App ist auf Englisch" in chat.kwargs["system_prompt"]
+    assert suggestions.kwargs["tools"][0].language == "en"
+    assert "auf Englisch (britisch)" in suggestions.kwargs["prompts"][0]
+    assert german.kwargs["tools"][0].language == "de"
+    assert "Die App ist auf Deutsch" in german.kwargs["system_prompt"]
 
 
 @dataclass

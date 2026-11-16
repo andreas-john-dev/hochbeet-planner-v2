@@ -93,8 +93,8 @@ export class AssistantGuardrail extends Construct {
     const stack = Stack.of(this);
     const { guardrailProfile } = props.assistant;
     const policies = {
-      blockedInputMessaging: ASSISTANT_BLOCKED_MESSAGES.input,
-      blockedOutputsMessaging: ASSISTANT_BLOCKED_MESSAGES.output,
+      blockedInputMessaging: ASSISTANT_BLOCKED_MESSAGES.de.input,
+      blockedOutputsMessaging: ASSISTANT_BLOCKED_MESSAGES.de.output,
       contentPolicyConfig: {
         filtersConfig: GUARDRAIL_FILTERS,
         contentFiltersTierConfig: { tierName: 'STANDARD' },

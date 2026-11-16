@@ -210,5 +210,6 @@ export const editor: typeof de = {
     disclaimer:
       'Answers come from an AI and can be wrong. Enter sends, Shift+Enter starts a new line.',
     defaultQuestion: 'What else can I plant in this bed?',
+    interrupted: 'The answer was interrupted. Please try again.',
   },
 };

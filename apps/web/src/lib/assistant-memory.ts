@@ -8,18 +8,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiFetch } from './api';
 import { useApi } from './api-context';
 import { ASSISTANT_PATH, newSessionId } from './assistant';
+import { currentLanguage } from './i18n';
 
 const memoriesKey = ['assistant', 'memories'] as const;
 
 /**
  * A request about the assistant's memory; it goes to the runtime like a question, but in a
- * session of its own and without counting against the daily quota.
+ * session of its own and without counting against the daily quota. Errors come in the app's
+ * language.
  */
 function memoryRequest<T>(api: ApiFetch, body: AssistantMemoryRequest) {
   return api<T>(ASSISTANT_PATH, {
     method: 'POST',
     headers: { [ASSISTANT_SESSION_HEADER]: newSessionId() },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ language: currentLanguage(), ...body }),
   });
 }
 

@@ -184,8 +184,8 @@ describe('AssistantStack', () => {
     template.resourceCountIs('AWS::Bedrock::Guardrail', 1);
     template.hasResourceProperties('AWS::Bedrock::Guardrail', {
       Name: 'prod-bed-assistant',
-      BlockedInputMessaging: ASSISTANT_BLOCKED_MESSAGES.input,
-      BlockedOutputsMessaging: ASSISTANT_BLOCKED_MESSAGES.output,
+      BlockedInputMessaging: ASSISTANT_BLOCKED_MESSAGES.de.input,
+      BlockedOutputsMessaging: ASSISTANT_BLOCKED_MESSAGES.de.output,
       ContentPolicyConfig: {
         FiltersConfig: Match.arrayWith([
           { Type: 'PROMPT_ATTACK', InputStrength: 'HIGH', OutputStrength: 'NONE' },

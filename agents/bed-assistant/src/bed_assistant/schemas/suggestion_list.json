@@ -59,7 +59,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 300,
-            "description": "Kurze Begründung auf Deutsch."
+            "description": "Kurze Begründung in der Antwortsprache."
           }
         },
         "required": [
@@ -75,7 +75,7 @@
     "summary": {
       "type": "string",
       "maxLength": 800,
-      "description": "Kurze Zusammenfassung der Vorschläge auf Deutsch."
+      "description": "Kurze Zusammenfassung der Vorschläge in der Antwortsprache."
     }
   },
   "required": [
