@@ -19,7 +19,13 @@ interface Ended {
  * the soil was renewed in between. A planting of another family in between breaks the chain,
  * but only on the cells it covers: one cell is enough for a warning.
  */
-export function cropRotationRule({ bed, plantings, texts, plantName }: RuleContext): Finding[] {
+export function cropRotationRule({
+  bed,
+  plantings,
+  texts,
+  plantName,
+  familyName,
+}: RuleContext): Finding[] {
   const cellsOf = new Map(
     plantings.map((item) => {
       const cells: number[] = [];
@@ -76,7 +82,7 @@ export function cropRotationRule({ bed, plantings, texts, plantName }: RuleConte
       const params = {
         plant: plantName(successor.plant),
         predecessor: plantName(predecessor.plant),
-        family: successor.plant.family,
+        family: familyName(successor.plant),
       };
       findings.push({
         rule: 'CROP_ROTATION',

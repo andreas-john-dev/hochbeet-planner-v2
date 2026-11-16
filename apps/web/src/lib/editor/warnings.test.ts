@@ -91,9 +91,9 @@ describe('season', () => {
       'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
     ]);
     expect(frost('04-20')).toEqual([]);
-    // The rule engine writes the text in the user's language.
+    // The rule engine writes the text in the user's language, plant names included.
     expect(frost('05-20', 'en')).toEqual([
-      'Tomate is frost-sensitive and should only go into the bed after 20 May.',
+      'Tomato is frost-sensitive and should only go into the bed after 20 May.',
     ]);
   });
 

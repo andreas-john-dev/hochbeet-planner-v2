@@ -12,6 +12,7 @@ import {
 import { getISOWeek, getISOWeekYear, parseISO, subDays } from 'date-fns';
 import { i18n } from '@/lib/i18n';
 import type { Language } from '@/lib/language';
+import { familyName, plantName } from '@/lib/plant-names';
 
 /**
  * The season containing `date`: from the last soil renewal on or before it up to the next
@@ -45,6 +46,8 @@ export function seasonFindings(
   const season = seasonOf(bed, date);
   const options = {
     locale: language,
+    plantName: (plant: Plant) => plantName(plant, language),
+    familyName: (plant: Plant) => familyName(plant, language),
     ...(lastFrost ? { lastFrost } : {}),
     ...(sowings ? { sowings } : {}),
   };

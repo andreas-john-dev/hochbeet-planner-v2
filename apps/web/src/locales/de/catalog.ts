@@ -142,10 +142,17 @@ export const catalog = {
     neighborRemove: '{{name}} entfernen',
     neighborMatches: 'Treffer für {{label}}',
     neighborAdd: 'hinzufügen',
+    english: 'Auf Englisch',
+    englishHint:
+      'Optional. So heißt die Sorte, wenn die App auf Englisch läuft; ohne Angabe der deutsche Name. Die Fruchtfolge vergleicht immer die deutsche Familie.',
+    englishName: 'Englischer Name',
+    englishFamily: 'Englische Familie',
   },
   errors: {
     name: 'Bitte gib einen Namen an.',
     family: 'Bitte gib eine Familie an.',
+    englishName: 'Bitte gib auch den englischen Namen an.',
+    englishFamily: 'Bitte gib auch die englische Familie an.',
     cm: 'Bitte {{min}} bis {{max}} cm angeben.',
     weeks: 'Bitte {{min}} bis {{max}} Wochen angeben.',
     years: 'Bitte {{min}} bis {{max}} Jahre angeben.',

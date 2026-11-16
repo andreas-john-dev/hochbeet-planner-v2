@@ -90,6 +90,7 @@ export function context(
     sowings: sowingInfos(sowings, plants),
     texts: messagesFor(locale),
     plantName: (p) => p.name,
+    familyName: (p) => p.family,
   };
 }
 

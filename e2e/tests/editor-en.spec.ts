@@ -55,9 +55,9 @@ test('creates a bed, plants a row, changes its length and undoes it', async ({
       .getByRole('button', { name: 'Row' })
       .tap();
     await sheet.getByRole('searchbox', { name: 'Search varieties' }).fill('Möhre');
-    await sheet.getByRole('button', { name: 'Möhre' }).tap();
+    await sheet.getByRole('button', { name: 'Carrot' }).tap();
     await expect(sheet).toBeHidden();
-    await expect(page.getByText(/Möhre as row at .* cm: tap the spot in the bed/)).toBeVisible();
+    await expect(page.getByText(/Carrot as row at .* cm: tap the spot in the bed/)).toBeVisible();
     const at = await screenPoint(page, { x: 100, y: 20 });
     await page.touchscreen.tap(at.x, at.y);
     await page
@@ -71,20 +71,20 @@ test('creates a bed, plants a row, changes its length and undoes it', async ({
       .getByRole('button', { name: 'Row' })
       .click();
     await palette.getByRole('searchbox', { name: 'Search varieties' }).fill('Möhre');
-    await palette.getByRole('button', { name: 'Möhre' }).focus();
+    await palette.getByRole('button', { name: 'Carrot' }).focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByText(/Möhre as row at 100 × 50 cm: arrow keys move it/)).toBeVisible();
+    await expect(page.getByText(/Carrot as row at 100 × 50 cm: arrow keys move it/)).toBeVisible();
     await page.keyboard.press('Enter');
   }
   const carrot = page.locator(`[data-plant-id="${CARROT}"]`);
   await expect(carrot).toHaveAttribute('data-kind', 'ROW');
   await expect(carrot).toHaveAttribute(
     'aria-label',
-    /^Möhre, row with \d+ plants( \((hint|warning|good neighbours)\))?$/,
+    /^Carrot, row with \d+ plants( \((hint|warning|good neighbours)\))?$/,
   );
 
   // Change the length with the handle of the selected row, then undo it
-  const handle = page.getByRole('slider', { name: 'Length of the row Möhre' });
+  const handle = page.getByRole('slider', { name: 'Length of the row Carrot' });
   const length = Number(await handle.getAttribute('aria-valuenow'));
   await handle.focus();
   await page.keyboard.press('ArrowDown');

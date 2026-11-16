@@ -12,7 +12,8 @@ import { Input } from '@/components/ui/input';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { filterCatalog, NO_FILTER } from '@/lib/catalog';
 import { usePlants, usePublicationQueue } from '@/lib/garden';
-import { useDateLocale } from '@/lib/i18n';
+import { useDateLocale, useLanguage } from '@/lib/i18n';
+import { familyName, plantName } from '@/lib/plant-names';
 
 const rowClass =
   'bg-card hover:bg-accent focus-visible:ring-ring/50 flex min-h-14 items-center gap-3 rounded-xl border p-3 outline-none focus-visible:ring-[3px]';
@@ -89,12 +90,14 @@ function Queue() {
 
 function GlobalPlants() {
   const { t } = useTranslation(['admin', 'catalog']);
+  const { language } = useLanguage();
   const plants = usePlants();
   const [query, setQuery] = useState('');
   const searchId = useId();
   const globals = filterCatalog(
     (plants.data ?? []).filter((p) => p.source === 'GLOBAL'),
     { ...NO_FILTER, query },
+    language,
   );
   return (
     <section aria-labelledby="global-plants" className="flex flex-col gap-3">
@@ -139,9 +142,9 @@ function GlobalPlants() {
               <Link to="/admin/sorten/$plantId" params={{ plantId: plant.id }} className={rowClass}>
                 <PlantIcon plant={plant} size={32} decorative />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-medium">{plant.name}</span>
+                  <span className="truncate font-medium">{plantName(plant, language)}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    {plant.family} · {t(`catalog:feeder.${plant.feeder}`)}
+                    {familyName(plant, language)} · {t(`catalog:feeder.${plant.feeder}`)}
                   </span>
                 </span>
               </Link>

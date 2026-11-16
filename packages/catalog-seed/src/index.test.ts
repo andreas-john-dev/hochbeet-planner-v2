@@ -39,6 +39,26 @@ describe('seed plants', () => {
     }
   });
 
+  it('names every plant and family in English, one English family per family', () => {
+    const englishFamily = new Map<string, Set<string>>();
+    for (const p of seedPlants) {
+      const en = p.translations?.en;
+      expect(en?.name, p.name).toMatch(/\S/);
+      expect(en?.family, p.name).toMatch(/\S/);
+      englishFamily.set(p.family, (englishFamily.get(p.family) ?? new Set()).add(en?.family ?? ''));
+    }
+    expect(new Set(seedPlants.map((p) => p.translations?.en?.name)).size).toBe(56);
+    for (const [family, english] of englishFamily) expect([...english], family).toHaveLength(1);
+    expect(plant('Kopfsalat').translations).toEqual({
+      en: { name: 'Lettuce', family: 'Daisy family' },
+    });
+  });
+
+  it('keeps the fixed ids', async () => {
+    const ids = seedPlants.map((p) => `${p.id} ${p.name}`).join('\n');
+    await expect(`${ids}\n`).toMatchFileSnapshot('../report/ids.txt');
+  });
+
   it('only references existing plants and never the plant itself', () => {
     const ids = new Set(seedPlants.map((p) => p.id));
     for (const p of seedPlants) {

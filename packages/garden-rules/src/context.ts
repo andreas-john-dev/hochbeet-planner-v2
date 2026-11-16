@@ -55,6 +55,8 @@ export interface RuleContext {
   texts: Messages;
   /** Name of a plant in the texts (`EvaluateOptions.plantName`). */
   plantName: (plant: Plant) => string;
+  /** Family of a plant in the texts (`EvaluateOptions.familyName`). */
+  familyName: (plant: Plant) => string;
 }
 
 /** Calls `visit` once for every unordered pair of plantings. */

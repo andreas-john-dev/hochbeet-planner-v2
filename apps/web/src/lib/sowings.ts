@@ -19,6 +19,7 @@ import { addWeeks, formatISO, parseISO } from 'date-fns';
 import type { PreviewSowing } from './editor/store';
 import { i18n } from './i18n';
 import { intlLocale, type Language } from './language';
+import { byPlantName } from './plant-names';
 
 /** The stages in order; `DONE` comes only through „Abschließen“. */
 export const STAGES: readonly SowingStage[] = [
@@ -150,12 +151,13 @@ export function weekText(date: string, language: Language): string {
   return `${week} · ${range}`;
 }
 
-/** Plants that can be raised indoors first, then the others; each by name. */
-export function plantsForSowing<T extends Pick<Plant, 'name' | 'sowing'>>(
-  plants: readonly T[],
-): T[] {
+/** Plants that can be raised indoors first, then the others; each by name in `language`. */
+export function plantsForSowing<
+  T extends Pick<Plant, 'name' | 'family' | 'translations' | 'sowing'>,
+>(plants: readonly T[], language: Language): T[] {
   const raised = (p: T) => (p.sowing && p.sowing.method !== 'DIRECT' ? 0 : 1);
-  return [...plants].sort((a, b) => raised(a) - raised(b) || a.name.localeCompare(b.name, 'de'));
+  const byName = byPlantName(language);
+  return [...plants].sort((a, b) => raised(a) - raised(b) || byName(a, b));
 }
 
 /** New batches in the current week or earlier are sown, later ones planned. */

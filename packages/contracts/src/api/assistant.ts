@@ -164,7 +164,9 @@ export const FindPlantsToolInputSchema = z.object({
     .trim()
     .max(50)
     .optional()
-    .describe('Teil des Sortennamens, z. B. "Tomate". Ohne Angabe: alle Sorten.'),
+    .describe(
+      'Teil des Sortennamens, deutsch oder englisch, z. B. "Tomate". Ohne Angabe: alle Sorten.',
+    ),
 });
 
 export const ListSowingsToolInputSchema = z.object({
@@ -218,8 +220,12 @@ export const GetBedToolOutputSchema = z.object({
 const ToolPlantSchema = z.object({
   id: UlidSchema,
   name: z.string(),
+  /** English name (`plantName(plant, 'en')`): the German one for own plants and adjusted names. */
+  nameEn: z.string(),
   category: CategorySchema,
   family: z.string(),
+  /** English family, like `nameEn`. */
+  familyEn: z.string(),
   feeder: FeederSchema,
   spacingInRowCm: z.number(),
   rowSpacingCm: z.number(),

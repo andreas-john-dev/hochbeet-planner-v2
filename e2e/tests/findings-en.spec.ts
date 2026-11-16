@@ -29,7 +29,7 @@ test('shows a spacing warning and the week in English in the editor', async ({ p
 
   await expect(page.getByTestId('findings-summary')).toContainText('1 warning');
   await expect(page.getByRole('list', { name: 'Hints' })).toContainText(
-    /Tomate and Tomate are too close: their footprints overlap by \d+ cm\./,
+    /Tomato and Tomato are too close: their footprints overlap by \d+ cm\./,
   );
   await expect(page.getByText('5 – 11 October 2026 · Week 41').first()).toBeVisible();
 });
@@ -62,11 +62,11 @@ test('shows findings at a batch in English, in the editor and on the seedlings p
   });
   await open(page, `/beete/${BED_ID}`, 'South bed');
   await expect(page.getByRole('list', { name: 'Hints' })).toContainText(
-    'Seedlings of Kopfsalat (week 37): 6 planned, but only 4 available.',
+    'Seedlings of Lettuce (week 37): 6 planned, but only 4 available.',
   );
 
   await open(page, '/anzucht', 'Seedlings');
-  const card = page.getByRole('article', { name: 'Kopfsalat' });
+  const card = page.getByRole('article', { name: 'Lettuce' });
   await expect(card).toContainText('Week 37 · 7 – 13 September 2026');
   await expect(card.getByRole('list', { name: 'Notes on this batch' })).toContainText(
     'More planned in beds than available: 6 planned, but only 4 available.',

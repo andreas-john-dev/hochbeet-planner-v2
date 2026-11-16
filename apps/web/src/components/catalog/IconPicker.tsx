@@ -4,6 +4,7 @@ import { IconSvg } from '@hochbeet/plant-icons/react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { usePlantNames } from '@/lib/plant-names';
 
 /**
  * Picks the icon of an own plant from packages/plant-icons; the first choice is the category
@@ -21,9 +22,10 @@ export function IconPicker({
   onChange: (icon: string | null) => void;
 }) {
   const { t } = useTranslation('catalog');
+  const { plantName } = usePlantNames();
   const name = useId();
   const nameOf = new Map(
-    catalog.filter((p) => p.source === 'GLOBAL').map((p) => [p.icon, p.name] as const),
+    catalog.filter((p) => p.source === 'GLOBAL').map((p) => [p.icon, plantName(p)] as const),
   );
   const options = [
     {

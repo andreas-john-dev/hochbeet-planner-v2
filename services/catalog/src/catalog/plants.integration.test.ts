@@ -69,6 +69,8 @@ describe('own plants and overrides against DynamoDB Local', () => {
         publication: { status: 'PRIVATE' },
       });
       expect(plant.id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+      // The fields come from the seed strawberry, translations included; own plants drop them.
+      expect(plant).not.toHaveProperty('translations');
       expect((await list(USER_A)).map((p) => p.id)).toContain(plant.id);
       expect((await list(USER_B)).map((p) => p.id)).not.toContain(plant.id);
     });

@@ -1,8 +1,8 @@
 import {
   type ApprovePublicationRequest,
   type ErrorKey,
+  type GlobalPlantFields,
   type Plant,
-  type PlantFields,
   PlantSchema,
   type PublicationQueueResponse,
 } from '@hochbeet/contracts';
@@ -64,14 +64,14 @@ export class AdminService {
     }
   }
 
-  async createGlobalPlant(fields: PlantFields): Promise<Plant> {
+  async createGlobalPlant(fields: GlobalPlantFields): Promise<Plant> {
     const plant: Plant = { ...fields, id: this.newId() };
     await this.checkGlobalNeighbors(plant);
     await this.store.putGlobalPlant(plant, 'create');
     return plant;
   }
 
-  async updateGlobalPlant(id: string, fields: PlantFields): Promise<Plant> {
+  async updateGlobalPlant(id: string, fields: GlobalPlantFields): Promise<Plant> {
     const plant: Plant = { ...fields, id };
     await this.checkGlobalNeighbors(plant);
     if (!(await this.store.putGlobalPlant(plant, 'replace'))) {

@@ -13,6 +13,7 @@ import type {
   PlantFields,
   PlantOverride,
   PublicationQueueResponse,
+  SaveGlobalPlantRequest,
   SowingBatch,
   SowingBatchFields,
 } from '@hochbeet/contracts';
@@ -201,7 +202,7 @@ export function useSaveGlobalPlant() {
   const api = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, fields }: { id?: string; fields: PlantFields }) =>
+    mutationFn: ({ id, fields }: { id?: string; fields: SaveGlobalPlantRequest }) =>
       api<Plant>(id ? `/api/catalog/admin/plants/${id}` : '/api/catalog/admin/plants', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(fields),

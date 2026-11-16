@@ -5,6 +5,8 @@ import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { filterCatalog, NO_FILTER } from '@/lib/catalog';
+import { useLanguage } from '@/lib/i18n';
+import { plantName } from '@/lib/plant-names';
 import { cn } from '@/lib/utils';
 
 const MAX_RESULTS = 6;
@@ -25,13 +27,14 @@ export function NeighborPicker({
   onChange: (ids: string[]) => void;
 }) {
   const { t } = useTranslation('catalog');
+  const { language } = useLanguage();
   const searchId = useId();
   const [query, setQuery] = useState('');
   const chosen = value.flatMap((id) => candidates.find((p) => p.id === id) ?? []);
   const matches =
     query.trim() === ''
       ? []
-      : filterCatalog(candidates, { ...NO_FILTER, query })
+      : filterCatalog(candidates, { ...NO_FILTER, query }, language)
           .filter((p) => !value.includes(p.id))
           .slice(0, MAX_RESULTS);
 
@@ -44,7 +47,7 @@ export function NeighborPicker({
             <li key={plant.id}>
               <button
                 type="button"
-                aria-label={t('form.neighborRemove', { name: plant.name })}
+                aria-label={t('form.neighborRemove', { name: plantName(plant, language) })}
                 onClick={() => {
                   onChange(value.filter((id) => id !== plant.id));
                 }}
@@ -56,7 +59,7 @@ export function NeighborPicker({
                 )}
               >
                 <PlantIcon plant={plant} size={24} decorative />
-                {plant.name}
+                {plantName(plant, language)}
                 <X aria-hidden className="size-4 opacity-70" />
               </button>
             </li>
@@ -89,7 +92,7 @@ export function NeighborPicker({
                 className="hover:bg-accent focus-visible:ring-ring/50 flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-left text-sm outline-none focus-visible:ring-[3px]"
               >
                 <PlantIcon plant={plant} size={24} decorative />
-                <span className="flex-1">{plant.name}</span>
+                <span className="flex-1">{plantName(plant, language)}</span>
                 <Plus aria-hidden className="text-muted-foreground size-4" />
                 <span className="sr-only">{t('form.neighborAdd')}</span>
               </button>

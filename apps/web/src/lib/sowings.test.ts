@@ -149,11 +149,14 @@ describe('stock', () => {
 
 describe('new batch', () => {
   it('lists plants raised indoors first', () => {
-    const names = plantsForSowing([seed('Möhre'), tomato, lettuce, seed('Erdbeere')]).map(
-      (p) => p.name,
-    );
+    const names = (language: 'de' | 'en') =>
+      plantsForSowing([seed('Möhre'), tomato, lettuce, seed('Erdbeere')], language).map(
+        (p) => p.name,
+      );
     // Kopfsalat and Tomate can be raised; Möhre is sown directly, Erdbeere has no details.
-    expect(names).toEqual(['Kopfsalat', 'Tomate', 'Erdbeere', 'Möhre']);
+    expect(names('de')).toEqual(['Kopfsalat', 'Tomate', 'Erdbeere', 'Möhre']);
+    // Lettuce, Tomato; Carrot, Strawberry
+    expect(names('en')).toEqual(['Kopfsalat', 'Tomate', 'Möhre', 'Erdbeere']);
   });
 
   it('plans batches of later weeks and counts this week as sown', () => {

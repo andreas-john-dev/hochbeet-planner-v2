@@ -11,12 +11,10 @@ export const seedPlant = (name: string): Plant => {
 };
 
 /** An own plant of a user, based on a seed plant but with a new id and name. */
-export const ownPlant = (id: string, name: string): Plant => ({
-  ...seedPlant('Tomate'),
-  id,
-  name,
-  goodNeighbors: [],
-  badNeighbors: [],
-});
+export const ownPlant = (id: string, name: string): Plant => {
+  // Own plants have no translations; their name holds in every language.
+  const { translations: _translations, ...tomato } = seedPlant('Tomate');
+  return { ...tomato, id, name, goodNeighbors: [], badNeighbors: [] };
+};
 
 export { authorized } from '@hochbeet/service-kit/testing';

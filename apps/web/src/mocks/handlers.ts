@@ -10,6 +10,7 @@ import {
   type PlantFields,
   type PublicationQueueResponse,
   RejectPublicationRequestSchema,
+  SaveGlobalPlantRequestSchema,
   SavePlantRequestSchema,
 } from '@hochbeet/contracts';
 import { ulid } from 'ulid';
@@ -258,7 +259,7 @@ export function mockRoutes(
       'POST',
       '/api/catalog/admin/plants',
       admin(async ({ request }) => {
-        const parsed = await parseJson(request, SavePlantRequestSchema);
+        const parsed = await parseJson(request, SaveGlobalPlantRequestSchema);
         if (parsed.response) return parsed.response;
         const globals = store.readCatalog();
         const plant: Plant = { ...parsed.data, id: newId() };
@@ -273,7 +274,7 @@ export function mockRoutes(
       'PUT',
       '/api/catalog/admin/plants/:id',
       admin(async ({ request, params }) => {
-        const parsed = await parseJson(request, SavePlantRequestSchema);
+        const parsed = await parseJson(request, SaveGlobalPlantRequestSchema);
         if (parsed.response) return parsed.response;
         const globals = store.readCatalog();
         if (!globals.some((p) => p.id === params.id)) return error(PLANT_NOT_FOUND, 404);

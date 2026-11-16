@@ -217,6 +217,16 @@ describe('tools through the gateway path', () => {
     expect(all.more).toBe(catalog.length - MAX_PLANTS);
   });
 
+  it('gives the English name and family and finds plants by them', async () => {
+    const { result } = await callAsUser('user-a', 'find_plants', { query: 'lettuce' });
+    const { plants } = FindPlantsToolOutputSchema.parse(result);
+    expect(plants.map((p) => [p.name, p.family, p.nameEn, p.familyEn])).toEqual([
+      ['Feldsalat', 'Baldriangewächse', "Lamb's lettuce", 'Valerian family'],
+      ['Kopfsalat', 'Korbblütler', 'Lettuce', 'Daisy family'],
+      ['Pflücksalat', 'Korbblütler', 'Loose-leaf lettuce', 'Daisy family'],
+    ]);
+  });
+
   it('finds the raising details of a plant with readable windows', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-07T10:00:00'));

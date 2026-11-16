@@ -16,6 +16,7 @@ import { apiErrorMessage } from '@/lib/api';
 import { changedFields, lifecycleText } from '@/lib/catalog';
 import { useAdjustPlant, usePlants } from '@/lib/garden';
 import { useLanguage } from '@/lib/i18n';
+import { byPlantName, familyName, plantName } from '@/lib/plant-names';
 import { sowingLines } from '@/lib/sowing';
 import { cn } from '@/lib/utils';
 
@@ -122,10 +123,12 @@ function PlantDetails({
       <header className="flex flex-wrap items-center gap-4">
         <PlantIcon plant={plant} size={64} decorative />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{plant.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+            {plantName(plant, language)}
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground text-sm">
-              {t(`category.${plant.category}`)} · {plant.family}
+              {t(`category.${plant.category}`)} · {familyName(plant, language)}
             </span>
             <SourceBadge plant={plant} />
           </div>
@@ -181,7 +184,12 @@ function PlantDetails({
             t(`category.${plant.category}`),
             global && t(`category.${global.category}`),
           )}
-          {row('family', t('detail.family'), plant.family, global?.family)}
+          {row(
+            'family',
+            t('detail.family'),
+            familyName(plant, language),
+            global && familyName(global, language),
+          )}
           {row(
             'feeder',
             t('detail.feeder'),
@@ -280,9 +288,10 @@ function Neighbors({
   tone: 'good' | 'bad';
   empty: string;
 }) {
+  const { language } = useLanguage();
   const neighbors = ids
     .flatMap((id) => catalog.find((p) => p.id === id) ?? [])
-    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    .sort(byPlantName(language));
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-lg font-semibold">{title}</h2>
@@ -303,7 +312,7 @@ function Neighbors({
                 )}
               >
                 <PlantIcon plant={neighbor} size={28} decorative />
-                {neighbor.name}
+                {plantName(neighbor, language)}
               </Link>
             </li>
           ))}

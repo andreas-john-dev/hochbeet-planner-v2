@@ -122,10 +122,17 @@ describe('publication and admin endpoints against DynamoDB Local', () => {
     ]);
 
     const approved = await asAdmin('POST', `/admin/publications/${melisse.id}/approve`, {
-      corrections: { spacingInRowCm: 35 },
+      corrections: {
+        spacingInRowCm: 35,
+        translations: { en: { name: 'Lemon balm', family: 'Mint family' } },
+      },
     });
     expect(approved.status).toBe(200);
-    expect(await approved.json()).toMatchObject({ id: melisse.id, spacingInRowCm: 35 });
+    expect(await approved.json()).toMatchObject({
+      id: melisse.id,
+      spacingInRowCm: 35,
+      translations: { en: { name: 'Lemon balm' } },
+    });
 
     // Global for everyone, with the same id; the author sees it once, as a global plant.
     const forB = (await list(USER_B)).filter((p) => p.id === melisse.id);
@@ -211,24 +218,27 @@ describe('publication and admin endpoints against DynamoDB Local', () => {
   });
 
   it('lets admins create and change global plants', async () => {
-    const created = await asAdmin(
-      'POST',
-      '/admin/plants',
-      fields('Pak Choi', { goodNeighbors: [tomato.id] }),
-    );
+    const created = await asAdmin('POST', '/admin/plants', {
+      ...fields('Pak Choi', { goodNeighbors: [tomato.id] }),
+      translations: { en: { name: 'Pak choi', family: 'Brassicas' } },
+    });
     expect(created.status).toBe(201);
     const pakChoi = (await created.json()) as Plant;
     expect((await list(USER_B)).find((p) => p.id === pakChoi.id)).toMatchObject({
       source: 'GLOBAL',
+      translations: { en: { name: 'Pak choi', family: 'Brassicas' } },
     });
 
-    const { id: _id, ...tomatoFields } = tomato;
+    // The fields replace the old ones: without translations the plant has none any more.
+    const { id: _id, translations: _translations, ...tomatoFields } = tomato;
     const changed = await asAdmin('PUT', `/admin/plants/${tomato.id}`, {
       ...tomatoFields,
       spacingInRowCm: 55,
     });
     expect(changed.status).toBe(200);
-    expect((await list(USER_A)).find((p) => p.id === tomato.id)?.spacingInRowCm).toBe(55);
+    const changedTomato = (await list(USER_A)).find((p) => p.id === tomato.id);
+    expect(changedTomato?.spacingInRowCm).toBe(55);
+    expect(changedTomato).not.toHaveProperty('translations');
 
     // The seed hash stays, so a later change of the tomato in the seed still applies.
     const { Item } = await db.client.send(

@@ -1,7 +1,13 @@
 import { seedPlants } from '@hochbeet/catalog-seed';
 import type { CatalogPlant } from '@hochbeet/contracts';
 import { describe, expect, it } from 'vitest';
-import { EMPTY_PLANT_FORM, ownNeighbors, parsePlantForm, plantForm } from './plant-form';
+import {
+  EMPTY_PLANT_FORM,
+  globalPlantForm,
+  ownNeighbors,
+  parsePlantForm,
+  plantForm,
+} from './plant-form';
 
 const catalog: CatalogPlant[] = seedPlants.map((p) => ({
   ...p,
@@ -85,5 +91,33 @@ describe('own plant form', () => {
     };
     const plant = { ...own, id: '01J9ZQ3W8D6V2K5M7N8P9R0P02', goodNeighbors: [onion.id, own.id] };
     expect(ownNeighbors(plant, [...catalog, own]).map((p) => p.name)).toEqual(['Meine Zwiebel']);
+  });
+});
+
+describe('global plant form', () => {
+  it('fills the English fields from the translations, empty for a new plant', () => {
+    expect(globalPlantForm(onion).english).toEqual({ name: 'Onion', family: 'Alliums' });
+    expect(globalPlantForm(undefined)).toEqual({
+      ...EMPTY_PLANT_FORM,
+      english: { name: '', family: '' },
+    });
+    // Own plants have no English fields.
+    expect(plantForm(onion)).not.toHaveProperty('english');
+  });
+
+  it('stores both English values or none and asks for the missing one', () => {
+    const parse = (name: string, family: string) =>
+      parsePlantForm({ ...filled, english: { name, family } }, 'en');
+    expect(parse(' Oat root ', 'Daisy family')).toMatchObject({
+      fields: { translations: { en: { name: 'Oat root', family: 'Daisy family' } } },
+    });
+    const none = parse(' ', '');
+    expect('fields' in none && none.fields).not.toHaveProperty('translations');
+    expect(parse('Oat root', '')).toEqual({
+      errors: { englishFamily: 'Please enter the English family as well.' },
+    });
+    expect(parse('', 'Daisy family')).toEqual({
+      errors: { englishName: 'Please enter the English name as well.' },
+    });
   });
 });

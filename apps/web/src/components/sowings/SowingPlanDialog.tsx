@@ -21,6 +21,7 @@ import { apiErrorMessage } from '@/lib/api';
 import { useApi } from '@/lib/api-context';
 import { queryKeys, useAllPlantings, usePlants, useSowings } from '@/lib/garden';
 import { useLanguage } from '@/lib/i18n';
+import { plantName } from '@/lib/plant-names';
 import { buildSowingPlan, saveSowingPlan, type SowingPlanRow } from '@/lib/sowing-plan';
 import { cn } from '@/lib/utils';
 
@@ -211,7 +212,7 @@ function PlanRow({
   const { t } = useTranslation('sowings');
   const { language } = useLanguage();
   const { week, range } = formatWeek(row.sowDate, language);
-  const name = t('planDialog.rowName', { plant: row.plant.name, week });
+  const name = t('planDialog.rowName', { plant: plantName(row.plant, language), week });
   const invalid = chosen && countOf(countText) === undefined;
   const beds = row.beds.map((bed) => t('quoted', { name: bed.name })).join(', ');
 
@@ -239,7 +240,7 @@ function PlanRow({
         <div className="flex items-start gap-2">
           <PlantIcon plant={row.plant} size={32} decorative className="hidden shrink-0 sm:block" />
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-foreground font-medium">{row.plant.name}</span>
+            <span className="text-foreground font-medium">{plantName(row.plant, language)}</span>
             <span>{t('planDialog.sowing', { week, range })}</span>
             <span className="text-muted-foreground text-xs">
               {t('planDialog.transplant', {

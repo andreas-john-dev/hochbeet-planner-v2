@@ -56,16 +56,23 @@ export interface EvaluateOptions {
   sowings?: readonly SowingWithPlantings[];
   /** Language of `message` (German by default); `params` are the same in every language. */
   locale?: RulesLocale;
-  /** Name of a plant in the texts; the stored name by default (display names: T-71). */
+  /** Name of a plant in the texts; the stored name by default (e.g. `plantName()` of contracts). */
   plantName?: (plant: Plant) => string;
+  /**
+   * Family of a plant in the texts; the stored family by default. Crop rotation always
+   * compares the stored `family`.
+   */
+  familyName?: (plant: Plant) => string;
 }
 
 const storedName = (plant: Plant) => plant.name;
+const storedFamily = (plant: Plant) => plant.family;
 
 /** Texts and names for the rules, from the options. */
-const textOptions = (options: Pick<EvaluateOptions, 'locale' | 'plantName'>) => ({
+const textOptions = (options: Pick<EvaluateOptions, 'locale' | 'plantName' | 'familyName'>) => ({
   texts: messagesFor(options.locale),
   plantName: options.plantName ?? storedName,
+  familyName: options.familyName ?? storedFamily,
 });
 
 /**
@@ -105,7 +112,7 @@ export function evaluateBed(
 export function evaluateSowings(
   sowings: readonly SowingWithPlantings[],
   plants: readonly Plant[],
-  options: Pick<EvaluateOptions, 'lastFrost' | 'locale' | 'plantName'> = {},
+  options: Pick<EvaluateOptions, 'lastFrost' | 'locale' | 'plantName' | 'familyName'> = {},
 ): SowingFinding[] {
   const context = { lastFrost: options.lastFrost ?? DEFAULT_LAST_FROST, ...textOptions(options) };
   const byId = new Map(plants.map((p) => [p.id, p]));

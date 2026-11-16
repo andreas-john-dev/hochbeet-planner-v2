@@ -17,3 +17,4 @@ export {
   safeParseIn,
   zodErrorMap,
 } from './messages';
+export { familyName, type NamedPlant, plantName } from './plant-names';
