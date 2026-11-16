@@ -25,6 +25,7 @@ import {
 import { useAdjustPlant } from '@/lib/garden';
 import { useLanguage } from '@/lib/i18n';
 import { LIFECYCLE_TYPES } from '@/lib/plant-form';
+import { usePlantNames } from '@/lib/plant-names';
 import { remainingErrors, type SowingForm } from '@/lib/sowing-form';
 
 const selectClass =
@@ -41,11 +42,12 @@ export function AdjustPlantDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useTranslation('catalog');
+  const { plantName } = usePlantNames();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('adjust.title', { name: plant.name })}</DialogTitle>
+          <DialogTitle>{t('adjust.title', { name: plantName(plant) })}</DialogTitle>
           <DialogDescription>{t('adjust.description')}</DialogDescription>
         </DialogHeader>
         {/* Mounted per opening, so every opening starts with the current values. */}

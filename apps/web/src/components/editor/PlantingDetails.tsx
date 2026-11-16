@@ -20,6 +20,7 @@ import { plantPositions } from '@/lib/editor/plantings';
 import { originText, weekText } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
+import { plantName } from '@/lib/plant-names';
 
 const ORIGINS = [
   { origin: 'DIRECT_SOW', label: 'details.directSow' },
@@ -93,7 +94,7 @@ export function PlantingDetails({
 
   return (
     <aside
-      aria-label={t('details.label', { plant: plant.name })}
+      aria-label={t('details.label', { plant: plantName(plant, language) })}
       className={cn(
         'bg-card flex min-h-0 flex-col gap-4 overflow-y-auto rounded-xl border p-3',
         className,
@@ -102,7 +103,7 @@ export function PlantingDetails({
       <div className="flex items-start gap-3">
         <PlantIcon plant={plant} size={40} decorative />
         <div className="flex min-w-0 flex-1 flex-col">
-          <h2 className="truncate font-semibold">{plant.name}</h2>
+          <h2 className="truncate font-semibold">{plantName(plant, language)}</h2>
           <p className="text-muted-foreground text-sm">{description}</p>
         </div>
         <Button variant="ghost" size="icon" aria-label={t('details.deselect')} onClick={onClose}>

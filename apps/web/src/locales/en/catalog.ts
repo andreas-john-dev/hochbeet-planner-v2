@@ -143,10 +143,17 @@ export const catalog: typeof de = {
     neighborRemove: 'Remove {{name}}',
     neighborMatches: 'Matches for {{label}}',
     neighborAdd: 'add',
+    english: 'In English',
+    englishHint:
+      'Optional. The name of the plant when the app runs in English; without it, the German name. Crop rotation always compares the German family.',
+    englishName: 'English name',
+    englishFamily: 'English family',
   },
   errors: {
     name: 'Please enter a name.',
     family: 'Please enter a family.',
+    englishName: 'Please enter the English name as well.',
+    englishFamily: 'Please enter the English family as well.',
     cm: 'Please enter {{min}} to {{max}} cm.',
     weeks: 'Please enter {{min}} to {{max}} weeks.',
     years: 'Please enter {{min}} to {{max}} years.',

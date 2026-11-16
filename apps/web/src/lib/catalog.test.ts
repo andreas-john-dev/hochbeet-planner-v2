@@ -32,18 +32,28 @@ const adjusted = (name: string, override: Partial<CatalogPlant>): CatalogPlant =
 describe('catalogue list', () => {
   it('searches names and families', () => {
     const names = (query: string) =>
-      filterCatalog(catalog, { ...NO_FILTER, query }).map((p) => p.name);
+      filterCatalog(catalog, { ...NO_FILTER, query }, 'de').map((p) => p.name);
     expect(names('salat')).toEqual(['Feldsalat', 'Kopfsalat', 'Pflücksalat', 'Salatgurke']);
     expect(names('dolden').length).toBeGreaterThan(3);
   });
 
+  it('finds German and English names in both languages, sorted in the language', () => {
+    const names = (query: string, language: 'de' | 'en') =>
+      filterCatalog(catalog, { ...NO_FILTER, query }, language).map((p) => p.name);
+    expect(names('lettuce', 'de')).toEqual(['Feldsalat', 'Kopfsalat', 'Pflücksalat']);
+    // Lamb's lettuce, Lettuce, Loose-leaf lettuce
+    expect(names('lettuce', 'en')).toEqual(['Feldsalat', 'Kopfsalat', 'Pflücksalat']);
+    expect(names('Kopfsalat', 'en')).toEqual(['Kopfsalat']);
+    expect(names('brassicas', 'en')).toContain('Brokkoli');
+    expect(names('', 'en').slice(0, 3)).toEqual(['Aubergine', 'Basilikum', 'Rote Bete']);
+  });
+
   it('filters by category, family and feeder', () => {
-    const result = filterCatalog(catalog, {
-      ...NO_FILTER,
-      category: 'GEMUESE',
-      family: 'Nachtschattengewächse',
-      feeder: 'STARK',
-    });
+    const result = filterCatalog(
+      catalog,
+      { ...NO_FILTER, category: 'GEMUESE', family: 'Nachtschattengewächse', feeder: 'STARK' },
+      'de',
+    );
     expect(result.map((p) => p.name)).toEqual([
       'Aubergine',
       'Chili',
@@ -53,9 +63,21 @@ describe('catalogue list', () => {
     ]);
   });
 
-  it('lists every family once', () => {
-    expect(families(catalog)).toContain('Kreuzblütler');
-    expect(new Set(families(catalog)).size).toBe(families(catalog).length);
+  it('lists every family once, named in the language', () => {
+    const german = families(catalog, 'de');
+    expect(german).toContainEqual({ family: 'Kreuzblütler', label: 'Kreuzblütler' });
+    expect(new Set(german.map((f) => f.family)).size).toBe(german.length);
+    const own: CatalogPlant = {
+      ...plant('Kohlrabi'),
+      id: '01J9ZQ3W8D6V2K5M7N8P9R0S1A',
+      name: 'Pak Choi',
+      translations: undefined,
+      source: 'OWN',
+    };
+    const english = families([own, ...catalog], 'en');
+    expect(english).toContainEqual({ family: 'Kreuzblütler', label: 'Brassicas' });
+    expect(english.map((f) => f.label).slice(0, 2)).toEqual(['Alliums', 'Amaranth family']);
+    expect(english).toHaveLength(german.length);
   });
 
   it('describes the lifecycle in German', () => {

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { messageKey } from '../messages';
-import { CatalogPlantSchema, PlantFieldsSchema, PlantOverrideSchema, PlantSchema } from '../domain';
+import {
+  CatalogPlantSchema,
+  GlobalPlantFieldsSchema,
+  PlantFieldsSchema,
+  PlantOverrideSchema,
+  PlantSchema,
+} from '../domain';
 import { IsoDateSchema, UlidSchema } from '../primitives';
 
 // Catalog-Service, routes under /api/catalog (docs/architecture/catalog.md, "Catalog-Service").
@@ -16,9 +22,13 @@ export type ListPlantsResponse = z.infer<typeof ListPlantsResponseSchema>;
 export const ListPublicPlantsResponseSchema = z.object({ plants: z.array(PlantSchema) });
 export type ListPublicPlantsResponse = z.infer<typeof ListPublicPlantsResponseSchema>;
 
-/** POST /catalog/plants, PUT /catalog/plants/{id}, POST/PUT /catalog/admin/plants[/{id}] */
+/** POST /catalog/plants, PUT /catalog/plants/{id}: own plants, without translations. */
 export const SavePlantRequestSchema = PlantFieldsSchema;
 export type SavePlantRequest = z.infer<typeof SavePlantRequestSchema>;
+
+/** POST /catalog/admin/plants, PUT /catalog/admin/plants/{id}: global plants. */
+export const SaveGlobalPlantRequestSchema = GlobalPlantFieldsSchema;
+export type SaveGlobalPlantRequest = z.infer<typeof SaveGlobalPlantRequestSchema>;
 
 /** PUT /catalog/plants/{id}/override */
 export const SaveOverrideRequestSchema = PlantOverrideSchema;
@@ -39,7 +49,7 @@ export type PublicationQueueResponse = z.infer<typeof PublicationQueueResponseSc
 
 /** POST /catalog/admin/publications/{id}/approve: optional corrections before publishing. */
 export const ApprovePublicationRequestSchema = z.object({
-  corrections: PlantFieldsSchema.partial().strict().optional(),
+  corrections: GlobalPlantFieldsSchema.partial().strict().optional(),
 });
 export type ApprovePublicationRequest = z.infer<typeof ApprovePublicationRequestSchema>;
 
@@ -62,7 +72,7 @@ export const MAX_IMPORT_PLANTS = 200;
 export const ImportCatalogRequestSchema = z.object({
   importId: UlidSchema,
   ownPlants: z
-    .array(PlantSchema.extend({ archived: z.boolean().optional() }))
+    .array(PlantFieldsSchema.extend({ id: UlidSchema, archived: z.boolean().optional() }))
     .max(MAX_IMPORT_PLANTS, messageKey('importMax', { max: MAX_IMPORT_PLANTS, kind: 'plants' })),
   overrides: z
     .array(z.object({ plantId: UlidSchema, fields: PlantOverrideSchema }))

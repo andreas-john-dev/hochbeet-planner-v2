@@ -1,4 +1,10 @@
-import type { CatalogPlant, Category, Lifecycle, PlantFields } from '@hochbeet/contracts';
+import type {
+  CatalogPlant,
+  Category,
+  GlobalPlantFields,
+  Lifecycle,
+  PlantTranslations,
+} from '@hochbeet/contracts';
 import { CATEGORY_ICONS, hasIcon } from '@hochbeet/plant-icons';
 import { type AdjustErrors, type AdjustForm, adjustForm, parseAdjustForm } from './catalog';
 import { i18n } from './i18n';
@@ -13,9 +19,18 @@ export interface PlantForm extends AdjustForm {
   badNeighbors: string[];
   color: string;
   icon: string | null;
+  /**
+   * English name and family, only in the form of global plants (admin): own plants have no
+   * translations.
+   */
+  english?: { name: string; family: string };
 }
 
-export type PlantFormErrors = AdjustErrors & { name?: string };
+export type PlantFormErrors = AdjustErrors & {
+  name?: string;
+  englishName?: string;
+  englishFamily?: string;
+};
 
 /** Starting colour of the footprint per category; the user can change it. */
 export const DEFAULT_COLOR: Record<Category, string> = {
@@ -56,17 +71,49 @@ export function plantForm(plant: CatalogPlant): PlantForm {
   };
 }
 
+/** The form of a global plant: like `plantForm()`, plus its English name and family. */
+export function globalPlantForm(plant: CatalogPlant | undefined): PlantForm {
+  const en = plant?.translations?.en;
+  return {
+    ...(plant ? plantForm(plant) : EMPTY_PLANT_FORM),
+    english: { name: en?.name ?? '', family: en?.family ?? '' },
+  };
+}
+
+/**
+ * Translations from the English fields: none when both are empty, both are needed otherwise.
+ * Without English fields (own plants), nothing.
+ */
+function parseEnglish(
+  english: PlantForm['english'],
+  language: Language,
+): { translations?: PlantTranslations } | { errors: PlantFormErrors } {
+  const name = english?.name.trim() ?? '';
+  const family = english?.family.trim() ?? '';
+  if (name === '' && family === '') return {};
+  if (name !== '' && family !== '') return { translations: { en: { name, family } } };
+  const t = i18n.getFixedT(language, 'catalog');
+  return {
+    errors:
+      name === ''
+        ? { englishName: t('errors.englishName') }
+        : { englishFamily: t('errors.englishFamily') },
+  };
+}
+
 /** Checks the form; returns the plant fields or messages per field in `language`. */
 export function parsePlantForm(
   form: PlantForm,
   language: Language,
-): { fields: PlantFields } | { errors: PlantFormErrors } {
+): { fields: GlobalPlantFields } | { errors: PlantFormErrors } {
   const name = form.name.trim();
   const rest = parseAdjustForm(form, language);
-  if (name === '' || 'errors' in rest) {
+  const english = parseEnglish(form.english, language);
+  if (name === '' || 'errors' in rest || 'errors' in english) {
     return {
       errors: {
         ...('errors' in rest ? rest.errors : {}),
+        ...('errors' in english ? english.errors : {}),
         ...(name === '' ? { name: i18n.getFixedT(language, 'catalog')('errors.name') } : {}),
       },
     };
@@ -92,6 +139,7 @@ export function parsePlantForm(
       // Missing means false, so only a frost sensitive plant stores the flag.
       ...(frostSensitive ? { frostSensitive } : {}),
       ...(sowing ? { sowing } : {}),
+      ...english,
     },
   };
 }

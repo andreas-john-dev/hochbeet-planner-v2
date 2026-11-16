@@ -21,6 +21,7 @@ import { Card } from '@/components/ui/card';
 import { apiErrorMessage } from '@/lib/api';
 import { useSaveSowing } from '@/lib/garden';
 import { useLanguage } from '@/lib/i18n';
+import { plantName } from '@/lib/plant-names';
 import {
   advance,
   complete,
@@ -54,7 +55,7 @@ export function SowingCard({
   const { language } = useLanguage();
   const { sowing } = item;
   const plant = plants.find((p) => p.id === sowing.plantId);
-  const name = plant?.name ?? t('card.unknownPlant');
+  const name = plant ? plantName(plant, language) : t('card.unknownPlant');
   const save = useSaveSowing();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);

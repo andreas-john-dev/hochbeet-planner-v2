@@ -1,4 +1,4 @@
-import type { CatalogPlant, Category, Feeder, PlantFields } from '@hochbeet/contracts';
+import type { CatalogPlant, Category, Feeder, GlobalPlantFields } from '@hochbeet/contracts';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconPicker } from '@/components/catalog/IconPicker';
@@ -46,7 +46,8 @@ export function PlantFormFields({
   pending: boolean;
   /** Failure of the last save, shown above the form. */
   error: unknown;
-  onSubmit: (fields: PlantFields) => Promise<void>;
+  /** Plant fields; translations only from a form with English fields (global plants). */
+  onSubmit: (fields: GlobalPlantFields) => Promise<void>;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(['catalog', 'common']);
@@ -70,6 +71,14 @@ export function PlantFormFields({
   const updateSowing = (change: Partial<SowingForm>) => {
     setForm((current) => ({ ...current, sowing: { ...current.sowing, ...change } }));
     setErrors((current) => ({ ...current, sowing: remainingErrors(current.sowing, change) }));
+  };
+  const updateEnglish = (change: Partial<NonNullable<PlantForm['english']>>) => {
+    setForm((current) => ({
+      ...current,
+      english: { name: '', family: '', ...current.english, ...change },
+    }));
+    // Either English field can settle the message of the other: both or none are needed.
+    setErrors(({ englishName: _name, englishFamily: _family, ...rest }) => rest);
   };
   const others = neighborCandidates;
 
@@ -140,8 +149,11 @@ export function PlantFormFields({
             }}
           />
           <datalist id={ids.families}>
-            {families(catalog).map((family) => (
-              <option key={family} value={family} />
+            {/* The value stays the stored family; the label names it in the language. */}
+            {families(catalog, language).map(({ family, label }) => (
+              <option key={family} value={family}>
+                {label === family ? undefined : label}
+              </option>
             ))}
           </datalist>
           <div className="flex flex-col gap-1.5">
@@ -189,6 +201,35 @@ export function PlantFormFields({
           />
         </div>
       </section>
+
+      {form.english && (
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-1 font-medium">{t('form.english')}</legend>
+          <p className="text-muted-foreground -mt-1 text-sm">{t('form.englishHint')}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField
+              label={t('form.englishName')}
+              autoComplete="off"
+              lang="en"
+              value={form.english.name}
+              error={errors.englishName}
+              onChange={(event) => {
+                updateEnglish({ name: event.target.value });
+              }}
+            />
+            <FormField
+              label={t('form.englishFamily')}
+              autoComplete="off"
+              lang="en"
+              value={form.english.family}
+              error={errors.englishFamily}
+              onChange={(event) => {
+                updateEnglish({ family: event.target.value });
+              }}
+            />
+          </div>
+        </fieldset>
+      )}
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-sm font-medium">{t('form.lifecycle')}</legend>

@@ -73,6 +73,8 @@ import {
   useSavePlanting,
   useSowings,
 } from '@/lib/garden';
+import type { Language } from '@/lib/language';
+import { plantName } from '@/lib/plant-names';
 import { availableSowings } from '@/lib/sowings';
 
 const ZOOM_STEP = 1.4;
@@ -467,9 +469,11 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
 type EditorT = TFunction<'editor'>;
 
 /** What screen readers hear while a plant is dragged from the palette. */
-function announcements(t: EditorT): Announcements {
-  const plant = (data: unknown) =>
-    (data as PaletteDragData | undefined)?.plant.name ?? t('placement.plant');
+function announcements(t: EditorT, language: Language): Announcements {
+  const plant = (data: unknown) => {
+    const dragged = (data as PaletteDragData | undefined)?.plant;
+    return dragged ? plantName(dragged, language) : t('placement.plant');
+  };
   return {
     onDragStart: ({ active }) => t('placement.pickedUp', { plant: plant(active.data.current) }),
     onDragOver: ({ active, over }) =>
@@ -488,16 +492,18 @@ function hint(
     kind,
     selected,
     isDesktop,
+    language,
   }: {
     placing: { plant: Plant; at: { x: number; y: number } } | null;
     kind: Planting['kind'];
     selected: string | undefined;
     isDesktop: boolean;
+    language: Language;
   },
 ) {
   if (placing) {
     const what = t('placement.what', {
-      plant: placing.plant.name,
+      plant: plantName(placing.plant, language),
       kind: t(kind === 'ROW' ? 'placement.asRow' : 'placement.asSingle'),
       x: placing.at.x,
       y: placing.at.y,
@@ -732,7 +738,7 @@ function Workspace({
       onDragEnd={onDragEnd}
       onDragCancel={onDragCancel}
       accessibility={{
-        announcements: announcements(t),
+        announcements: announcements(t, language),
         screenReaderInstructions: { draggable: t('placement.dragInstructions') },
       }}
     >
@@ -812,7 +818,13 @@ function Workspace({
               </Button>
             ))}
           <p id={hintId} className="text-muted-foreground text-xs" aria-live="polite">
-            {hint(t, { placing, kind, selected: selected?.plant.name, isDesktop })}
+            {hint(t, {
+              placing,
+              kind,
+              selected: selected && plantName(selected.plant, language),
+              isDesktop,
+              language,
+            })}
           </p>
         </div>
       </div>
@@ -840,7 +852,7 @@ function Workspace({
           {selected && (
             <>
               <SheetTitle className="sr-only">
-                {t('details.label', { plant: selected.plant.name })}
+                {t('details.label', { plant: plantName(selected.plant, language) })}
               </SheetTitle>
               <PlantingDetails
                 key={selected.planting.id}
@@ -872,7 +884,7 @@ function Workspace({
         {dragged && !preview ? (
           <div className="bg-card flex items-center gap-2 rounded-md border px-2 py-1 text-sm shadow-md">
             <PlantIcon plant={dragged.plant} size={28} decorative />
-            {dragged.plant.name}
+            {plantName(dragged.plant, language)}
           </div>
         ) : null}
       </DragOverlay>

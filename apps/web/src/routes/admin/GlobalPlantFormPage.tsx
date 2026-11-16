@@ -8,7 +8,7 @@ import { FormMessage } from '@/components/FormField';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { globalValues } from '@/lib/admin';
 import { usePlants, useSaveGlobalPlant } from '@/lib/garden';
-import { EMPTY_PLANT_FORM, plantForm } from '@/lib/plant-form';
+import { globalPlantForm } from '@/lib/plant-form';
 
 /** Route component for /admin/sorten/neu and /admin/sorten/$plantId. */
 export function GlobalPlantFormPage() {
@@ -69,7 +69,7 @@ function GlobalPlantForm({
   const toAdmin = () => navigate({ to: '/admin' });
   return (
     <PlantFormFields
-      initial={plant ? plantForm(globalValues(plant)) : EMPTY_PLANT_FORM}
+      initial={globalPlantForm(plant && globalValues(plant))}
       catalog={catalog}
       // Global plants may only point to global plants.
       neighborCandidates={catalog.filter((p) => p.source === 'GLOBAL' && p.id !== plant?.id)}

@@ -1,5 +1,5 @@
 import { PutCommand } from '@aws-sdk/lib-dynamodb';
-import type { ListPlantsResponse } from '@hochbeet/contracts';
+import type { ListPlantsResponse, ListPublicPlantsResponse } from '@hochbeet/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
 import { createLogger } from '@hochbeet/service-kit';
@@ -85,6 +85,20 @@ describe('GET /api/catalog/plants against DynamoDB Local', () => {
       overridden: false,
     });
     expect(plants.filter((p) => p.source === 'OWN').map((p) => p.name)).toEqual(['Andenbeere']);
+  });
+
+  it('returns the translations of global plants, also for adjusted and public ones', async () => {
+    const plants = await list(USER_A);
+    expect(plants.find((p) => p.name === 'Kopfsalat')?.translations).toEqual({
+      en: { name: 'Lettuce', family: 'Daisy family' },
+    });
+    const adjusted = plants.find((p) => p.id === tomato.id);
+    expect(adjusted?.translations).toEqual({ en: { name: 'Tomato', family: 'Nightshades' } });
+    expect(adjusted?.global?.translations).toEqual(adjusted?.translations);
+    expect(plants.find((p) => p.name === 'Zitronenmelisse')).not.toHaveProperty('translations');
+    const response = await app.request('/api/catalog/public/plants');
+    const { plants: publicPlants } = (await response.json()) as ListPublicPlantsResponse;
+    expect(publicPlants.find((p) => p.id === tomato.id)?.translations?.en?.name).toBe('Tomato');
   });
 
   it('strips storage attributes from the response', async () => {

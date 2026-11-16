@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { MarkdownInline } from '@/components/Markdown';
 import { Button } from '@/components/ui/button';
 import type { ShownSuggestion } from '@/lib/editor/suggestions';
+import { usePlantNames } from '@/lib/plant-names';
 import { cn } from '@/lib/utils';
 
 const STATUS_CLASS: Record<Severity, string> = {
@@ -32,6 +33,7 @@ export function SuggestionList({
   onDiscard: () => void;
 }) {
   const { t } = useTranslation('editor');
+  const { plantName } = usePlantNames();
   const headingId = useId();
   const section = useRef<HTMLElement>(null);
   // New suggestions come in below the conversation: bring them into view.
@@ -63,10 +65,10 @@ export function SuggestionList({
                   <p className="font-medium">
                     {item.planting.kind === 'ROW'
                       ? t('suggestions.rowName', {
-                          plant: item.plant.name,
+                          plant: plantName(item.plant),
                           length: item.planting.lengthCm,
                         })
-                      : item.plant.name}
+                      : plantName(item.plant)}
                   </p>
                   <p className="text-muted-foreground text-xs">
                     {t('suggestions.at', { x: item.planting.x, y: item.planting.y })}
@@ -81,7 +83,7 @@ export function SuggestionList({
                   size="sm"
                   variant="outline"
                   className="h-11 shrink-0"
-                  aria-label={t('suggestions.adoptPlant', { plant: item.plant.name })}
+                  aria-label={t('suggestions.adoptPlant', { plant: plantName(item.plant) })}
                   onClick={() => {
                     onAdopt(item);
                   }}

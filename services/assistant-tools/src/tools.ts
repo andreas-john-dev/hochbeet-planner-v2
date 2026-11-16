@@ -1,6 +1,7 @@
 import {
   type CandidatePlanting,
   type CatalogPlant,
+  familyName,
   type EvaluateBedToolOutput,
   EvaluateBedToolInputSchema,
   type FindPlantsToolOutput,
@@ -12,6 +13,7 @@ import {
   type ListSowingsToolOutput,
   ListSowingsToolInputSchema,
   type Planting,
+  plantName,
   type Sowing,
   type ToolError,
 } from '@hochbeet/contracts';
@@ -146,7 +148,13 @@ async function findPlants(api: GardenReader, query?: string): Promise<FindPlants
   const names = plantNames(plants);
   const needle = query?.toLocaleLowerCase('de');
   const matches = plants
-    .filter((plant) => !needle || plant.name.toLocaleLowerCase('de').includes(needle))
+    .filter(
+      (plant) =>
+        !needle ||
+        [plant.name, plantName(plant, 'en')].some((name) =>
+          name.toLocaleLowerCase('de').includes(needle),
+        ),
+    )
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   const neighbors = (ids: readonly string[]) =>
     ids.flatMap((id) => names.get(id) ?? []).sort((a, b) => a.localeCompare(b, 'de'));
@@ -154,8 +162,10 @@ async function findPlants(api: GardenReader, query?: string): Promise<FindPlants
     plants: matches.slice(0, MAX_PLANTS).map((plant) => ({
       id: plant.id,
       name: plant.name,
+      nameEn: plantName(plant, 'en'),
       category: plant.category,
       family: plant.family,
+      familyEn: familyName(plant, 'en'),
       feeder: plant.feeder,
       spacingInRowCm: plant.spacingInRowCm,
       rowSpacingCm: plant.rowSpacingCm,

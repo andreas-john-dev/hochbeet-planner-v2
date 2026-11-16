@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GRID_CM, rowLengthTo } from '@/lib/editor/placement';
 import type { Point } from '@/lib/editor/viewport';
+import { usePlantNames } from '@/lib/plant-names';
 
 const KEY_DIRECTION: Readonly<Record<string, number>> = {
   ArrowRight: 1,
@@ -35,6 +36,7 @@ export function RowHandle({
   onCommit: (lengthCm: number) => void;
 }) {
   const { t } = useTranslation('editor');
+  const { plantName } = usePlantNames();
   // Length at the start of a drag and the current one; `row` already shows the draft.
   const dragged = useRef<{ from: number; to: number } | null>(null);
   const horizontal = row.orientation === 'H';
@@ -82,7 +84,7 @@ export function RowHandle({
     <g
       role="slider"
       tabIndex={0}
-      aria-label={t('canvas.rowLength', { plant: plant.name })}
+      aria-label={t('canvas.rowLength', { plant: plantName(plant) })}
       aria-orientation={horizontal ? 'horizontal' : 'vertical'}
       aria-valuemin={GRID_CM}
       aria-valuemax={max}

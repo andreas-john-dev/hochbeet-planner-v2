@@ -16,6 +16,17 @@ Jeder User sieht eine effektive Sicht aus drei Quellen: globale Sorten, eigene S
 
 Eine Anpassung ist ein Overlay auf eine globale Sorte: effektive Sorte = `{...global, ...override}`. Anpassbar sind alle fachlichen Felder, auch Abstände und Nachbarlisten. Angepasste Sorten sind im UI markiert und lassen sich auf den globalen Stand zurücksetzen.
 
+### Sortennamen in zwei Sprachen
+
+Stand T-71. Globale Sorten tragen optional `translations: { en?: { name, family } }`: den englischen Namen und die englische Familie, nur zur Anzeige.
+
+- **Contracts:** `GlobalPlantFieldsSchema` erweitert `PlantFieldsSchema` um `translations`; `PlantSchema` und damit `CatalogPlant` haben das Feld optional. Eigene Sorten (`SavePlantRequestSchema`), Anpassungen (`PlantOverrideSchema`) und der Gastimport bleiben ohne: Zod verwirft das Feld dort bzw. lehnt es in der strikten Anpassung ab. Globale Sorten pflegt der Admin über `SaveGlobalPlantRequestSchema`, Korrekturen bei der Freigabe dürfen `translations` enthalten.
+- **Anzeige:** `plantName(plant, locale)` und `familyName(plant, locale)` aus `packages/contracts` liefern die Übersetzung, sonst den gespeicherten Namen. Eigene Sorten erscheinen also so, wie der User sie eingegeben hat. Eine persönliche Anpassung des Namens oder der Familie gilt in beiden Sprachen: Weicht der Wert von `global` ab, gewinnt er über die Übersetzung.
+- **Fruchtfolge:** Die Regel vergleicht weiter die gespeicherte (deutsche) `family`. Nur der Text des Befunds nennt die Familie über die Option `familyName` von `evaluateBed()`, analog zu `plantName`.
+- **Frontend:** Überall, wo Sorten erscheinen (Palette, Panel, Beet, Katalog, Detailseite, Anzucht, Aufgaben, Befunde, Vorschläge, Ansagen beim Ziehen), über `plantName()`/`familyName()` bzw. `usePlantNames()` aus `apps/web/src/lib/plant-names.ts`. Listen sortieren nach dem Namen in der Sprache (`byPlantName()`). Die Suche in Katalog, Palette, Nachbarwahl und Anzucht findet deutsche und englische Namen in beiden Sprachen (`matchesPlantName()`), die Katalogsuche auch beide Familien. Der Familienfilter zeigt die Familie in der Sprache, filtert aber über `family`. Alle Sorten-Icons in der App sind dekorativ, ihr Name steht daneben.
+- **Admin:** Das Formular globaler Sorten hat die Gruppe „Auf Englisch“ mit englischem Namen und englischer Familie: beide oder keines, leer heißt keine Übersetzung. Die Prüfung einer Anfrage (`/admin/anfragen/$plantId`) zeigt die gespeicherten Werte.
+- **Assistent-Tools:** `find_plants` liefert zu jeder Sorte `nameEn` und `familyEn` und findet Sorten auch über den englischen Namen. Die Antworten des Assistenten bleiben bis T-72 deutsch.
+
 ### Publikations-Workflow
 
 1. Der User legt eine eigene Sorte an (Status `PRIVATE`).
@@ -50,6 +61,7 @@ Umsetzung in `packages/catalog-seed`:
 - Exportiert werden `seedPlants` (fertige `Plant`-Objekte) und `seedPlantByName`.
 - Icon-Schlüssel sind der Sortenname in Kleinbuchstaben mit Bindestrichen, Umlaute ausgeschrieben, z. B. `rote-bete`, `fruehlingszwiebel`. `packages/plant-icons` liefert die passenden SVGs.
 - Tests prüfen das Zod-Schema, die Nachbar-Referenzen und die Kurzformen. Widersprüche (gut auf einer, schlecht auf der anderen Seite) listet der Testreport `packages/catalog-seed/report/contradictions.md`; er vergleicht die einseitigen Listen aus `resolveOneSided()`. Die Tabelle wendet „Warnung sticht“ bereits an und enthält aktuell keine.
+- Jede Sorte hat `translations.en` mit englischem Namen und englischer Familie; ein Test prüft das für alle 56 Sorten, einen eindeutigen englischen Namen und eine englische Familie je deutscher Familie. Die festen IDs prüft ein Datei-Snapshot (`report/ids.txt`).
 - Ändert sich der Seed einer Sorte, schreibt `Custom::CatalogSeed` sie beim Deploy neu (`seedHash`); Admin-Korrekturen an genau dieser Sorte werden dabei überschrieben. Anpassungen der User (Overlay) bleiben erhalten und überdecken weiterhin die globalen Werte.
 
 ### Pflanzen-Icons
@@ -95,7 +107,7 @@ Schlüsselnamen und Index stehen in `services/catalog/src/table.ts` (`catalogTab
 | GET | `/catalog/admin/publications` | Offene Anfragen (Admin) |
 | POST | `/catalog/admin/publications/{id}/approve` | Freigeben, optional mit Korrekturen (Admin) |
 | POST | `/catalog/admin/publications/{id}/reject` | Ablehnen mit Kommentar (Admin) |
-| POST/PUT | `/catalog/admin/plants[/{id}]` | Globale Sorten pflegen (Admin) |
+| POST/PUT | `/catalog/admin/plants[/{id}]` | Globale Sorten pflegen, mit `translations` (Admin) |
 | POST | `/catalog/import` | Eigene Sorten und Anpassungen aus dem Gastmodus übernehmen |
 
 ### Umsetzung (`services/catalog`)

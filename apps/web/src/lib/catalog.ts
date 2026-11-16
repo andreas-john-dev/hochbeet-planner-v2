@@ -7,7 +7,8 @@ import type {
   PlantOverride,
 } from '@hochbeet/contracts';
 import { i18n } from './i18n';
-import type { Language } from './language';
+import { intlLocale, type Language } from './language';
+import { byPlantName, familyName, matchesPlantName } from './plant-names';
 import { parseSowingForm, type SowingErrors, type SowingForm, sowingForm } from './sowing-form';
 
 /** Categories and feeders in the order the filters and forms show them. */
@@ -38,23 +39,50 @@ export const NO_FILTER: CatalogFilter = { query: '', category: null, family: nul
 
 const normalize = (text: string) => text.toLocaleLowerCase('de').trim();
 
-/** Plants matching search and filters, sorted by name. */
-export function filterCatalog(plants: readonly CatalogPlant[], filter: CatalogFilter) {
+/**
+ * Plants matching search and filters, sorted by their name in `language`. The search finds
+ * German and English names and families in every language.
+ */
+export function filterCatalog(
+  plants: readonly CatalogPlant[],
+  filter: CatalogFilter,
+  language: Language,
+) {
   const q = normalize(filter.query);
+  const familyMatches = (p: CatalogPlant) =>
+    [p.family, familyName(p, 'en')].some((family) => normalize(family).includes(q));
   return plants
     .filter(
       (p) =>
         (filter.category === null || p.category === filter.category) &&
         (filter.family === null || p.family === filter.family) &&
         (filter.feeder === null || p.feeder === filter.feeder) &&
-        (normalize(p.name).includes(q) || normalize(p.family).includes(q)),
+        (matchesPlantName(p, q) || familyMatches(p)),
     )
-    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    .sort(byPlantName(language));
 }
 
-/** All families of the catalogue, sorted, for the filter. */
-export function families(plants: readonly CatalogPlant[]): string[] {
-  return [...new Set(plants.map((p) => p.family))].sort((a, b) => a.localeCompare(b, 'de'));
+/** A family of the catalogue: the stored `family` and its name in the language. */
+export interface FamilyOption {
+  family: string;
+  label: string;
+}
+
+/**
+ * All families of the catalogue, sorted by their name in `language`, for the filter and the
+ * suggestions of the form. The value stays the stored family that crop rotation compares.
+ */
+export function families(plants: readonly CatalogPlant[], language: Language): FamilyOption[] {
+  const labels = new Map<string, string>();
+  for (const plant of plants) {
+    const label = familyName(plant, language);
+    // A translated name wins over the stored one, e.g. of an own plant of the same family.
+    if (!labels.has(plant.family) || label !== plant.family) labels.set(plant.family, label);
+  }
+  const collator = new Intl.Collator(intlLocale(language));
+  return [...labels]
+    .map(([family, label]) => ({ family, label }))
+    .sort((a, b) => collator.compare(a.label, b.label));
 }
 
 const FIELDS = [

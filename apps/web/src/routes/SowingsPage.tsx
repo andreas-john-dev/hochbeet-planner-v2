@@ -15,6 +15,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api';
 import { useGardenSettings, usePlants, useSowings } from '@/lib/garden';
 import { useLanguage } from '@/lib/i18n';
+import { plantName } from '@/lib/plant-names';
 import { filterSowings, groupByYear, SOWING_FILTERS, type SowingFilter } from '@/lib/sowings';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,7 @@ export function SowingsPage() {
     const byBatch = new Map<string, SowingFinding[]>();
     const list = evaluateSowings(all, plants.data ?? [], {
       locale: language,
+      plantName: (plant) => plantName(plant, language),
       ...(lastFrost ? { lastFrost } : {}),
     });
     for (const finding of list) {

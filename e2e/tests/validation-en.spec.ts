@@ -21,7 +21,7 @@ test('shows English validation messages for a batch', async ({ page }) => {
   await page.getByRole('button', { name: 'Create your first batch' }).click();
   const dialog = page.getByRole('dialog', { name: 'New batch' });
   await dialog.getByRole('searchbox', { name: 'Search plants' }).fill('Tomate');
-  await dialog.getByRole('radio', { name: /Tomate/ }).check();
+  await dialog.getByRole('radio', { name: /Tomato/ }).check();
   await dialog.getByLabel('Amount sown').fill('0');
   await dialog.getByRole('button', { name: 'Create batch' }).click();
   await expect(dialog.getByText('Enter a number from 1 to 9999.')).toBeVisible();

@@ -11,6 +11,7 @@ import { addWeeks, formatISO, parseISO } from 'date-fns';
 import { i18n } from './i18n';
 import type { Language } from './language';
 import { defaultTransplantDate, fieldsOf, hasSeedlings } from './sowings';
+import { plantName } from './plant-names';
 
 /** Tasks at a batch, checked off on the card. */
 export type SowingTaskKind = 'SOW' | 'PRICK_OUT' | 'HARDEN';
@@ -198,14 +199,15 @@ export function taskDone(task: SowingTask): SowingBatchFields {
 const count = (items: BedTask['items'], language: Language) => {
   const t = i18n.getFixedT(language, 'sowings');
   return items
-    .map(({ plant, count: n }) => t('tasks.item', { count: n, plant: plant.name }))
+    .map(({ plant, count: n }) => t('tasks.item', { count: n, plant: plantName(plant, language) }))
     .join(', ');
 };
 
 /** The task in a few words, e.g. „Tomate aussäen“ or „Auspflanzen in „Hochbeet Süd““. */
 export function taskTitle(task: WeeklyTask, language: Language): string {
   const t = i18n.getFixedT(language, 'sowings');
-  if (isSowingTask(task)) return t(`tasks.${task.kind}`, { plant: task.plant.name });
+  if (isSowingTask(task))
+    return t(`tasks.${task.kind}`, { plant: plantName(task.plant, language) });
   return t(`tasks.${task.kind}`, { bed: t('quoted', { name: task.bed.name }) });
 }
 

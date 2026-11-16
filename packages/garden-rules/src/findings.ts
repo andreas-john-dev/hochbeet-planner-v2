@@ -33,7 +33,7 @@ type Pair = [string, string];
 
 /**
  * Values behind the text of each rule, so callers never have to parse `message`. Plant names
- * are display names (`EvaluateOptions.plantName`), last frost is `MM-DD`, weeks are ISO weeks.
+ * and families are display names (`EvaluateOptions.plantName`/`familyName`), last frost is `MM-DD`, weeks are ISO weeks.
  */
 export interface FindingParams {
   SPACING: { plants: Pair; overlapCm: number };

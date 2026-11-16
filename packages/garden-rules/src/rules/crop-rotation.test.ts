@@ -174,4 +174,19 @@ describe('crop rotation rule in English', () => {
     );
     expect(finding?.params).toEqual(run(plantings)[0]?.params);
   });
+
+  it('names the family through familyName but compares the stored family', () => {
+    const plantings = [
+      radishAt(50, 50),
+      single('k', 'kohlrabi', 50, 50, { startDate: '2026-06-01' }),
+    ];
+    const english = {
+      ...context(plants, plantings, {}, '05-15', [], 'en'),
+      // Different display names of the same family must not hide the warning.
+      familyName: (p: { id: string }) => (p.id === 'kohlrabi' ? 'Brassicas' : 'Cabbage family'),
+    };
+    const [finding] = cropRotationRule(english);
+    expect(finding?.params).toMatchObject({ family: 'Brassicas' });
+    expect(finding?.message).toContain('(both Brassicas)');
+  });
 });

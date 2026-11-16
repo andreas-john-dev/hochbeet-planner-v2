@@ -28,6 +28,7 @@ import { apiErrorMessage } from '@/lib/api';
 import { useGardenSettings, useSaveSowing } from '@/lib/garden';
 import { monthDayText } from '@/lib/garden-settings';
 import { useLanguage } from '@/lib/i18n';
+import { matchesPlantName, plantName } from '@/lib/plant-names';
 import {
   defaultStage,
   defaultTransplantDate,
@@ -293,8 +294,6 @@ function SowingForm({
   );
 }
 
-const normalize = (text: string) => text.toLocaleLowerCase('de').trim();
-
 /** Search and pick one plant; plants raised indoors come first. */
 function PlantPicker({
   plants,
@@ -308,10 +307,11 @@ function PlantPicker({
   onChange: (plantId: string) => void;
 }) {
   const { t } = useTranslation('sowings');
+  const { language } = useLanguage();
   const ids = { search: useId(), error: useId() };
   const [query, setQuery] = useState('');
-  const shown = plantsForSowing(plants).filter(
-    (p) => p.id === value || normalize(p.name).includes(normalize(query)),
+  const shown = plantsForSowing(plants, language).filter(
+    (p) => p.id === value || matchesPlantName(p, query),
   );
   return (
     <fieldset className="flex flex-col gap-2" aria-describedby={error ? ids.error : undefined}>
@@ -354,7 +354,7 @@ function PlantPicker({
                 }}
               />
               <PlantIcon plant={plant} size={24} decorative />
-              <span className="flex-1 truncate">{plant.name}</span>
+              <span className="flex-1 truncate">{plantName(plant, language)}</span>
               {plant.sowing && plant.sowing.method !== 'DIRECT' && (
                 <span className="text-muted-foreground text-xs">{t('form.presow')}</span>
               )}

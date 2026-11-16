@@ -18,6 +18,8 @@ import {
   NO_FILTER,
 } from '@/lib/catalog';
 import { usePlants } from '@/lib/garden';
+import { useLanguage } from '@/lib/i18n';
+import { familyName, plantName } from '@/lib/plant-names';
 import { cn } from '@/lib/utils';
 
 /** One option of a filter group; pressed when active. */
@@ -50,12 +52,13 @@ function Chip({
 /** The user's catalogue: global plants (possibly adjusted) and own plants, searchable. */
 export function CatalogPage() {
   const { t } = useTranslation('catalog');
+  const { language } = useLanguage();
   const plants = usePlants();
   const [filter, setFilter] = useState<CatalogFilter>(NO_FILTER);
   const searchId = useId();
   const familyId = useId();
   const all = plants.data ?? [];
-  const shown = filterCatalog(all, filter);
+  const shown = filterCatalog(all, filter, language);
   const update = (change: Partial<CatalogFilter>) => {
     setFilter((current) => ({ ...current, ...change }));
   };
@@ -137,9 +140,9 @@ export function CatalogPage() {
             className="bg-card focus-visible:ring-ring/50 h-11 rounded-md border px-3 text-base outline-none focus-visible:ring-[3px] md:h-9 md:text-sm"
           >
             <option value="">{t('list.allFamilies')}</option>
-            {families(all).map((family) => (
+            {families(all, language).map(({ family, label }) => (
               <option key={family} value={family}>
-                {family}
+                {label}
               </option>
             ))}
           </select>
@@ -167,11 +170,11 @@ export function CatalogPage() {
                   <PlantIcon plant={plant} size={40} decorative />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="flex items-center gap-2">
-                      <span className="truncate font-medium">{plant.name}</span>
+                      <span className="truncate font-medium">{plantName(plant, language)}</span>
                       <SourceBadge plant={plant} />
                     </span>
                     <span className="text-muted-foreground truncate text-xs">
-                      {plant.family} · {t(`feeder.${plant.feeder}`)}
+                      {familyName(plant, language)} · {t(`feeder.${plant.feeder}`)}
                     </span>
                   </span>
                 </Link>

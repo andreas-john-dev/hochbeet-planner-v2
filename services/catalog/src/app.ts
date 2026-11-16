@@ -4,6 +4,7 @@ import {
   type ListPlantsResponse,
   type ListPublicPlantsResponse,
   RejectPublicationRequestSchema,
+  SaveGlobalPlantRequestSchema,
   SaveOverrideRequestSchema,
   SavePlantRequestSchema,
 } from '@hochbeet/contracts';
@@ -111,12 +112,12 @@ export function createApp({ store, logger, now, newId = () => ulid() }: AppDeps)
   });
 
   app.post('/admin/plants', async (c) => {
-    const fields = await parseBody(c, SavePlantRequestSchema);
+    const fields = await parseBody(c, SaveGlobalPlantRequestSchema);
     return c.json(await admin.createGlobalPlant(fields), 201);
   });
 
   app.put('/admin/plants/:id', async (c) => {
-    const fields = await parseBody(c, SavePlantRequestSchema);
+    const fields = await parseBody(c, SaveGlobalPlantRequestSchema);
     return c.json(await admin.updateGlobalPlant(c.req.param('id'), fields));
   });
 

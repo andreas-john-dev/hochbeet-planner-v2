@@ -4,6 +4,7 @@ import { IconSvg } from '@hochbeet/plant-icons/react';
 import { resolveIconKey } from '@hochbeet/plant-icons';
 import { useTranslation } from 'react-i18next';
 import { iconSizeCm, plantPositions } from '@/lib/editor/plantings';
+import { usePlantNames } from '@/lib/plant-names';
 
 /** Colour and symbol per status; colour is never the only signal. */
 const BADGE: Record<Severity, { fill: string; symbol: string }> = {
@@ -78,6 +79,7 @@ export function PlantingShape({
   onFocus?: () => void;
 }) {
   const { t } = useTranslation('editor');
+  const { plantName } = usePlantNames();
   const fp = footprint(planting, plant);
   const icon = resolveIconKey(plant);
   const size = iconSizeCm(plant);
@@ -103,8 +105,8 @@ export function PlantingShape({
   };
   const label =
     planting.kind === 'ROW'
-      ? t('canvas.rowLabel', { plant: plant.name, count: positions.length })
-      : plant.name;
+      ? t('canvas.rowLabel', { plant: plantName(plant), count: positions.length })
+      : plantName(plant);
   return (
     <g
       data-testid={

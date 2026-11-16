@@ -136,8 +136,8 @@ Umsetzung (Stand T-35):
 
 ## Mehrsprachigkeit
 
-Umsetzung (Stand T-70, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404- und 403-Seite (T-66), Beetübersicht und Beet-Editor mit der Oberfläche des Assistenten (T-67), Anzucht, Katalog, Profil-Karten, Admin-Bereich, Gast-Import und Icon-Galerie (T-68). Damit ist die ganze Oberfläche zweisprachig. Seit T-69 schreibt auch die Regel-Engine Befunde, Wochenlabels und Fenstertexte in der Sprache des Users, seit T-70 kommen Validierungs- und Fehlermeldungen aus `packages/contracts` und den Services in beiden Sprachen.
-Noch deutsch bleiben Sortennamen und Familien (T-71) und die Antworten des Assistenten (T-72). In englischen Sätzen stehen diese Teile bis dahin auf Deutsch, z. B. „Kartoffel and Tomate are bad neighbours.“
+Umsetzung (Stand T-71, Epic #153): Grundlage plus Rahmen, Anmeldung, Profil, 404- und 403-Seite (T-66), Beetübersicht und Beet-Editor mit der Oberfläche des Assistenten (T-67), Anzucht, Katalog, Profil-Karten, Admin-Bereich, Gast-Import und Icon-Galerie (T-68). Damit ist die ganze Oberfläche zweisprachig. Seit T-69 schreibt auch die Regel-Engine Befunde, Wochenlabels und Fenstertexte in der Sprache des Users, seit T-70 kommen Validierungs- und Fehlermeldungen aus `packages/contracts` und den Services in beiden Sprachen, seit T-71 heißen die Sorten des Startkatalogs auf Englisch englisch (`plantName()`/`familyName()`, siehe [Katalog](catalog.md#sortennamen-in-zwei-sprachen)).
+Noch deutsch bleiben die Antworten des Assistenten (T-72) und eigene Sorten, die so heißen, wie der User sie eingegeben hat.
 
 - **Setup:** `src/lib/i18n.ts` initialisiert i18next synchron mit den gebündelten Texten, sodass schon der erste Render übersetzt ist. Deutsch ist Fallback und Quelle.
   - Die Texte liegen als TS-Objekte unter `src/locales/{de,en}/<bereich>.ts`, ein Namespace je Bereich: `common`, `layout`, `auth`, `profile`, `beds`, `editor`, `sowings` (Anzucht, Anzuchtplan, Aufgaben der Woche), `catalog` (Liste, Detailseite, Aussaatkalender, Formulare, Veröffentlichung, Icon-Galerie), `admin` und `guestImport`.

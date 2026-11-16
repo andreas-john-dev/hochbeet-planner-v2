@@ -135,7 +135,7 @@ describe('keyboard placement', () => {
 describe('palette', () => {
   it('filters by search text and category, sorted by name', () => {
     const names = (q: string, c: Parameters<typeof filterPlants>[2]) =>
-      filterPlants(seedPlants, q, c).map((p) => p.name);
+      filterPlants(seedPlants, q, c, 'de').map((p) => p.name);
     expect(names('kohl', null)).toEqual([
       'Blumenkohl',
       'Chinakohl',
@@ -147,6 +147,14 @@ describe('palette', () => {
     ]);
     expect(names('', 'OBST')).toEqual(['Erdbeere']);
     expect(names('MINZE', 'KRAUT')).toEqual(['Pfefferminze']);
+  });
+
+  it('finds English names too and sorts by the name in the language', () => {
+    const names = (q: string, language: 'de' | 'en') =>
+      filterPlants(seedPlants, q, 'GEMUESE', language).map((p) => p.name);
+    expect(names('cabbage', 'de')).toEqual(['Chinakohl', 'Rotkohl', 'Weißkohl', 'Wirsing']);
+    // Chinese, Red, Savoy, White cabbage
+    expect(names('cabbage', 'en')).toEqual(['Chinakohl', 'Rotkohl', 'Wirsing', 'Weißkohl']);
   });
 });
 

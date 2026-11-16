@@ -12,6 +12,7 @@ import type { PlantingKind } from '@/lib/editor/placement';
 import type { EditorStore, PreviewSowing } from '@/lib/editor/store';
 import { type AvailableSowing, previewSowing } from '@/lib/sowings';
 import { useLanguage } from '@/lib/i18n';
+import { plantName } from '@/lib/plant-names';
 import { cn } from '@/lib/utils';
 
 const KINDS = [
@@ -72,7 +73,7 @@ function ItemLabel({ plant, sowing }: { plant: Plant; sowing: PreviewSowing | un
     <>
       <PlantIcon plant={plant} size={28} decorative />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate">{plant.name}</span>
+        <span className="truncate">{plantName(plant, language)}</span>
         {sowing && (
           <span className="text-muted-foreground truncate text-xs">
             {t('palette.free', {
@@ -173,13 +174,14 @@ export function PlantPalette({
   className?: string;
 }) {
   const { t } = useTranslation('editor');
+  const { language } = useLanguage();
   const sheet = variant === 'sheet';
   const Item = sheet ? TapItem : DraggableItem;
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category | null>(null);
   const { kind, setKind, preview } = useStore(store);
   const searchId = useId();
-  const shown = filterPlants(plants, query, category);
+  const shown = filterPlants(plants, query, category, language);
 
   return (
     <aside

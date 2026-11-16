@@ -16,7 +16,7 @@ test('creates a batch and moves it on to the next stage', async ({ page }) => {
   await page.getByRole('button', { name: 'Create your first batch' }).click();
   const dialog = page.getByRole('dialog', { name: 'New batch' });
   await dialog.getByRole('searchbox', { name: 'Search plants' }).fill('Tomate');
-  await dialog.getByRole('radio', { name: /Tomate/ }).check();
+  await dialog.getByRole('radio', { name: /Tomato/ }).check();
   await dialog.getByLabel('Amount sown').fill('24');
   // Frost sensitive: planting out waits for the last frost, 15 May by default.
   await expect(dialog.getByText(/frost-sensitive: not before 15 May\.$/)).toBeVisible();
@@ -24,7 +24,7 @@ test('creates a batch and moves it on to the next stage', async ({ page }) => {
   await expect(dialog).toBeHidden();
 
   // Sown this week (the clock stands on 7 October 2026).
-  const tomato = page.getByRole('article', { name: 'Tomate' });
+  const tomato = page.getByRole('article', { name: 'Tomato' });
   await expect(tomato.getByTestId('stock')).toHaveText('24 sown');
   await tomato.getByRole('button', { name: 'Next: Germinated' }).click();
   await expect(tomato.getByTestId('stock')).toHaveText('alive 24 · allocated 0 · free 24');
@@ -41,13 +41,13 @@ test('filters the catalogue and opens a plant with its sowing calendar', async (
 
   await page.getByRole('searchbox', { name: 'Search plant or family' }).fill('salat');
   await page.getByRole('button', { name: 'Heavy feeder' }).click();
-  await expect(list.getByRole('link')).toHaveText([/^Salatgurke.*Heavy feeder$/]);
+  await expect(list.getByRole('link')).toHaveText([/^Cucumber.*Heavy feeder$/]);
   await expect(page.getByText('1 plant', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Heavy feeder' }).click();
 
-  await list.getByRole('link', { name: /^Kopfsalat/ }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Kopfsalat' })).toBeVisible();
-  await expect(page.getByText('Vegetables · Korbblütler')).toBeVisible();
+  await list.getByRole('link', { name: /^Lettuce/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Lettuce' })).toBeVisible();
+  await expect(page.getByText('Vegetables · Daisy family')).toBeVisible();
   await expect(page.getByText('8 weeks', { exact: true })).toBeVisible();
 
   const calendar = page.getByRole('region', { name: 'Sowing calendar' });
@@ -97,6 +97,6 @@ test('shows the admin area in English', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'No open requests' })).toBeVisible();
   const globals = page.getByRole('list', { name: 'Global plants' });
   await expect(globals.getByRole('listitem')).toHaveCount(56);
-  await expect(globals.getByRole('link', { name: /^Kopfsalat/ })).toContainText('Medium feeder');
+  await expect(globals.getByRole('link', { name: /^Lettuce/ })).toContainText('Medium feeder');
   await expect(page.getByRole('link', { name: 'Create global plant' })).toBeVisible();
 });

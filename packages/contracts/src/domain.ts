@@ -306,8 +306,28 @@ export const PlantFieldsSchema = z.object({
   sowing: SowingSchema.optional(),
 });
 
-export const PlantSchema = PlantFieldsSchema.extend({ id: UlidSchema });
+/** Name and family of a plant in another language, only for display. */
+export const PlantTranslationSchema = z.object({ name: NameSchema, family: NameSchema });
+export type PlantTranslation = z.infer<typeof PlantTranslationSchema>;
+
+/**
+ * Display names of a global plant per language besides German. `family` itself stays the
+ * German name: crop rotation compares it, never a translation.
+ */
+export const PlantTranslationsSchema = z.object({ en: PlantTranslationSchema.optional() });
+export type PlantTranslations = z.infer<typeof PlantTranslationsSchema>;
+
+/**
+ * Fields of a global plant: the plant fields plus translations. Own plants and personal
+ * adjustments have no translations; their names hold in every language.
+ */
+export const GlobalPlantFieldsSchema = PlantFieldsSchema.extend({
+  translations: PlantTranslationsSchema.optional(),
+});
+
+export const PlantSchema = GlobalPlantFieldsSchema.extend({ id: UlidSchema });
 export type PlantFields = z.infer<typeof PlantFieldsSchema>;
+export type GlobalPlantFields = z.infer<typeof GlobalPlantFieldsSchema>;
 export type Plant = z.infer<typeof PlantSchema>;
 
 /** Personal adjustment of a global plant: effective plant = { ...global, ...override }. */
@@ -328,7 +348,7 @@ export const CatalogPlantSchema = PlantSchema.extend({
    * The unchanged global values, only for adjusted global plants: the UI marks what differs
    * and computes the next override against them.
    */
-  global: PlantFieldsSchema.optional(),
+  global: GlobalPlantFieldsSchema.optional(),
   /** Only for own plants. */
   publication: z
     .object({
