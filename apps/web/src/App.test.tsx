@@ -1,5 +1,5 @@
 import { createMemoryHistory } from '@tanstack/react-router';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
@@ -151,9 +151,12 @@ describe('App', () => {
       const { paths } = renderGuest('/anmelden');
       await startGuest();
       expect(screen.getByTestId('guest-banner')).toHaveTextContent('nur in diesem Browser');
-      const links = (await sidebarNav()).getAllByRole('link');
-      expect(links.map((l) => l.textContent)).toEqual(['Beete', 'Anzucht', 'Katalog']);
       expect(await screen.findByRole('button', { name: 'Erstes Beet anlegen' })).toBeVisible();
+      // A new guest starts in the simple view (T-73): no seedlings in the navigation.
+      const nav = await sidebarNav();
+      await waitFor(() => {
+        expect(nav.getAllByRole('link').map((l) => l.textContent)).toEqual(['Beete', 'Katalog']);
+      });
       expect(localStorage.getItem(GUEST_MODE_KEY)).toBe('1');
       expect(paths()).toEqual([]);
     });

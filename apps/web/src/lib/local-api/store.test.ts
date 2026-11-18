@@ -125,7 +125,6 @@ describe('loadGarden', () => {
 
   describe('migration from version 2', () => {
     it('starts without sowing batches', () => {
-      expect(GUEST_STORAGE_VERSION).toBe(3);
       const migrated = loadGarden(envelope({ beds: [bed], plantings: [planting] }, 2));
       expect(migrated).toMatchObject({ beds: [bed], plantings: [planting], sowings: [] });
     });
@@ -133,6 +132,34 @@ describe('loadGarden', () => {
     it('keeps batches that are already there', () => {
       const garden = { beds: [bed], plantings: [planting], sowings: [sowing] };
       expect(loadGarden(envelope(garden, 2))?.sowings).toEqual([sowing]);
+    });
+  });
+
+  describe('migration from version 3', () => {
+    it('keeps guests with beds in the expert view', () => {
+      expect(GUEST_STORAGE_VERSION).toBe(4);
+      const migrated = loadGarden(envelope({ beds: [bed], plantings: [planting], sowings: [] }, 3));
+      expect(migrated?.settings).toEqual({ lastFrost: '05-15', view: 'EXPERT' });
+      expect(migrated).toMatchObject({ beds: [bed], plantings: [planting] });
+    });
+
+    it('starts an empty garden in the simple view', () => {
+      const migrated = loadGarden(envelope({ beds: [], plantings: [], sowings: [sowing] }, 3));
+      // No settings: the defaults apply, and they are simple.
+      expect(migrated?.settings).toBeUndefined();
+      expect(migrated?.sowings).toEqual([sowing]);
+    });
+
+    it('keeps saved settings and reads a new guest as simple', () => {
+      const garden = { beds: [bed], plantings: [], settings: { lastFrost: '04-20' } };
+      expect(loadGarden(envelope(garden, 3))?.settings).toEqual({
+        lastFrost: '04-20',
+        view: 'EXPERT',
+      });
+      // Version 4 data without a view (e.g. a guest who never switched) reads as simple.
+      expect(
+        loadGarden(envelope({ ...garden, settings: { lastFrost: '04-20' } }))?.settings,
+      ).toEqual({ lastFrost: '04-20', view: 'SIMPLE' });
     });
   });
 });

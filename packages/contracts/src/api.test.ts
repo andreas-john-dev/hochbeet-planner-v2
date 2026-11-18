@@ -14,6 +14,7 @@ import {
   DEFAULT_GARDEN_SETTINGS,
   ErrorResponseSchema,
   GardenSettingsSchema,
+  SaveGardenSettingsRequestSchema,
   ImportCatalogRequestSchema,
   ImportGardenRequestSchema,
   ListSowingsResponseSchema,
@@ -68,8 +69,25 @@ describe('garden API contracts', () => {
     expect(ListSowingsResponseSchema.safeParse(rowWithoutLength).success).toBe(false);
   });
 
+  it('starts in the simple view and keeps the saved view when a request has none', () => {
+    // Settings saved before T-73 have no view: simple, like a new user.
+    expect(GardenSettingsSchema.parse({ lastFrost: '04-20' })).toEqual({
+      lastFrost: '04-20',
+      view: 'SIMPLE',
+    });
+    expect(GardenSettingsSchema.parse({ lastFrost: '04-20', view: 'EXPERT' }).view).toBe('EXPERT');
+    expect(GardenSettingsSchema.safeParse({ lastFrost: '04-20', view: 'PRO' }).success).toBe(false);
+    // A PUT without view (older app) must not reset it; the service keeps the saved one.
+    expect(SaveGardenSettingsRequestSchema.parse({ lastFrost: '04-20' })).toEqual({
+      lastFrost: '04-20',
+    });
+  });
+
   it('accepts a last frost day of every year and nothing else', () => {
-    expect(GardenSettingsSchema.parse(DEFAULT_GARDEN_SETTINGS)).toEqual({ lastFrost: '05-15' });
+    expect(GardenSettingsSchema.parse(DEFAULT_GARDEN_SETTINGS)).toEqual({
+      lastFrost: '05-15',
+      view: 'SIMPLE',
+    });
     for (const lastFrost of ['01-01', '04-30', '02-28', '12-31']) {
       expect(GardenSettingsSchema.safeParse({ lastFrost }).success).toBe(true);
     }

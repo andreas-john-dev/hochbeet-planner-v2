@@ -6,46 +6,83 @@ import type { Access } from './pages';
 export const MOCK_API_KEY = 'hochbeet-mock-api';
 /** Guest data in the browser (apps/web/src/lib/local-api/keys.ts), versioned envelope. */
 export const GUEST_STORAGE_KEY = 'hochbeet-guest';
+/** GUEST_STORAGE_VERSION in apps/web/src/lib/local-api/store.ts. */
+export const GUEST_STORAGE_VERSION = 4;
+/** Users whose mock data `seedGarden()` already wrote (test only, not read by the app). */
+const SEEDED_USERS_KEY = 'e2e-seeded-users';
+
+/** The garden view (T-73). */
+export type View = 'SIMPLE' | 'EXPERT';
+/**
+ * View of seeded users and guests: existing tests and baselines show the expert view, like
+ * users with data before T-73. Tests of the simple view pass `view: 'SIMPLE'`.
+ */
+export const SEED_VIEW: View = 'EXPERT';
 
 export interface Garden {
   beds: unknown[];
   plantings: unknown[];
   /** Own plants as the catalogue lists them (`source: 'OWN'`, with `publication`). */
   ownPlants?: unknown[];
-  /** Garden settings such as `{ lastFrost: '04-20' }`; missing means the defaults. */
-  settings?: unknown;
+  /** Garden settings such as `{ lastFrost: '04-20' }`; the view comes from `view`. */
+  settings?: { lastFrost?: string };
+  /** The view of the seeded user or guest, `SEED_VIEW` (expert) unless set. */
+  view?: View;
   /** Sowing batches, see `sowing()`; plantings point to them with `sowingId`. */
   sowings?: unknown[];
 }
 
+/** The garden as the app stores it: settings with the view, no `view` of its own. */
+export const storedGarden = ({ view = SEED_VIEW, settings, ...garden }: Garden) => ({
+  ...garden,
+  settings: { lastFrost: '05-15', ...settings, view },
+});
+
 /**
- * Seeds the mock API with data for a test user (default: the normal user). Can be called for
- * several users; each user's data is only written once, so changes survive reloads.
+ * Seeds the mock API with data for a test user (default: the normal user), in the expert view
+ * unless `garden.view` says otherwise. Can be called for several users; each user's data is
+ * only written once, so changes survive reloads. Replaces what `signInAs()` put there.
  */
 export async function seedGarden(page: Page, garden: Garden, email: string = USERS.user.email) {
+  await page.addInitScript(
+    ([key, seededKey, user, data]) => {
+      const seeded = JSON.parse(localStorage.getItem(seededKey) ?? '[]') as string[];
+      if (seeded.includes(user)) return;
+      const all = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+      localStorage.setItem(key, JSON.stringify({ ...all, [user]: data }));
+      localStorage.setItem(seededKey, JSON.stringify([...seeded, user]));
+    },
+    [MOCK_API_KEY, SEEDED_USERS_KEY, email, storedGarden(garden)] as const,
+  );
+}
+
+/**
+ * The view of a test user without seeded data, as `signInAs()` sets it: only while the user
+ * has nothing in the mock API, so `seedGarden()` and changes in the test win.
+ */
+export async function seedView(page: Page, email: string, view: View) {
   await page.addInitScript(
     ([key, user, data]) => {
       const all = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
       if (!(user in all)) localStorage.setItem(key, JSON.stringify({ ...all, [user]: data }));
     },
-    [MOCK_API_KEY, email, garden] as const,
+    [MOCK_API_KEY, email, storedGarden({ beds: [], plantings: [], view })] as const,
   );
 }
 
 /**
  * Seeds the guest's browser storage once per tab, so changes, an import or deleting the data
- * survive reloads.
+ * survive reloads. In the expert view unless `garden.view` says otherwise.
  */
 export async function seedGuestGarden(page: Page, garden: Garden) {
   await page.addInitScript(
-    ([key, data]) => {
+    ([key, version, data]) => {
       if (!sessionStorage.getItem('guest-garden-seeded')) {
         sessionStorage.setItem('guest-garden-seeded', '1');
-        // GUEST_STORAGE_VERSION in apps/web/src/lib/local-api/store.ts.
-        localStorage.setItem(key, JSON.stringify({ version: 3, garden: data }));
+        localStorage.setItem(key, JSON.stringify({ version, garden: data }));
       }
     },
-    [GUEST_STORAGE_KEY, garden] as const,
+    [GUEST_STORAGE_KEY, GUEST_STORAGE_VERSION, storedGarden(garden)] as const,
   );
 }
 

@@ -1,6 +1,7 @@
 import {
   ApprovePublicationRequestSchema,
   type CatalogPlant,
+  DEFAULT_GARDEN_SETTINGS,
   ImportCatalogRequestSchema,
   type ImportCatalogResponse,
   ImportGardenRequestSchema,
@@ -184,6 +185,10 @@ export function mockRoutes(
           ...(garden.sowings ?? []),
           ...parsed.data.sowings.map((s) => ({ ...s, id: sowingIds[s.id] ?? '' })),
         ],
+        // The guest's view, like the garden service only while the account has no settings.
+        ...(parsed.data.view && !garden.settings
+          ? { settings: { ...DEFAULT_GARDEN_SETTINGS, view: parsed.data.view } }
+          : {}),
       });
       const result: ImportGardenResponse = { bedIds };
       store.writeImport(key, result);

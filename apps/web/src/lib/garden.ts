@@ -13,6 +13,7 @@ import type {
   PlantFields,
   PlantOverride,
   PublicationQueueResponse,
+  SaveGardenSettingsRequest,
   SaveGlobalPlantRequest,
   SowingBatch,
   SowingBatchFields,
@@ -90,12 +91,15 @@ export function useGardenSettings() {
   });
 }
 
-/** Replaces the garden settings; the answer becomes the cached settings at once. */
+/**
+ * Replaces the garden settings; the answer becomes the cached settings at once. Without
+ * `view` the saved view stays (see `useView()` in `src/lib/view.ts` for switching it).
+ */
 export function useSaveGardenSettings() {
   const api = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (settings: GardenSettings) =>
+    mutationFn: (settings: SaveGardenSettingsRequest) =>
       api<GardenSettings>('/api/garden/settings', {
         method: 'PUT',
         body: JSON.stringify(settings),

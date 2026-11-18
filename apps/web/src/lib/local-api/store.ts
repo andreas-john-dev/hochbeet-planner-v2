@@ -3,6 +3,7 @@ import {
   type CatalogPlant,
   CatalogPlantSchema,
   type Bed,
+  DEFAULT_LAST_FROST,
   type GardenSettings,
   GardenSettingsSchema,
   type Planting,
@@ -31,7 +32,10 @@ export interface LocalGarden {
   overrides?: Record<string, PlantOverride>;
   /** Own plants as the catalogue lists them; archived ones stay for existing plantings. */
   ownPlants?: OwnPlant[];
-  /** Garden settings; missing means the defaults (guests have no profile to set them). */
+  /**
+   * Garden settings; missing means the defaults. Guests have no profile: they only set the
+   * view, in the editor.
+   */
   settings?: GardenSettings;
   /** Sowing batches; plantings point to them with `sowingId`. Missing means none. */
   sowings?: SowingBatch[];
@@ -46,7 +50,7 @@ export interface GardenRepository {
 export const emptyGarden = (): LocalGarden => ({ beds: [], plantings: [] });
 
 export { GUEST_BACKUP_KEY, GUEST_STORAGE_KEY } from './keys';
-export const GUEST_STORAGE_VERSION = 3;
+export const GUEST_STORAGE_VERSION = 4;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -69,6 +73,19 @@ const migrations: Record<number, (garden: unknown) => unknown> = {
       : garden,
   // 2 → 3: sowing batches; older data has none.
   2: (garden) => (isRecord(garden) ? { sowings: [], ...garden } : garden),
+  // 3 → 4: the view (T-73). Guests with beds keep the expert view they know; an empty
+  // garden keeps no settings and starts simple, like a new guest.
+  3: (garden) =>
+    isRecord(garden) && Array.isArray(garden.beds) && garden.beds.length > 0
+      ? {
+          ...garden,
+          settings: {
+            lastFrost: DEFAULT_LAST_FROST,
+            ...(isRecord(garden.settings) ? garden.settings : {}),
+            view: 'EXPERT',
+          },
+        }
+      : garden,
 };
 
 const validItems = <T>(schema: z.ZodType<T>, items: unknown): T[] =>

@@ -109,13 +109,29 @@ describe('createLocalFetch', () => {
   });
 
   it('keeps the garden settings, with the defaults until they are saved', async () => {
-    expect(await (await send('/api/garden/settings')).json()).toEqual({ lastFrost: '05-15' });
+    expect(await (await send('/api/garden/settings')).json()).toEqual({
+      lastFrost: '05-15',
+      view: 'SIMPLE',
+    });
     const saved = await send('/api/garden/settings', 'PUT', { lastFrost: '04-25' });
-    expect(await saved.json()).toEqual({ lastFrost: '04-25' });
+    expect(await saved.json()).toEqual({ lastFrost: '04-25', view: 'SIMPLE' });
     expect((await send('/api/garden/settings', 'PUT', { lastFrost: '02-29' })).status).toBe(400);
     // Survives a reload of the stored garden.
-    expect(createGuestRepository(localStorage).read().settings).toEqual({ lastFrost: '04-25' });
-    expect(await (await send('/api/garden/settings')).json()).toEqual({ lastFrost: '04-25' });
+    expect(createGuestRepository(localStorage).read().settings).toEqual({
+      lastFrost: '04-25',
+      view: 'SIMPLE',
+    });
+    expect(await (await send('/api/garden/settings')).json()).toEqual({
+      lastFrost: '04-25',
+      view: 'SIMPLE',
+    });
+  });
+
+  it('saves the view and keeps it when a request has none, like the garden service', async () => {
+    await send('/api/garden/settings', 'PUT', { lastFrost: '05-15', view: 'EXPERT' });
+    const older = await send('/api/garden/settings', 'PUT', { lastFrost: '04-25' });
+    expect(await older.json()).toEqual({ lastFrost: '04-25', view: 'EXPERT' });
+    expect(createGuestRepository(localStorage).read().settings?.view).toBe('EXPERT');
   });
 
   it('keeps sowing batches with their plantings from all beds, sorted by sowing week', async () => {

@@ -13,6 +13,17 @@ export const common = {
     de: 'Deutsch',
     en: 'English',
   },
+  // Garden views (T-73); the codes are the keys.
+  view: {
+    label: 'Ansicht',
+    choose: 'Einfach oder Experte',
+    SIMPLE: 'Einfach',
+    EXPERT: 'Experte',
+    description: {
+      SIMPLE: 'Beet bepflanzen und Abstände und Nachbarn prüfen, ohne Zeitplanung.',
+      EXPERT: 'Mit Zeitachse, Fruchtfolge, Erde erneuern und Anzucht.',
+    },
+  },
   apiError: {
     unauthorized: 'Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.',
     forbidden: 'Dafür fehlt dir die Berechtigung.',

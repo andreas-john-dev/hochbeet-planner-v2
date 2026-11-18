@@ -17,11 +17,12 @@ export const editor = {
     undoTitle: 'Rückgängig (Strg+Z)',
     redo: 'Wiederholen',
     redoTitle: 'Wiederholen (Strg+Umschalt+Z)',
-    view: 'Ansicht',
+    zoom: 'Ausschnitt',
     zoomOut: 'Verkleinern',
     zoomIn: 'Vergrößern',
     fit: 'Auf Beet einpassen',
     assistant: 'Assistent',
+    more: 'Mehr',
   },
   canvas: {
     label: 'Beet {{name}}, {{width}} × {{depth}} cm',

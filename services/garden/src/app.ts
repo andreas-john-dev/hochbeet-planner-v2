@@ -2,14 +2,15 @@ import {
   type Bed,
   type BedWithPlantingsResponse,
   DEFAULT_GARDEN_SETTINGS,
+  DEFAULT_GARDEN_VIEW,
   type ErrorKey,
   type GardenSettings,
-  GardenSettingsSchema,
   ImportGardenRequestSchema,
   type ListBedsResponse,
   type Planting,
   type ListSowingsResponse,
   SaveBedRequestSchema,
+  SaveGardenSettingsRequestSchema,
   SavePlantingRequestSchema,
   SaveSowingRequestSchema,
   type SowingBatch,
@@ -34,6 +35,7 @@ export type GardenStore = Pick<
   | 'putImported'
   | 'getSettings'
   | 'putSettings'
+  | 'createSettings'
   | 'listSowings'
   | 'putSowing'
   | 'deleteSowing'
@@ -166,9 +168,15 @@ export function createApp({ store, logger, newId = () => ulid() }: AppDeps) {
     return c.json(body);
   });
 
+  // Without `view` (app versions before T-73) the saved view stays.
   app.put('/settings', async (c) => {
-    const settings = await parseBody(c, GardenSettingsSchema);
-    await store.putSettings(c.get('user').id, settings);
+    const userId = c.get('user').id;
+    const { view, ...rest } = await parseBody(c, SaveGardenSettingsRequestSchema);
+    const settings: GardenSettings = {
+      ...rest,
+      view: view ?? (await store.getSettings(userId))?.view ?? DEFAULT_GARDEN_VIEW,
+    };
+    await store.putSettings(userId, settings);
     return c.json(settings);
   });
 

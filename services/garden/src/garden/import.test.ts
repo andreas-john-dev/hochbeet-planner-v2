@@ -98,6 +98,7 @@ describe('importGarden', () => {
         store.writes += 1;
         return Promise.resolve();
       }),
+      createSettings: vi.fn<ImportStore['createSettings']>(() => Promise.resolve(true)),
     };
     return store satisfies ImportStore;
   }
@@ -108,6 +109,17 @@ describe('importGarden', () => {
     const second = await importGarden(store, 'user', request, counter());
     expect(second).toEqual(first);
     expect(store.writes).toBe(1);
+    // Without a view (app versions before T-73) the settings stay untouched.
+    expect(store.createSettings).not.toHaveBeenCalled();
+  });
+
+  it('hands the guest view to the settings, with the default last frost', async () => {
+    const store = memoryStore();
+    await importGarden(store, 'user', { ...request, view: 'EXPERT' }, counter());
+    expect(store.createSettings).toHaveBeenCalledWith('user', {
+      lastFrost: '05-15',
+      view: 'EXPERT',
+    });
   });
 
   it('finishes an interrupted import with the same ids', async () => {

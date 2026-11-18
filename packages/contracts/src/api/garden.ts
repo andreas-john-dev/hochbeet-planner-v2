@@ -74,14 +74,40 @@ export const MonthDaySchema = z
     return month >= 1 && month <= 12 && day >= 1 && day <= (DAYS_IN_MONTH[month - 1] ?? 0);
   }, messageKey('monthDayEveryYear'));
 
+/**
+ * How the app shows the garden: `SIMPLE` is the bed as it is now, without timeline, crop
+ * rotation, soil renewals and sowing batches; `EXPERT` shows all of it. Both views show the
+ * same beds and plantings; switching changes no data.
+ */
+export const GARDEN_VIEWS = ['SIMPLE', 'EXPERT'] as const;
+export const GardenViewSchema = z.enum(GARDEN_VIEWS);
+export type GardenView = z.infer<typeof GardenViewSchema>;
+
+/** New users and guests start simple; users with data before T-73 were migrated to `EXPERT`. */
+export const DEFAULT_GARDEN_VIEW: GardenView = 'SIMPLE';
+
 /** GET and PUT /garden/settings: the user's settings for all beds. */
 export const GardenSettingsSchema = z.object({
   /** Last frost, every year on this day; frost sensitive plants go outside after it. */
   lastFrost: MonthDaySchema,
+  /** Missing in settings saved before T-73. */
+  view: GardenViewSchema.default(DEFAULT_GARDEN_VIEW),
 });
 export type GardenSettings = z.infer<typeof GardenSettingsSchema>;
 
-export const DEFAULT_GARDEN_SETTINGS: GardenSettings = { lastFrost: DEFAULT_LAST_FROST };
+/**
+ * Body of PUT /garden/settings. Without `view` (app versions before T-73) the saved view
+ * stays, so saving the last frost never resets it.
+ */
+export const SaveGardenSettingsRequestSchema = GardenSettingsSchema.extend({
+  view: GardenViewSchema.optional(),
+});
+export type SaveGardenSettingsRequest = z.infer<typeof SaveGardenSettingsRequestSchema>;
+
+export const DEFAULT_GARDEN_SETTINGS: GardenSettings = {
+  lastFrost: DEFAULT_LAST_FROST,
+  view: DEFAULT_GARDEN_VIEW,
+};
 
 /** Most beds and plantings one import may carry; more than any guest plans in a browser. */
 export const MAX_IMPORT_BEDS = 50;
@@ -115,6 +141,8 @@ export const ImportGardenRequestSchema = z
         messageKey('importMax', { max: MAX_IMPORT_SOWINGS, kind: 'sowings' }),
       )
       .default([]),
+    /** The guest's view; the account takes it only while it has no settings yet. */
+    view: GardenViewSchema.optional(),
   })
   .superRefine(({ beds, plantings, sowings }, ctx) => {
     const bedIds = new Set(beds.map((b) => b.id));

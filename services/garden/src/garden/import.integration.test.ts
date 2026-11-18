@@ -1,6 +1,7 @@
 import type {
   BedWithPlantingsResponse,
   ErrorResponse,
+  GardenSettings,
   ImportGardenResponse,
   ListBedsResponse,
   ListSowingsResponse,
@@ -14,6 +15,8 @@ import { GardenRepository } from './repository';
 
 const USER_A = 'a1b2c3d4-0000-4000-8000-00000000000a';
 const USER_B = 'a1b2c3d4-0000-4000-8000-00000000000b';
+const USER_C = 'a1b2c3d4-0000-4000-8000-00000000000c';
+const USER_D = 'a1b2c3d4-0000-4000-8000-00000000000d';
 const GUEST_BED = '01J9ZQ3W8D6V2K5M7N8P9R0BDA';
 const OWN_PLANT = '01J9ZQ3W8D6V2K5M7N8P9R0WN1';
 const GUEST_SOWING = '01J9ZQ3W8D6V2K5M7N8P9R0SW1';
@@ -170,5 +173,21 @@ describe('/api/garden/import against DynamoDB Local', () => {
       message: 'Dieses Beet fehlt im Import.',
     });
     expect(await listBeds(USER_A)).toHaveLength(2);
+  });
+
+  it('takes over the guest view only while the account has no settings', async () => {
+    const settingsOf = async (userId: string) =>
+      (await (await call(userId, 'GET', '/settings')).json()) as GardenSettings;
+
+    // A new account takes the guest's view, with the default last frost.
+    const fresh = { ...importBody('01J9ZQ3W8D6V2K5M7N8P9R0MP4'), view: 'EXPERT' };
+    expect((await call(USER_C, 'POST', '/import', fresh)).status).toBe(200);
+    expect(await settingsOf(USER_C)).toEqual({ lastFrost: '05-15', view: 'EXPERT' });
+
+    // An account with settings keeps them, view included.
+    await call(USER_D, 'PUT', '/settings', { lastFrost: '04-20', view: 'SIMPLE' });
+    const existing = { ...importBody('01J9ZQ3W8D6V2K5M7N8P9R0MP5'), view: 'EXPERT' };
+    expect((await call(USER_D, 'POST', '/import', existing)).status).toBe(200);
+    expect(await settingsOf(USER_D)).toEqual({ lastFrost: '04-20', view: 'SIMPLE' });
   });
 });

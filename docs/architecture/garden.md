@@ -8,7 +8,7 @@ Teil der [Architektur](../architecture.md). Beete, Pflanzungen und Anzucht-Charg
 | `USER#<uid>` | `BED#<bedId>#PLANTING#<id>` | Pflanzung |
 | `USER#<uid>` | `SOWING#<id>` | Anzucht-Charge (`SowingBatchSchema`) |
 | `USER#<uid>` | `IMPORT#<importId>` | Stand eines Imports aus dem Gastmodus (ID-Zuordnung, Antwort) |
-| `USER#<uid>` | `SETTINGS` | Einstellungen für alle Beete, z. B. letzter Frost (`GardenSettingsSchema`) |
+| `USER#<uid>` | `SETTINGS` | Einstellungen für alle Beete: letzter Frost und Ansicht (`GardenSettingsSchema`) |
 
 Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen über alle Zeiträume. Die Mandantentrennung ist damit Teil des Schlüssels.
 
@@ -28,7 +28,7 @@ Eine Query mit `begins_with BED#<bedId>` lädt ein Beet samt allen Pflanzungen �
 | DELETE | `/garden/sowings/{id}` | Charge löschen; verknüpfte Pflanzungen bleiben |
 | POST | `/garden/import` | Beete, Pflanzungen und Chargen aus dem Gastmodus übernehmen |
 | GET | `/garden/settings` | Einstellungen des Users, ohne Eintrag die Standardwerte |
-| PUT | `/garden/settings` | Einstellungen ersetzen |
+| PUT | `/garden/settings` | Einstellungen ersetzen; ohne `view` bleibt die gespeicherte Ansicht |
 
 Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erzeugen den Hinweis „Beetrand“.
 
@@ -54,7 +54,13 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
   - `POST` legt eine Charge mit neuer ULID an, `PUT` ersetzt eine bestehende, `DELETE` löscht sie; fremde und unbekannte Chargen liefern 404.
   - Die API prüft nur die Struktur über `SaveSowingRequestSchema`: Aussaat und geplantes Auspflanzen am Montag (Auspflanzen danach), ganze Mengen, bekannte Phase, Textlängen. Ob Sorte oder Charge existieren, prüft sie nicht; auch eine Pflanzung darf auf eine gelöschte Charge zeigen.
   - `sowingId` an Pflanzungen ist nur mit `origin: 'TRANSPLANT'` erlaubt, sonst 400.
-- **Einstellungen** (T-53): `lastFrost` als Monat und Tag (`MM-DD`, gilt jedes Jahr; der 29. Februar wird abgelehnt, weil es ihn nicht jedes Jahr gibt). `GET` liefert ohne Eintrag `DEFAULT_GARDEN_SETTINGS` (letzter Frost `05-15`), `PUT` ersetzt den Eintrag. Das Datum eines Jahres berechnet `lastFrostDate(settings, year)` in `packages/garden-rules/src/time.ts`. Gäste haben kein Profil; die lokale API liefert ihnen die Standardwerte (`settings` im Gastspeicher ist optional, die Version bleibt).
+- **Einstellungen** (T-53): `lastFrost` als Monat und Tag (`MM-DD`, gilt jedes Jahr; der 29. Februar wird abgelehnt, weil es ihn nicht jedes Jahr gibt). `GET` liefert ohne Eintrag `DEFAULT_GARDEN_SETTINGS` (letzter Frost `05-15`), `PUT` ersetzt den Eintrag. Das Datum eines Jahres berechnet `lastFrostDate(settings, year)` in `packages/garden-rules/src/time.ts`. Gäste haben kein Profil; die lokale API liefert ihnen die Standardwerte (`settings` im Gastspeicher ist optional).
+- **Ansicht** (T-73, Epic #161): `view` in den Einstellungen, `SIMPLE` (einfach) oder `EXPERT` (Experte), für alle Beete und Geräte. Beide Ansichten zeigen dieselben Beete und Pflanzungen; ein Wechsel ändert keine Daten.
+  - Standard ist `SIMPLE` (`DEFAULT_GARDEN_VIEW`): für neue User ohne Eintrag und für Einstellungen, die vor T-73 ohne `view` gespeichert wurden.
+  - `PUT` nimmt `SaveGardenSettingsRequestSchema`: Fehlt `view` (App-Stände vor T-73, Speichern des letzten Frosts), bleibt die gespeicherte Ansicht. So setzt das Speichern des Frosttermins die Ansicht nie zurück.
+  - **Migration der Bestandsuser:** Die Custom Resource `Custom::GardenViewMigration` im Stack `Prod-GardenStateful` (Handler `src/migration/handler.ts`, Logik `src/migration/view.ts`) liest einmal die Schlüssel der ganzen Tabelle (`Scan` mit `PK, SK`) und setzt für jeden User mit Beeten (samt Pflanzungen), Chargen oder Einstellungen `view: 'EXPERT'` per `UpdateItem` mit der Bedingung `attribute_not_exists(view)`. Ein gespeicherter letzter Frost bleibt (`if_not_exists`), sonst kommt der Standard dazu. Ein Import-Eintrag allein zählt nicht als Daten.
+  - Die Eigenschaft `MigrationVersion` ist fest (`VIEW_MIGRATION_VERSION = 1`), deshalb läuft sie genau einmal, beim Deploy, der sie hinzufügt. Sie ist idempotent und überschreibt nie eine gesetzte Ansicht. Ein erneuter Lauf würde aber auch neue User mit Beeten und ohne gespeicherte Ansicht umstellen; die Version also nie erhöhen.
+  - Wer sich danach registriert, hat keine Einstellungen und startet einfach.
 - **Import aus dem Gastmodus** (`POST /garden/import`, `src/garden/import.ts`): siehe „Übernahme aus dem Gastmodus“.
 - **Mandantentrennung:** Fremde und unbekannte Beete liefern 404. Weil der User Teil jedes Schlüssels ist, kann eine Query nie fremde Beete treffen.
 - **Tests:** Integrationstests gegen DynamoDB Local; die Hilfsfunktionen dafür stellt `@hochbeet/service-kit/testing` bereit.
@@ -64,7 +70,7 @@ Verkleinert ein User sein Beet, bleiben Pflanzungen außerhalb erhalten und erze
 Meldet sich ein Gast an oder registriert sich, fragt die App nach der Übernahme seiner Daten aus dem Browser (T-39). Weil Services sich nie gegenseitig aufrufen, gibt es zwei Endpunkte, und der Client verbindet sie:
 
 1. `POST /catalog/import` mit eigenen Sorten (auch archivierten, weil Pflanzungen sie nutzen können) und Anpassungen. Eigene Sorten bekommen neue ULIDs und sind privat; Nachbarn zeigen auf die neuen IDs importierter Sorten oder auf globale Sorten, unbekannte fallen weg. Anpassungen gelten nur für globale Sorten und nur mit globalen Nachbarn; hat der User für eine Sorte schon eine Anpassung, bleibt seine (`PutItem` mit `attribute_not_exists`). Die Antwort ordnet alte Sorten-IDs den neuen zu.
-2. Der Client setzt diese IDs in die Pflanzungen und Chargen ein und ruft `POST /garden/import` mit Beeten, Pflanzungen und Chargen auf. Alle bekommen neue ULIDs, Pflanzungen zeigen auf die neuen Beete und Chargen; eine Pflanzung eines Beets, das nicht im Import ist, ergibt 400. Eine `sowingId` einer Charge, die nicht im Import ist (im Browser gelöscht), fällt weg. `sowings` fehlt in Requests älterer App-Stände und gilt dann als leer.
+2. Der Client setzt diese IDs in die Pflanzungen und Chargen ein und ruft `POST /garden/import` mit Beeten, Pflanzungen und Chargen auf. Alle bekommen neue ULIDs, Pflanzungen zeigen auf die neuen Beete und Chargen; eine Pflanzung eines Beets, das nicht im Import ist, ergibt 400. Eine `sowingId` einer Charge, die nicht im Import ist (im Browser gelöscht), fällt weg. `sowings` fehlt in Requests älterer App-Stände und gilt dann als leer. Hat der Gast eine Ansicht gespeichert, geht sie als `view` mit; das Konto übernimmt sie nur, solange es noch keine Einstellungen hat (`PutItem` mit `attribute_not_exists`, letzter Frost dann der Standard).
 
 - **Idempotenz:** Beide Requests tragen dieselbe `importId` (ULID aus dem Client, im `localStorage` unter `hochbeet-guest-import-id`, bis der Import gelungen ist). Jeder Service speichert unter `IMPORT#<importId>` zuerst die ID-Zuordnung, schreibt dann die Daten mit genau diesen IDs und zuletzt die Antwort. Ein wiederholter Request liefert die gespeicherte Antwort; ein unterbrochener Import wird mit denselben IDs zu Ende geschrieben. So entstehen nie Duplikate.
 - **Grenzen:** höchstens 50 Beete, 1000 Pflanzungen, 200 Chargen, 200 eigene Sorten und 200 Anpassungen je Import, mit deutscher Meldung; das reicht weit für alles, was ein Gast im Browser plant, und hält einen Request klein.

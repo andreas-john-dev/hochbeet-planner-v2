@@ -4,6 +4,7 @@ import { LanguageButtons } from '@/components/layout/LanguageToggle';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AssistantMemoryCard } from '@/components/profile/AssistantMemoryCard';
 import { GardenSettingsCard } from '@/components/profile/GardenSettingsCard';
+import { ViewCard } from '@/components/profile/ViewCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { canUseAssistant } from '@/lib/assistant';
@@ -66,6 +67,7 @@ export function ProfilePage() {
             <LanguageButtons />
           </CardContent>
         </Card>
+        <ViewCard />
         <GardenSettingsCard />
         {canUseAssistant(user, guest) && <AssistantMemoryCard />}
       </div>

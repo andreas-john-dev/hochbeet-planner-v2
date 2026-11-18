@@ -18,11 +18,12 @@ export const editor: typeof de = {
     undoTitle: 'Undo (Ctrl+Z)',
     redo: 'Redo',
     redoTitle: 'Redo (Ctrl+Shift+Z)',
-    view: 'View',
+    zoom: 'Zoom',
     zoomOut: 'Zoom out',
     zoomIn: 'Zoom in',
     fit: 'Fit to bed',
     assistant: 'Assistant',
+    more: 'More',
   },
   canvas: {
     label: 'Bed {{name}}, {{width}} × {{depth}} cm',

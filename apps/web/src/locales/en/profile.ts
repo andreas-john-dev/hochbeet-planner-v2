@@ -16,6 +16,9 @@ export const profile: typeof de = {
     title: 'Language',
     description: 'Applies to the app in this browser.',
   },
+  view: {
+    description: 'Applies to all beds, on all devices. Beds and plantings stay the same.',
+  },
   garden: {
     title: 'Garden',
     description:

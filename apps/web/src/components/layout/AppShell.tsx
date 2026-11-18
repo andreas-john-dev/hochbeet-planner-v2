@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/context';
 import { isAdmin } from '@/lib/auth/types';
 import { cn } from '@/lib/utils';
+import { useView } from '@/lib/view';
 import { GuestBanner } from './GuestBanner';
 import { Logo } from './Logo';
-import { navItems } from './nav-items';
+import { visibleNavItems } from './nav-items';
 import { ThemeToggle } from './ThemeToggle';
 
 /** Sidebar on desktop, top bar and bottom navigation on phones; a banner in guest mode. */
@@ -16,9 +17,8 @@ export function AppShell() {
   const { t } = useTranslation('layout');
   const { user, guest } = useAuth();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const items = navItems.filter(
-    (item) => (!item.adminOnly || isAdmin(user)) && (!item.accountOnly || !guest),
-  );
+  const { view } = useView();
+  const items = visibleNavItems({ admin: isAdmin(user), guest, view });
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
