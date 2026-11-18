@@ -122,6 +122,21 @@ Umsetzung (Stand T-30):
 - **State:** Ein Zustand-Store je geöffnetem Beet (`lib/editor/store.ts`) hält Größe, Viewport, Pflanzart, Vorschau, Auswahl, den Entwurf beim Ziehen (Position oder Länge) und die Undo-Historie.
 - **Speichern:** Für Pflanzungen gibt es `useSavePlanting` und `useDeletePlanting` in `lib/garden.ts`. Sie ändern den Query-Cache optimistisch, rollen bei Fehlern zurück und laden danach neu. Neue Pflanzungen tragen bis zur Antwort eine temporäre ID (`tmp-…`); erst danach erscheint der Griff.
 
+### Einfache Ansicht (T-75)
+
+In der einfachen Ansicht (Epic #161, `useView()`) zeigt der Editor das Beet, wie es jetzt ist. Er arbeitet auf denselben Daten wie die Expertenansicht; ein Wechsel ändert keine Pflanzung.
+
+- **Woche:** fest der Montag der aktuellen Woche. `BedEditorPage` setzt sie beim Wechsel in die einfache Ansicht zurück, auch wenn der Editor über `?woche=` geöffnet wurde. Es gibt keinen `WeekSlider` und keine Geister. Solange die Einstellungen laden, zeigt der Editor das Beet noch nicht, damit die Zeitachse nicht kurz aufblitzt; kann er sie nicht laden, gilt der Standard (`DEFAULT_GARDEN_VIEW`).
+- **Panel `PlantingDetails` (`simple`):** Sorte, Reihe oder Einzelpflanze mit Länge, Position und „Pflanzung entfernen“. Herkunft, Charge, Start, Ende, „Ende anpassen“ und „Entfernen ab“ fehlen. Die Expertenansicht bleibt unverändert.
+- **Palette:** ohne „Aus der Anzucht“. Damit gibt es auch kein Auspflanzen aus Chargen.
+- **Neue Pflanzungen** aus Palette, Tastatur, Ziehen und übernommenen Vorschlägen laufen über `simplePlanting()` (`lib/editor/simple.ts`). Sie beginnen am Montag der aktuellen Woche, haben kein eigenes Ende (`endDate: null`, also endet die Pflanzung nach der Kulturdauer wie ohne eigenes Ende in der Expertenansicht), `origin` kommt aus `defaultOrigin()`, und eine Charge gibt es nicht. Vorschläge des Assistenten zeichnet `showSuggestions(…, 'SIMPLE')` schon so.
+- **Entfernen** (Panel und Entf-Taste) über `simpleRemoval()`: Eine Pflanzung, die in dieser Woche begonnen hat, wird gelöscht. Ältere bekommen `removedDate` = Montag der aktuellen Woche, die Expertenansicht zeigt sie also bis zur Vorwoche. Beides ist ein Undo-Schritt über `commit()`.
+- **Warnungen:** `seasonFindings(…, { scope: 'SIMPLE' })` ruft `evaluateBed(…, { scope: 'SIMPLE', week })` auf (T-74). Es gelten nur Pflanzabstand, Nachbarn, Starkzehrer und Beetrand; Fruchtfolge, Frost und Anzucht entfallen. Die Befundliste heißt „Hinweise im Beet“ und zeigt keine Zeiträume (`FindingsList` mit `simple`).
+- **Beet-Dialog:** ohne „Erde erneuert“. Beim Speichern bleiben die gespeicherten Termine unverändert, ein neues Beet bekommt keine. Beetübersicht und Vorschau zeigen wie bisher die aktuelle Woche.
+- **Hinweis:** Unter dem Beet steht dezent „Mehr Möglichkeiten in der Expertenansicht“. Der Link setzt auf dem Desktop den Fokus auf „Experte“ im Umschalter des Kopfs und öffnet auf dem Telefon das Menü „Mehr“.
+- **Telefon:** Die Bottom-Sheets nutzen dieselben Komponenten, die Vereinfachungen gelten dort also genauso.
+- **Tests:** `e2e/tests/simple-view.spec.ts` (alle Projekte); `pages.ts` hat Beetübersicht und Editor in der einfachen Ansicht (`beete-einfach`, `beet-editor-einfach`) für axe und Screenshots.
+
 ## Barrierefreiheit und Feinschliff
 
 Umsetzung (Stand T-35):

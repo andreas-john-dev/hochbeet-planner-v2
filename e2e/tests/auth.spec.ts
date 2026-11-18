@@ -1,4 +1,5 @@
 import { expect, open, signInAs, test, USERS } from './fixtures';
+import { SEED_VIEW } from './garden';
 import { appPages, protectedPages } from './pages';
 
 const MOCK_CODE = '123456';
@@ -94,11 +95,12 @@ test('shows the admin section only to admins', async ({ page }) => {
 });
 
 test('lists every page in pages.ts once', () => {
-  // Guest pages share paths with the signed-in pages, so a page is path plus access; states
-  // of a page (with `setup`, e.g. an open panel) share its path too.
+  // Guest pages share paths with the signed-in pages, so a page is path plus access; pages in
+  // the simple view (T-75) share the path with the expert view, and states of a page (with
+  // `setup`, e.g. an open panel) share its path too.
   expect(new Set(appPages.map((p) => p.id)).size).toBe(appPages.length);
   const pages = appPages.filter((p) => !p.setup);
-  expect(new Set(pages.map((p) => `${p.access} ${p.path} ${p.language ?? 'de'}`)).size).toBe(
-    pages.length,
-  );
+  const key = (p: (typeof pages)[number]) =>
+    `${p.access} ${p.path} ${p.language ?? 'de'} ${p.seed?.view ?? SEED_VIEW}`;
+  expect(new Set(pages.map(key)).size).toBe(pages.length);
 });

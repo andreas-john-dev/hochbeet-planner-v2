@@ -40,7 +40,7 @@ const profileOption = (page: Page, name: 'Einfach' | 'Experte') =>
 /** The view switch in the editor: in the header on desktop, behind "Mehr" on phones. */
 async function switchInEditor(page: Page, name: 'Einfach' | 'Experte', isMobile: boolean) {
   if (isMobile) {
-    await page.getByRole('button', { name: 'Mehr' }).click();
+    await page.getByRole('button', { name: 'Mehr', exact: true }).click();
     const sheet = page.getByRole('dialog', { name: 'Mehr' });
     await sheet.getByRole('button', { name: new RegExp(`^${name}`) }).click();
     await expect(sheet.getByRole('button', { name: new RegExp(`^${name}`) })).toHaveAttribute(
@@ -60,7 +60,7 @@ async function switchInEditor(page: Page, name: 'Einfach' | 'Experte', isMobile:
 
 async function editorView(page: Page, isMobile: boolean) {
   if (isMobile) {
-    await page.getByRole('button', { name: 'Mehr' }).click();
+    await page.getByRole('button', { name: 'Mehr', exact: true }).click();
     const sheet = page.getByRole('dialog', { name: 'Mehr' });
     const pressed = sheet.getByRole('button', { pressed: true });
     const name = (await pressed.textContent()) ?? '';

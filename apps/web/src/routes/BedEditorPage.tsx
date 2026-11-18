@@ -1,4 +1,11 @@
-import type { Bed, Plant, Planting, Suggestion, SowingWithPlantings } from '@hochbeet/contracts';
+import {
+  type Bed,
+  DEFAULT_GARDEN_VIEW,
+  type Plant,
+  type Planting,
+  type Suggestion,
+  type SowingWithPlantings,
+} from '@hochbeet/contracts';
 import { type Finding, isActiveInWeek, soilRenewalsIn } from '@hochbeet/garden-rules';
 import { PlantIcon } from '@hochbeet/plant-icons/react';
 import {
@@ -59,6 +66,7 @@ import {
   type PlantingKind,
 } from '@/lib/editor/placement';
 import { withDraft } from '@/lib/editor/plantings';
+import { simplePlanting, simpleRemoval } from '@/lib/editor/simple';
 import { createEditorStore, type EditorStore, type PreviewSowing } from '@/lib/editor/store';
 import { parseBedEditorSearch } from '@/lib/editor/search';
 import { adoptedPlanting, type ShownSuggestion, showSuggestions } from '@/lib/editor/suggestions';
@@ -78,6 +86,7 @@ import {
 import type { Language } from '@/lib/language';
 import { plantName } from '@/lib/plant-names';
 import { availableSowings } from '@/lib/sowings';
+import { useView } from '@/lib/view';
 
 const ZOOM_STEP = 1.4;
 
@@ -107,6 +116,11 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
   const [store] = useState(() => createEditorStore(initialWeek ? parseISO(initialWeek) : today));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, guest } = useAuth();
+  // The view (Epic #161): undefined while the settings load; without settings the default.
+  const viewState = useView();
+  const view = viewState.view ?? (viewState.loadError ? DEFAULT_GARDEN_VIEW : undefined);
+  const simple = view === 'SIMPLE';
+  const viewSwitchId = useId();
   const assistant = canUseAssistant(user, guest);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -117,6 +131,10 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
   const remove = useDeletePlanting(bedId);
   const { history, week } = useStore(store);
   const weekDate = parseISO(week);
+  // The simple view always shows the current week, also when opened on another one.
+  useEffect(() => {
+    if (simple) store.getState().setWeek(today);
+  }, [simple, store, today]);
   const queryClient = useQueryClient();
   // The assistant's suggestions, shown in the bed until taken over or discarded; never saved.
   const [suggested, setSuggested] = useState<{
@@ -134,9 +152,10 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
             plants.data,
             week,
             lastFrost,
+            simple ? 'SIMPLE' : 'ALL',
           )
         : [],
-    [suggested, suggestionBed, details.data?.plantings, plants.data, week, lastFrost],
+    [suggested, suggestionBed, details.data?.plantings, plants.data, week, lastFrost, simple],
   );
   // Undo and redo run one after another, each after all running requests have finished,
   // so that temporary ids are resolved first and no key press gets lost.
@@ -281,7 +300,21 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
 
   const bed = details.data?.bed;
   const shown = activePlantings(details.data?.plantings ?? [], plants.data ?? [], weekDate);
-  const faint = ghosts(withPlants(details.data?.plantings ?? [], plants.data ?? []), week);
+  const faint = simple
+    ? []
+    : ghosts(withPlants(details.data?.plantings ?? [], plants.data ?? []), week);
+
+  /** "Mehr Möglichkeiten": to the view switch in the header, on phones in the menu. */
+  const showViewSwitch = () => {
+    if (!isDesktop) {
+      setMoreOpen(true);
+      return;
+    }
+    const target = document
+      .getElementById(viewSwitchId)
+      ?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]');
+    target?.focus();
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -385,7 +418,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
           )}
           {/* The view (T-73): in the header on larger screens, in the menu on phones. */}
           {isDesktop ? (
-            <ViewSwitch />
+            <ViewSwitch id={viewSwitchId} />
           ) : (
             <Button
               variant="outline"
@@ -401,18 +434,21 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
           )}
         </div>
       </div>
-      <WeekSlider
-        week={week}
-        today={today}
-        renewals={bed ? soilRenewalsIn(bed, Number(week.slice(0, 4))) : []}
-        onChange={(next) => {
-          store.getState().setWeek(next);
-        }}
-      />
+      {view === 'EXPERT' && (
+        <WeekSlider
+          week={week}
+          today={today}
+          renewals={bed ? soilRenewalsIn(bed, Number(week.slice(0, 4))) : []}
+          onChange={(next) => {
+            store.getState().setWeek(next);
+          }}
+        />
+      )}
       <div className="flex flex-col gap-4 md:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          {bed && plants.data ? (
+          {bed && plants.data && view ? (
             <Workspace
+              simple={simple}
               bed={bed}
               plants={plants.data}
               plantings={shown}
@@ -467,6 +503,15 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
           </aside>
         )}
       </div>
+      {simple && (
+        <button
+          type="button"
+          onClick={showViewSwitch}
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 w-fit rounded-sm text-sm underline underline-offset-4 outline-none focus-visible:ring-[3px]"
+        >
+          {t('expertHint')}
+        </button>
+      )}
       {error && <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>}
       {bed && <BedFormDialog bed={bed} open={settingsOpen} onOpenChange={setSettingsOpen} />}
       <Sheet open={!isDesktop && moreOpen} onOpenChange={setMoreOpen}>
@@ -554,6 +599,7 @@ function dragPoint(event: DragMoveEvent) {
 
 /** Palette and canvas with drag & drop and keyboard placement in between. */
 function Workspace({
+  simple,
   bed,
   plants,
   plantings,
@@ -566,6 +612,11 @@ function Workspace({
   sowings,
   onCommit,
 }: {
+  /**
+   * Simple view: the current week only, new plantings without an own end, removing ends older
+   * plantings this week, only the spatial rules, no batches.
+   */
+  simple: boolean;
   bed: Bed;
   plants: readonly Plant[];
   /** Plantings in the bed in the shown week. */
@@ -607,21 +658,26 @@ function Workspace({
   const { seasonal, statuses } = useMemo(() => {
     const live = allPlantings.map((p) => withDraft(p, draft));
     if (preview) {
-      live.push(
-        newPlanting({
-          bed,
-          plant: preview.plant,
-          kind,
-          at: preview.at,
-          today: week,
-          id: 'preview',
-        }),
-      );
+      const planting = newPlanting({
+        bed,
+        plant: preview.plant,
+        kind,
+        at: preview.at,
+        today: week,
+        id: 'preview',
+      });
+      live.push(simple ? simplePlanting(planting, preview.plant, week) : planting);
     }
-    const season = seasonFindings(bed, live, plants, weekIso, { language, lastFrost, sowings });
+    const season = seasonFindings(bed, live, plants, weekIso, {
+      language,
+      lastFrost,
+      sowings,
+      scope: simple ? 'SIMPLE' : 'ALL',
+    });
     const thisWeek = season.filter((f) => isActiveInWeek(f.period, weekIso));
     return { seasonal: season, statuses: statusByPlanting(thisWeek) };
   }, [
+    simple,
     allPlantings,
     draft,
     preview,
@@ -635,9 +691,10 @@ function Workspace({
     language,
   ]);
 
+  // The simple view has no raising: no batches in the palette.
   const offered = useMemo(
-    () => availableSowings(sowings, plants, weekIso),
-    [sowings, plants, weekIso],
+    () => (simple ? [] : availableSowings(sowings, plants, weekIso)),
+    [simple, sowings, plants, weekIso],
   );
 
   const pick = (finding: Finding) => {
@@ -659,7 +716,8 @@ function Workspace({
       setPlantOut({ plant, sowing, at });
       return;
     }
-    const planting = newPlanting({ bed, plant, kind: state.kind, at, today: week });
+    const placed = newPlanting({ bed, plant, kind: state.kind, at, today: week });
+    const planting = simple ? simplePlanting(placed, plant, week) : placed;
     // Rows get selected for their length handle; after a single plant the palette stays.
     state.select(planting.kind === 'ROW' ? planting.id : null);
     onCommit({ before: null, after: planting });
@@ -687,9 +745,10 @@ function Workspace({
     onCommit({ before, after });
   };
 
+  // In the simple view an older planting only leaves the bed this week (history stays).
   const remove = (planting: Planting) => {
     store.getState().select(null);
-    onCommit({ before: planting, after: null });
+    onCommit(simple ? simpleRemoval(planting, week) : { before: planting, after: null });
   };
 
   const selected = plantings.find(({ planting }) => planting.id === selectedId);
@@ -783,6 +842,7 @@ function Workspace({
               plant={selected.plant}
               week={week}
               sowings={sowings}
+              simple={simple}
               onChange={change}
               onDelete={remove}
               onClose={() => {
@@ -859,7 +919,13 @@ function Workspace({
           </p>
         </div>
       </div>
-      <FindingsList findings={seasonal} week={weekIso} highlighted={highlighted} onPick={pick} />
+      <FindingsList
+        findings={seasonal}
+        week={weekIso}
+        highlighted={highlighted}
+        simple={simple}
+        onPick={pick}
+      />
       <Sheet open={!isDesktop && paletteOpen} onOpenChange={setPaletteOpen}>
         <SheetContent aria-describedby={undefined}>
           <SheetTitle>{t('placement.addPlant')}</SheetTitle>
@@ -891,6 +957,7 @@ function Workspace({
                 plant={selected.plant}
                 week={week}
                 sowings={sowings}
+                simple={simple}
                 onChange={change}
                 onDelete={remove}
                 onClose={() => {

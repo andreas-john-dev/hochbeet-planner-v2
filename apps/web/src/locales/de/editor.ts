@@ -9,6 +9,7 @@ export const editor = {
     text: 'Dieses Beet gibt es nicht oder nicht mehr.',
   },
   loadError: 'Das Beet konnte nicht geladen werden. Bitte lade die Seite neu.',
+  expertHint: 'Mehr Möglichkeiten in der Expertenansicht',
   toolbar: {
     edit: 'Bearbeiten',
     bedSettings: 'Beet bearbeiten',
@@ -110,6 +111,7 @@ export const editor = {
     removeHint: 'Die Pflanzung bleibt in der Historie und zählt für die Fruchtfolge.',
     startsLater: 'Die Pflanzung beginnt erst nach {{week}}.',
     delete: 'Pflanzung löschen',
+    remove: 'Pflanzung entfernen',
     toSowing: 'Zur Anzucht',
     fromSowing: 'Aus der Anzucht',
     noSowing: 'Keine (z. B. gekauft)',
@@ -148,6 +150,7 @@ export const editor = {
   },
   findings: {
     title: 'Hinweise dieser Saison',
+    titleSimple: 'Hinweise im Beet',
     list: 'Hinweise',
     warnings_one: '{{count}} Warnung',
     warnings_other: '{{count}} Warnungen',

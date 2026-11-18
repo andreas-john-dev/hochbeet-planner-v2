@@ -59,12 +59,13 @@ export function ViewOptions({ labelledBy }: { labelledBy?: string }) {
 }
 
 /** Compact switch for the editor's header on larger screens; the sentence is its title. */
-export function ViewSwitch() {
+export function ViewSwitch({ id }: { id?: string }) {
   const { t } = useTranslation('common');
   const { view, loading, setView, saveError } = useView();
 
   return (
     <div
+      id={id}
       role="group"
       aria-label={t('view.choose')}
       className="bg-muted flex h-11 rounded-md border p-1"

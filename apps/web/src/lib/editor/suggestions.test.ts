@@ -71,6 +71,47 @@ describe('suggestions in the editor', () => {
     expect(near?.status).toBe('WARNING');
   });
 
+  it('starts suggestions this week without an own end in the simple view', () => {
+    const existing = {
+      id: 'p1',
+      bedId: bed.id,
+      plantId: plantId('Kopfsalat'),
+      kind: 'SINGLE' as const,
+      x: 50,
+      y: 50,
+      origin: 'TRANSPLANT' as const,
+      startDate: '2026-09-28',
+      endDate: null,
+      removedDate: null,
+    };
+    // Suggested for next spring, next to the lettuce of this week.
+    const later = suggestion('Kopfsalat', { x: 55, y: 50, startDate: '2027-03-08' });
+    const [expert] = showSuggestions(
+      [{ index: 0, suggestion: later }],
+      bed,
+      [existing],
+      seedPlants,
+      '2026-10-05',
+    );
+    expect(expert?.planting.startDate).toBe('2027-03-08');
+    expect(expert?.status).toBeUndefined();
+    const [simple] = showSuggestions(
+      [{ index: 0, suggestion: later }],
+      bed,
+      [existing],
+      seedPlants,
+      '2026-10-05',
+      undefined,
+      'SIMPLE',
+    );
+    expect(simple?.planting).toMatchObject({ startDate: '2026-10-05', endDate: null });
+    expect(simple?.status).toBe('WARNING');
+    expect(simple && adoptedPlanting(simple)).toMatchObject({
+      startDate: '2026-10-05',
+      endDate: null,
+    });
+  });
+
   it('leaves out suggestions of unknown plants', () => {
     expect(
       showSuggestions(

@@ -23,6 +23,7 @@ import { withContractMessages } from '@/lib/form-errors';
 import { useSaveBed } from '@/lib/garden';
 import { cn } from '@/lib/utils';
 import { checkRenewals } from '@/lib/soil-renewals';
+import { useView } from '@/lib/view';
 import { RowDirectionSketch } from './RowDirectionSketch';
 import { type RenewalEntry, SoilRenewalsField } from './SoilRenewalsField';
 import { useLanguage } from '@/lib/i18n';
@@ -40,6 +41,7 @@ const NEW_BED: BedForm = { name: '', widthCm: 200, depthCm: 100, mainRowDirectio
 /**
  * Create or edit a bed: name, size, main row direction and soil renewals. Until the user picks
  * a direction, it follows the default: parallel to the shorter edge, so rows run across the bed.
+ * The simple view has no soil renewals; saving keeps the bed's dates as they are.
  */
 export function BedFormDialog({
   bed,
@@ -74,6 +76,7 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
   const { t } = useTranslation(['beds', 'common']);
   const { language } = useLanguage();
   const save = useSaveBed();
+  const simple = useView().view === 'SIMPLE';
   const [directionChosen, setDirectionChosen] = useState(!!bed);
   const [today] = useState(() => formatISO(new Date(), { representation: 'date' }));
   const [renewals, setRenewals] = useState<RenewalEntry[]>(() =>
@@ -96,6 +99,14 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
   }, [directionChosen, suggested, form]);
 
   const onSubmit = form.handleSubmit(async (fields) => {
+    if (simple) {
+      await save.mutateAsync({
+        id: bed?.id,
+        fields: { ...fields, soilRenewals: bed?.soilRenewals ?? [] },
+      });
+      onDone();
+      return;
+    }
     const checked = checkRenewals(
       renewals.map((r) => r.value),
       language,
@@ -192,12 +203,14 @@ function BedForm({ bed, onDone }: { bed: Bed | undefined; onDone: () => void }) 
         />
         <p className="text-muted-foreground text-xs">{t('form.directionHelp')}</p>
       </fieldset>
-      <SoilRenewalsField
-        entries={renewals}
-        today={today}
-        error={renewalError}
-        onChange={setRenewals}
-      />
+      {!simple && (
+        <SoilRenewalsField
+          entries={renewals}
+          today={today}
+          error={renewalError}
+          onChange={setRenewals}
+        />
+      )}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           {t('common:cancel')}
