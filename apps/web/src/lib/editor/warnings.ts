@@ -1,6 +1,7 @@
 import type { Bed, IsoDate, Plant, Planting, SowingWithPlantings } from '@hochbeet/contracts';
 import {
   evaluateBed,
+  type EvaluateScope,
   type Finding,
   type Interval,
   isActiveInWeek,
@@ -33,21 +34,34 @@ export interface SeasonOptions {
   lastFrost?: string | undefined;
   /** The user's sowing batches, for the rules about planted out seedlings. */
   sowings?: readonly SowingWithPlantings[] | undefined;
+  /**
+   * `SIMPLE` for the simple view: only the spatial rules for the plantings of the week of
+   * `date`, so only findings of that week. `ALL` (default) evaluates the whole season.
+   */
+  scope?: EvaluateScope | undefined;
 }
 
-/** Findings that touch the season of `date`, with all plantings of the bed evaluated. */
+/**
+ * Findings that touch the season of `date`, with all plantings of the bed evaluated; in the
+ * simple view only those of the week of `date`.
+ */
 export function seasonFindings(
   bed: Bed,
   plantings: readonly Planting[],
   plants: readonly Plant[],
   date: IsoDate,
-  { language, lastFrost, sowings }: SeasonOptions,
+  { language, lastFrost, sowings, scope = 'ALL' }: SeasonOptions,
 ): Finding[] {
-  const season = seasonOf(bed, date);
-  const options = {
+  const texts = {
     locale: language,
     plantName: (plant: Plant) => plantName(plant, language),
     familyName: (plant: Plant) => familyName(plant, language),
+  };
+  if (scope === 'SIMPLE')
+    return evaluateBed(bed, plantings, plants, { ...texts, scope, week: date });
+  const season = seasonOf(bed, date);
+  const options = {
+    ...texts,
     ...(lastFrost ? { lastFrost } : {}),
     ...(sowings ? { sowings } : {}),
   };

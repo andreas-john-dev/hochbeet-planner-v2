@@ -120,6 +120,60 @@ describe('season', () => {
   });
 });
 
+describe('simple view', () => {
+  it('finds only spatial problems of the week, no crop rotation, frost or sowing problems', () => {
+    // Tomato (frost sensitive, before 15 May) next to a potato, after an earlier tomato on
+    // the same spot (crop rotation), and lettuce planted out too early from a batch.
+    const plantings = [
+      planting('tomate-alt', 'Tomate', { startDate: '2026-03-02', endDate: '2026-05-04' }),
+      planting('tomate', 'Tomate'),
+      planting('kartoffel', 'Kartoffel', { x: 80 }),
+      planting('salat', 'Kopfsalat', { x: 150, origin: 'TRANSPLANT', sowingId: 'batch' }),
+    ];
+    const sowings = [
+      {
+        sowing: {
+          id: 'batch',
+          plantId: plant('Kopfsalat').id,
+          sowDate: '2026-04-20',
+          sownCount: 12,
+          aliveCount: 10,
+          stage: 'HARDENING' as const,
+        },
+        plantings: [
+          { id: 'salat', bedId: bed.id, kind: 'SINGLE' as const, startDate: '2026-05-04' },
+        ],
+      },
+    ];
+    const rules = (scope: 'ALL' | 'SIMPLE') =>
+      new Set(
+        seasonFindings(bed, plantings, seedPlants, '2026-05-04', {
+          language: 'de',
+          sowings,
+          scope,
+        }).map((f) => f.rule),
+      );
+    expect(rules('ALL')).toEqual(
+      new Set(['BAD_NEIGHBOR', 'SPACING', 'CROP_ROTATION', 'FROST', 'TRANSPLANT_EARLY']),
+    );
+    expect(rules('SIMPLE')).toEqual(new Set(['BAD_NEIGHBOR', 'SPACING']));
+  });
+
+  it('only finds problems of plantings in the bed that week', () => {
+    // The potato is gone by October; in May it stands next to the tomato.
+    const plantings = [
+      planting('tomate', 'Tomate', { endDate: '2026-12-28' }),
+      planting('kartoffel', 'Kartoffel', { x: 80, endDate: '2026-08-03' }),
+    ];
+    const simple = (date: string) =>
+      seasonFindings(bed, plantings, seedPlants, date, { language: 'de', scope: 'SIMPLE' }).map(
+        (f) => f.rule,
+      );
+    expect(simple('2026-05-04')).toEqual(['BAD_NEIGHBOR', 'SPACING']);
+    expect(simple('2026-10-05')).toEqual([]);
+  });
+});
+
 describe('status per planting', () => {
   it('keeps the most serious finding', () => {
     const status = statusByPlanting([

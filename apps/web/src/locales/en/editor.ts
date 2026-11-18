@@ -10,6 +10,7 @@ export const editor: typeof de = {
     text: 'This bed does not exist or no longer exists.',
   },
   loadError: 'The bed could not be loaded. Please reload the page.',
+  expertHint: 'More options in the expert view',
   toolbar: {
     edit: 'Edit',
     bedSettings: 'Edit bed',
@@ -111,6 +112,7 @@ export const editor: typeof de = {
     removeHint: 'The planting stays in the history and counts for crop rotation.',
     startsLater: 'The planting only starts after {{week}}.',
     delete: 'Delete planting',
+    remove: 'Remove planting',
     toSowing: 'Go to seedlings',
     fromSowing: 'From your seedlings',
     noSowing: 'None (e.g. bought)',

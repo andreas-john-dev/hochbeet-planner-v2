@@ -18,17 +18,19 @@ const keyOf = (f: Finding) => `${f.rule}:${f.plantingIds.join(',')}:${f.period.s
 /**
  * Findings of the season with text and period; the rule engine writes the text in the user's
  * language. A click highlights the plantings and jumps to the week; findings outside the
- * shown week are greyed out.
+ * shown week are greyed out. The simple view shows no periods (`showPeriods`).
  */
 export function FindingsList({
   findings,
   week,
   highlighted,
+  showPeriods = true,
   onPick,
 }: {
   findings: readonly Finding[];
   week: IsoDate;
   highlighted: readonly string[];
+  showPeriods?: boolean;
   onPick: (finding: Finding) => void;
 }) {
   const { t } = useTranslation('editor');
@@ -70,9 +72,11 @@ export function FindingsList({
                   <Icon aria-hidden className={cn('mt-0.5 size-4 shrink-0', className)} />
                   <span className="sr-only">{t(`severity.${finding.severity}`)}: </span>
                   <span className="flex-1">{finding.message}</span>
-                  <span className="text-muted-foreground shrink-0 text-xs">
-                    {formatPeriod(finding.period, language)}
-                  </span>
+                  {showPeriods && (
+                    <span className="text-muted-foreground shrink-0 text-xs">
+                      {formatPeriod(finding.period, language)}
+                    </span>
+                  )}
                 </button>
               </li>
             );

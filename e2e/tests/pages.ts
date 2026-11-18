@@ -67,6 +67,21 @@ export const appPages: readonly AppPage[] = [
     seed: exampleGarden,
   },
   {
+    // The simple view (T-75): the bed of this week without timeline, dates and raising.
+    id: 'beete-einfach',
+    path: '/beete',
+    heading: 'Meine Beete',
+    access: 'user',
+    seed: { ...exampleGarden, view: 'SIMPLE' },
+  },
+  {
+    id: 'beet-editor-einfach',
+    path: `/beete/${EXAMPLE_BED_ID}`,
+    heading: 'Hochbeet Süd',
+    access: 'user',
+    seed: { ...exampleGarden, view: 'SIMPLE' },
+  },
+  {
     // The editor with the Beet-Assistent open and one streamed answer (admins may use it).
     id: 'beet-editor-assistent',
     path: `/beete/${EXAMPLE_BED_ID}`,
