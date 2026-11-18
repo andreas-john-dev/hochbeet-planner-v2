@@ -18,5 +18,14 @@ test('the next test starts without it', async ({ page }) => {
   await signInAs(page, 'user');
   await open(page, '/beete', 'Meine Beete');
   await expect(page.getByRole('heading', { name: 'Noch keine Beete' })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('hochbeet-mock-api'))).toBeNull();
+  // Only what signInAs() seeds for the view (T-73), nothing of the previous test.
+  const stored = await page.evaluate(() => localStorage.getItem('hochbeet-mock-api'));
+  expect(stored).not.toContain('Bleibt nicht');
+  expect(JSON.parse(stored ?? '{}')).toEqual({
+    'test@example.com': {
+      beds: [],
+      plantings: [],
+      settings: { lastFrost: '05-15', view: 'EXPERT' },
+    },
+  });
 });

@@ -4,7 +4,6 @@ import {
   type CatalogPlant,
   DEFAULT_GARDEN_SETTINGS,
   type GardenSettings,
-  GardenSettingsSchema,
   type ListBedsResponse,
   type ListPlantsResponse,
   type ListSowingsResponse,
@@ -13,6 +12,7 @@ import {
   type PlantFields,
   type PlantOverride,
   SaveBedRequestSchema,
+  SaveGardenSettingsRequestSchema,
   SaveOverrideRequestSchema,
   SavePlantingRequestSchema,
   SavePlantRequestSchema,
@@ -194,11 +194,17 @@ export function localRoutes({ repo, globals, newId = () => ulid() }: LocalApiOpt
       json<GardenSettings>(repo.read().settings ?? DEFAULT_GARDEN_SETTINGS),
     ),
 
+    // Like the garden service: without `view` the saved one stays.
     route('PUT', '/api/garden/settings', async ({ request }) => {
-      const parsed = await parseJson(request, GardenSettingsSchema);
+      const parsed = await parseJson(request, SaveGardenSettingsRequestSchema);
       if (parsed.response) return parsed.response;
-      repo.write({ ...repo.read(), settings: parsed.data });
-      return json<GardenSettings>(parsed.data);
+      const garden = repo.read();
+      const settings: GardenSettings = {
+        ...parsed.data,
+        view: parsed.data.view ?? garden.settings?.view ?? DEFAULT_GARDEN_SETTINGS.view,
+      };
+      repo.write({ ...garden, settings });
+      return json<GardenSettings>(settings);
     }),
 
     // Sowing batches; like the garden service, plantings keep the id of a deleted batch.

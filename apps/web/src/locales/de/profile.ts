@@ -1,4 +1,4 @@
-/** Profile page with its cards: account, appearance, language, garden and assistant. */
+/** Profile page with its cards: account, appearance, language, view, garden and assistant. */
 export const profile = {
   title: 'Profil',
   description: 'Konto und Einstellungen.',
@@ -14,6 +14,9 @@ export const profile = {
   language: {
     title: 'Sprache',
     description: 'Gilt für die App in diesem Browser.',
+  },
+  view: {
+    description: 'Gilt für alle Beete, auf allen Geräten. Beete und Pflanzungen bleiben gleich.',
   },
   garden: {
     title: 'Garten',

@@ -9,7 +9,7 @@ Eine CDK-App in TypeScript deployt acht Stacks nach `eu-central-1` und den Zerti
 | `Prod-SharedStateful` | Cognito User Pool, SPA-Client (ohne Secret, SRP), Gruppen `admins` und `ai-testers`, monatliches AWS-Budget mit Alarm | – |
 | `Prod-CatalogStateful` | DynamoDB-Tabelle mit GSI, Seed per Custom Resource | – |
 | `Prod-CatalogStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
-| `Prod-GardenStateful` | DynamoDB-Tabelle | – |
+| `Prod-GardenStateful` | DynamoDB-Tabelle, einmalige Migration der Ansicht per Custom Resource (T-73) | – |
 | `Prod-GardenStateless` | Lambdalith, HTTP API, JWT-Authorizer | User Pool, Tabelle |
 | `Prod-AssistantStateful` | DynamoDB-Tabelle für das Tageskontingent des Assistenten (TTL), AgentCore Memory des Assistenten (T-44) | – |
 | `Prod-Assistant` | AgentCore Runtime mit dem Python-Agenten, JWT-Authorizer und Usage-Logs; Bedrock Guardrail mit fester Version (T-63); AgentCore Gateway mit Tool-Lambda und Request-Interceptor | User Pool, Kontingent-Tabelle; Garden- und Catalog-API über die Domain |
@@ -79,6 +79,8 @@ cdk-nag (AwsSolutions) läuft als Policy-Validation-Plugin über die ganze App; 
 | `AwsSolutions-APIG4` (Route ohne Autorisierung) | Route `GET /api/catalog/public/plants` (`ServiceApiStack`, `publicGetPaths`) | Bewusst öffentlich für Gäste: nur lesend, ohne User-Daten, von CloudFront gecacht und mit eigenem, niedrigem Throttling. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Seed-Funktion im Catalog-Stack | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `PutItem`. |
 | `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Seed-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Seed-Funktion>:*`) lassen sich nicht anpassen. |
+| `AwsSolutions-IAM4` (AWS-managed Policy) | Migrationsfunktion der Ansicht im Garden-Stack (T-73) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; auf die Tabelle darf die Funktion nur `Scan` und `UpdateItem`. |
+| `AwsSolutions-IAM4`, `-IAM5` | Provider-Framework der Migrations-Custom-Resource | Von aws-cdk-lib erzeugt; Rolle und Aufrufrecht (`<Migrationsfunktion>:*`) lassen sich nicht anpassen. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Passwort-Funktion des Smoke-Testusers (`SharedStatefulStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; sonst darf die Funktion nur `AdminSetUserPassword` auf diesem User Pool. |
 | `AwsSolutions-IAM4` (AWS-managed Policy) | Tool- und Interceptor-Lambda des Gateways (`AssistantStack`) | `AWSLambdaBasicExecutionRole` erlaubt nur das Schreiben der eigenen Logs; weitere AWS-Rechte brauchen die Funktionen nicht. |
 | `AwsSolutions-IAM5` | Rolle des AgentCore Gateways (`AssistantStack`) | Vom Gateway-Construct erzeugt: das Aufrufrecht auf Tool- und Interceptor-Lambda umfasst `<Funktion>:*` (Versionen und Aliase). Einzeln bestätigt. |

@@ -251,6 +251,23 @@ export class GardenRepository {
     );
   }
 
+  /** Saves the settings only while the user has none; true if they were written. */
+  async createSettings(userId: string, settings: GardenSettings): Promise<boolean> {
+    try {
+      await this.client.send(
+        new PutCommand({
+          TableName: this.tableName,
+          Item: { PK: userPk(userId), SK: SETTINGS_SK, ...settings },
+          ConditionExpression: 'attribute_not_exists(PK)',
+        }),
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof ConditionalCheckFailedException) return false;
+      throw error;
+    }
+  }
+
   async getImport(userId: string, importId: string): Promise<ImportRecord | undefined> {
     const { Item } = await this.client.send(
       new GetCommand({

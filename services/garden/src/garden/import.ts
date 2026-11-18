@@ -1,4 +1,5 @@
 import {
+  DEFAULT_GARDEN_SETTINGS,
   type ImportGardenRequest,
   type ImportGardenResponse,
   ImportGardenResponseSchema,
@@ -6,7 +7,10 @@ import {
 } from '@hochbeet/contracts';
 import type { GardenRepository, ImportedGarden } from './repository';
 
-export type ImportStore = Pick<GardenRepository, 'getImport' | 'putImport' | 'putImported'>;
+export type ImportStore = Pick<
+  GardenRepository,
+  'getImport' | 'putImport' | 'putImported' | 'createSettings'
+>;
 
 /**
  * The imported beds, plantings and sowing batches with new ids. `known` holds ids already
@@ -39,7 +43,7 @@ export function planGardenImport(
 }
 
 /**
- * Imports a guest's beds, plantings and sowing batches into the user's garden. The id mapping is stored
+ * Imports a guest's beds, plantings, sowing batches and view into the user's garden. The id mapping is stored
  * before anything else, the response only at the end: a repeated call with the same
  * `importId` returns the stored response, or finishes an interrupted import with the same ids.
  */
@@ -56,6 +60,10 @@ export async function importGarden(
   const { ids, ...garden } = planGardenImport(request, existing?.ids ?? {}, newId);
   await store.putImport(userId, request.importId, { ids });
   await store.putImported(userId, garden);
+  // The guest's view, unless the account already has settings (and with them a view).
+  if (request.view) {
+    await store.createSettings(userId, { ...DEFAULT_GARDEN_SETTINGS, view: request.view });
+  }
   const result: ImportGardenResponse = {
     bedIds: Object.fromEntries(request.beds.map((bed) => [bed.id, ids[bed.id] ?? ''])),
   };

@@ -16,6 +16,7 @@ import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { parseISO } from 'date-fns';
 import {
   ArrowLeft,
+  Ellipsis,
   Maximize,
   MapPinOff,
   MessageCircle,
@@ -43,6 +44,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FormMessage } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { ViewOptions, ViewSwitch } from '@/components/ViewChoice';
 import { ApiError, apiErrorMessage } from '@/lib/api';
 import { activePlantings } from '@/lib/active-plantings';
 import { canUseAssistant } from '@/lib/assistant';
@@ -94,7 +96,7 @@ function bedIdParam(params: unknown): string {
 
 /** Bed editor: the bed true to scale with grid, plantings of the current week, zoom and pan. */
 function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string | undefined }) {
-  const { t } = useTranslation('editor');
+  const { t } = useTranslation(['editor', 'common']);
   const details = useBedWithPlantings(bedId);
   const plants = usePlants();
   const sowings = useSowings();
@@ -107,8 +109,10 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
   const { user, guest } = useAuth();
   const assistant = canUseAssistant(user, guest);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const assistantId = useId();
+  const viewHeadingId = useId();
   const save = useSavePlanting(bedId);
   const remove = useDeletePlanting(bedId);
   const { history, week } = useStore(store);
@@ -332,7 +336,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
               <Redo2 />
             </Button>
           </div>
-          <div className="flex gap-2" role="toolbar" aria-label={t('toolbar.view')}>
+          <div className="flex gap-2" role="toolbar" aria-label={t('toolbar.zoom')}>
             <Button
               variant="outline"
               size="icon"
@@ -377,6 +381,22 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
             >
               <MessageCircle aria-hidden />
               {t('toolbar.assistant')}
+            </Button>
+          )}
+          {/* The view (T-73): in the header on larger screens, in the menu on phones. */}
+          {isDesktop ? (
+            <ViewSwitch />
+          ) : (
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={t('toolbar.more')}
+              aria-haspopup="dialog"
+              onClick={() => {
+                setMoreOpen(true);
+              }}
+            >
+              <Ellipsis />
             </Button>
           )}
         </div>
@@ -449,6 +469,17 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
       </div>
       {error && <FormMessage tone="error">{apiErrorMessage(error)}</FormMessage>}
       {bed && <BedFormDialog bed={bed} open={settingsOpen} onOpenChange={setSettingsOpen} />}
+      <Sheet open={!isDesktop && moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent aria-describedby={undefined}>
+          <SheetTitle>{t('toolbar.more')}</SheetTitle>
+          <section aria-labelledby={viewHeadingId} className="flex flex-col gap-2">
+            <h3 id={viewHeadingId} className="text-sm font-medium">
+              {t('common:view.label')}
+            </h3>
+            <ViewOptions labelledBy={viewHeadingId} />
+          </section>
+        </SheetContent>
+      </Sheet>
       {assistant && bed && (
         <Sheet open={!isDesktop && assistantOpen} onOpenChange={setAssistantOpen}>
           <SheetContent aria-describedby={undefined} className="h-[85dvh]">

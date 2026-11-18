@@ -13,6 +13,16 @@ export const common: typeof de = {
     de: 'Deutsch',
     en: 'English',
   },
+  view: {
+    label: 'View',
+    choose: 'Simple or expert',
+    SIMPLE: 'Simple',
+    EXPERT: 'Expert',
+    description: {
+      SIMPLE: 'Plant your bed and check spacing and neighbours, without planning over time.',
+      EXPERT: 'With timeline, crop rotation, soil renewal and seedlings.',
+    },
+  },
   apiError: {
     unauthorized: 'Your session has expired. Please sign in again.',
     forbidden: 'You do not have permission to do that.',

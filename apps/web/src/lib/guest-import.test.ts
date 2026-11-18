@@ -116,6 +116,12 @@ describe('import requests', () => {
     ]);
     expect(request.plantings[0]).toMatchObject({ plantId: 'NEW-OWN', sowingId: SOWING });
   });
+
+  it('sends the guest view only when the guest has settings', () => {
+    expect(gardenImportRequest(garden, 'IMPORT', {})).not.toHaveProperty('view');
+    const expert: LocalGarden = { ...garden, settings: { lastFrost: '05-15', view: 'EXPERT' } };
+    expect(gardenImportRequest(expert, 'IMPORT', {}).view).toBe('EXPERT');
+  });
 });
 
 describe('importGuestData', () => {

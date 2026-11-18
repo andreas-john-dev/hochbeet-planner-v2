@@ -57,6 +57,7 @@ export function catalogImportRequest(garden: LocalGarden, importId: string): Imp
 /**
  * Beds, plantings and sowing batches, with plantings and batches pointing to the new ids of
  * imported own plants. The garden service gives everything new ids and maps `sowingId`.
+ * The guest's view goes along; the account only takes it while it has no settings.
  */
 export function gardenImportRequest(
   garden: LocalGarden,
@@ -69,6 +70,7 @@ export function gardenImportRequest(
     beds: garden.beds,
     plantings: garden.plantings.map((p) => ({ ...p, plantId: plantId(p.plantId) })),
     sowings: (garden.sowings ?? []).map((s) => ({ ...s, plantId: plantId(s.plantId) })),
+    ...(garden.settings ? { view: garden.settings.view } : {}),
   };
 }
 

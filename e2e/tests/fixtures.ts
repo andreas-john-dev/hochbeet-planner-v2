@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
+import { SEED_VIEW, seedView, type View } from './garden';
 import type { Access, Language } from './pages';
 
 /** Fixed "now" so date labels and screenshots are stable: Wednesday, 7 October 2026. */
@@ -58,8 +59,16 @@ interface StorageState {
  * project. Each test chooses its account itself and some switch accounts midway, so the
  * stored localStorage is applied per page instead of per project. Only seeds it once, so a
  * sign-out in the test sticks across reloads.
+ *
+ * Accounts start in the expert view like users with data before T-73, so existing tests and
+ * baselines stay as they were; `{ view: null }` starts like a new user (simple view). Guests
+ * get their view from `seedGuestGarden()`; without seeded data they start simple.
  */
-export async function signInAs(page: Page, access: Access) {
+export async function signInAs(
+  page: Page,
+  access: Access,
+  { view = SEED_VIEW }: { view?: View | null } = {},
+) {
   if (access === 'public') return;
   if (access === 'guest') {
     // Only once, so ending guest mode in the test sticks across reloads.
@@ -71,6 +80,7 @@ export async function signInAs(page: Page, access: Access) {
     }, GUEST_MODE_KEY);
     return;
   }
+  if (view) await seedView(page, USERS[access].email, view);
   const state = JSON.parse(readFileSync(authFile(access), 'utf8')) as StorageState;
   const entries = state.origins.flatMap((o) => o.localStorage);
   await page.addInitScript((items) => {
