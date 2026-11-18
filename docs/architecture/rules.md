@@ -1,23 +1,25 @@
 # Regel-Engine
 
-Teil der [Architektur](../architecture.md). Die Fachregeln in `packages/garden-rules` (Abstand, Nachbarn, Starkzehrer, Fruchtfolge, Beetrand, Frost) und ihre Schnittstelle.
+Teil der [Architektur](../architecture.md). Die Fachregeln in `packages/garden-rules` (Abstand, Nachbarn, Starkzehrer, Fruchtfolge, Beetrand, Frost, Anzucht) und ihre Schnittstelle.
 
 Alle Warnungen werden von einer reinen TypeScript-Bibliothek `packages/garden-rules` berechnet und nie gespeichert. Warnungen blockieren das Speichern nie. Sie veralten deshalb auch nicht, wenn eine Sorte angepasst wird.
 
 Alle Regeln für Paare außer der Fruchtfolge gelten nur zwischen Pflanzungen, deren Zeiträume sich überlappen. Der Einflussradius für Nachbarschaft und Starkzehrer beträgt 30 cm und ist als Konstante zentral konfigurierbar.
 
-| Regel | Bedingung | Stufe |
-| --- | --- | --- |
-| Pflanzabstand | Standflächen zweier Pflanzungen überlappen (Lücke < 0) | Warnung |
-| Schlechte Nachbarn | Eine Sorte steht in `badNeighbors` der anderen und die Lücke ist < 30 cm | Warnung |
-| Gute Nachbarn | Eine Sorte steht in `goodNeighbors` der anderen, keine Seite markiert das Paar als schlecht, und die Lücke ist < 30 cm | Positiver Hinweis |
-| Starkzehrer | Beide sind `STARK`, stehen quer zur Reihenrichtung nebeneinander und die Lücke ist < 30 cm; hintereinander in Reihenrichtung nie | Warnung |
-| Fruchtfolge | Auf mindestens einer Rasterzelle gehört der direkte Vorgänger zur selben Familie, und dazwischen wurde die Erde nicht erneuert | Warnung |
-| Beetrand | Standfläche ragt über den Beetrand | Dezenter Hinweis |
-| Frost | Sorte ist `frostSensitive` und kommt am oder vor dem letzten Frosttermin desselben Jahres ins Beet (Direktsaat wie Pflanzung) | Dezenter Hinweis |
-| Zu früh ausgepflanzt | Pflanzung aus einer Charge: `startDate` < Aussaatwoche + `propagationWeeks.min` | Warnung |
-| Zu lange in der Anzucht | Pflanzung aus einer Charge: `startDate` > Aussaatwoche + `propagationWeeks.max` + 2 Wochen | Dezenter Hinweis |
-| Mehr verplant als vorhanden | Verplant (alle Beete) > Bestand einer nicht abgeschlossenen Charge (`batchStock()`: vor der Keimung `sownCount`, danach `aliveCount`) | Warnung an allen verknüpften Pflanzungen des Beets |
+| Regel | Bedingung | Stufe | Einfache Ansicht |
+| --- | --- | --- | --- |
+| Pflanzabstand | Standflächen zweier Pflanzungen überlappen (Lücke < 0) | Warnung | ja |
+| Schlechte Nachbarn | Eine Sorte steht in `badNeighbors` der anderen und die Lücke ist < 30 cm | Warnung | ja |
+| Gute Nachbarn | Eine Sorte steht in `goodNeighbors` der anderen, keine Seite markiert das Paar als schlecht, und die Lücke ist < 30 cm | Positiver Hinweis | ja |
+| Starkzehrer | Beide sind `STARK`, stehen quer zur Reihenrichtung nebeneinander und die Lücke ist < 30 cm; hintereinander in Reihenrichtung nie | Warnung | ja |
+| Fruchtfolge | Auf mindestens einer Rasterzelle gehört der direkte Vorgänger zur selben Familie, und dazwischen wurde die Erde nicht erneuert | Warnung | nein |
+| Beetrand | Standfläche ragt über den Beetrand | Dezenter Hinweis | ja |
+| Frost | Sorte ist `frostSensitive` und kommt am oder vor dem letzten Frosttermin desselben Jahres ins Beet (Direktsaat wie Pflanzung) | Dezenter Hinweis | nein |
+| Zu früh ausgepflanzt | Pflanzung aus einer Charge: `startDate` < Aussaatwoche + `propagationWeeks.min` | Warnung | nein |
+| Zu lange in der Anzucht | Pflanzung aus einer Charge: `startDate` > Aussaatwoche + `propagationWeeks.max` + 2 Wochen | Dezenter Hinweis | nein |
+| Mehr verplant als vorhanden | Verplant (alle Beete) > Bestand einer nicht abgeschlossenen Charge (`batchStock()`: vor der Keimung `sownCount`, danach `aliveCount`) | Warnung an allen verknüpften Pflanzungen des Beets | nein |
+
+In der einfachen Ansicht (`scope: 'SIMPLE'`, T-74) gelten nur die räumlichen Regeln einer Woche. Fruchtfolge, Frost und Anzucht hängen von der Historie, vom Datum oder von den Chargen ab und fallen weg.
 
 Befunde an Chargen (`evaluateSowings()`, Anzucht-Seite):
 
@@ -59,11 +61,13 @@ Der Einflussradius (`INFLUENCE_RADIUS_CM = 30` in `constants.ts`) gilt, solange 
 
 ## Schnittstelle
 
-Die Engine erhält ein Beet, alle seine Pflanzungen und die effektiven Sorten des Users: `evaluateBed(bed, plantings, plants, { week?, lastFrost?, sowings?, locale?, plantName?, familyName? })`. `sowings` sind die Chargen des Users mit ihren verknüpften Pflanzungen aus allen Beeten (`GET /garden/sowings`); ohne sie greifen die Anzucht-Regeln nicht. Sie liefert eine Liste von Befunden mit Regel, Stufe, betroffenen Pflanzungs-IDs, Zeitraum, Parametern und einem Anzeigetext in der gewünschten Sprache. Optional kann man auf eine Woche filtern. Die Engine ist isomorph und läuft im Browser wie in Node.
+Die Engine erhält ein Beet, alle seine Pflanzungen und die effektiven Sorten des Users: `evaluateBed(bed, plantings, plants, { scope?, week?, lastFrost?, sowings?, locale?, plantName?, familyName? })`. `sowings` sind die Chargen des Users mit ihren verknüpften Pflanzungen aus allen Beeten (`GET /garden/sowings`); ohne sie greifen die Anzucht-Regeln nicht. Sie liefert eine Liste von Befunden mit Regel, Stufe, betroffenen Pflanzungs-IDs, Zeitraum, Parametern und einem Anzeigetext in der gewünschten Sprache. Optional kann man auf eine Woche filtern. Die Engine ist isomorph und läuft im Browser wie in Node.
 
 Umsetzung (`packages/garden-rules/src/engine.ts`):
 
 - `evaluateBed` verbindet die Pflanzungen einmal mit ihren Sorten und ruft alle Regeln auf. Die Befunde kommen in fester Reihenfolge: Warnungen, dann dezente Hinweise, dann positive Hinweise; innerhalb davon nach Regel, Pflanzungs-IDs und Zeitraum.
+- **Regelliste:** `BED_RULES` führt jede Regel als `{ rule, ids, timeDependent }` mit den Regelcodes ihrer Befunde. `timeDependent` ist Pflicht: Neue Regeln müssen sich entscheiden, ob sie mehr als die Pflanzungen einer Woche brauchen (Historie, Datum, Chargen). Ein Test prüft, dass jeder Code aus `RULE_IDS` zu genau einer Regel gehört. `ruleIdsInScope(scope)` liefert die Codes, die ein Umfang liefern kann.
+- **Umfang** (`scope`, T-74): `ALL` (Standard) wertet alle Regeln aus wie bisher. `SIMPLE` (einfache Ansicht, Epic #161) verlangt `week` (im Typ von `EvaluateOptions` und zur Laufzeit) und wertet nur die Regeln ohne `timeDependent` aus: Pflanzabstand, schlechte und gute Nachbarn, Starkzehrer und Beetrand. Dabei zählen nur die Pflanzungen, die in der Woche im Beet stehen; Chargen werden ignoriert. Weil Paare nur über ihre gemeinsame Zeit warnen, liefern die räumlichen Regeln für diese Woche genau dasselbe wie mit `ALL`. Ein Property-Test sichert das zu: Die Befunde mit `SIMPLE` sind die räumlichen Befunde mit `ALL` für dieselbe Woche, also eine Teilmenge.
 - `lastFrost` ist der letzte Frost des Users als `MM-DD` (`GardenSettings`, T-53); fehlt er, gilt `DEFAULT_LAST_FROST` (15. Mai). Die Regeln bekommen ihn über `RuleContext.lastFrost`. Der Editor übergibt ihn aus `useGardenSettings()` (Gäste: Standard), das Gateway-Tool `evaluate_bed` liest ihn mit dem Token des Users über `GET /api/garden/settings`, damit Assistent und App dieselben Befunde sehen.
 - Die Chargen kommen einmal vorberechnet in den Kontext (`RuleContext.sowings`: Charge und verplante Menge je ID, `sowingInfos()`), damit jede Regel nur nachschlägt.
 - **Zweiter Einstieg** `evaluateSowings(sowings, plants, { lastFrost?, locale?, plantName?, familyName? })` liefert `SowingFinding`s (`rule`, `severity`, `sowingId`, `params`, `message`) für die Anzucht-Seite, sortiert nach Stufe, Regel und Charge. **Abweichung von „nur `evaluateBed()`“** (Epic #121): Befunde an Chargen haben kein Beet und keine Pflanzungen, an denen sie hängen könnten; sie in `evaluateBed()` zu packen, hätte die Anzucht-Seite gezwungen, ein Beet zu erfinden, und jedem Beet dieselben Befunde zur Charge gegeben. Beide Einstiege nutzen dieselben Bausteine (`sowingInfos()`, `rules/sowing.ts`), die Regeln bleiben rein und isomorph.
@@ -74,4 +78,4 @@ Umsetzung (`packages/garden-rules/src/engine.ts`):
 - Ein Test prüft, dass jede Regel (`RULE_IDS`, `SOWING_RULE_IDS`) in jeder Sprache einen Text hat; neue Regeln brauchen deshalb Texte in beiden Dateien (der Typ `Messages` erzwingt das schon beim Kompilieren).
 - Mit `week` wird trotzdem die ganze Historie ausgewertet (die Fruchtfolge braucht Vorgänger); zurück kommen nur Befunde, deren Zeitraum die ISO-Woche berührt.
 - Property-Tests (fast-check) sichern zu: Das Ergebnis hängt nicht von der Reihenfolge der Pflanzungen, Sorten oder Chargen ab (für beide Einstiege), Anzucht-Befunde hängen nur an Pflanzungen bekannter Chargen, Nachbarlisten wirken symmetrisch, Befunde sind wohlgeformt, und der Wochenfilter liefert genau die passende Teilmenge.
-- Leistung: 200 Pflanzungen in einem 6 × 3 m Beet über zwei Saisons brauchen im Median etwa 15 ms (Vorgabe: unter 50 ms, auch mit 25 Chargen und jeder zweiten Pflanzung aus einer Charge und mit `locale: 'en'`; `engine.perf.test.ts` misst die CPU-Zeit des Prozesses, damit parallel laufende Test-Suites das Ergebnis nicht verfälschen). Die Fruchtfolge nutzt dafür einen Zellindex mit kleinen ganzzahligen Schlüsseln und prüft Familie und Erneuerung nur einmal pro Paar.
+- Leistung: 200 Pflanzungen in einem 6 × 3 m Beet über zwei Saisons brauchen im Median etwa 15 ms (Vorgabe: unter 50 ms, auch mit 25 Chargen und jeder zweiten Pflanzung aus einer Charge, mit `locale: 'en'` und für eine Woche mit beiden Werten von `scope`; mit `SIMPLE` sind es wenige Millisekunden, weil nur die Pflanzungen der Woche zählen; `engine.perf.test.ts` misst die CPU-Zeit des Prozesses, damit parallel laufende Test-Suites das Ergebnis nicht verfälschen). Die Fruchtfolge nutzt dafür einen Zellindex mit kleinen ganzzahligen Schlüsseln und prüft Familie und Erneuerung nur einmal pro Paar.

@@ -1,7 +1,7 @@
 import type { Plant, Planting, SowingWithPlantings } from '@hochbeet/contracts';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { evaluateBed, evaluateSowings } from './engine';
+import { evaluateBed, evaluateSowings, ruleIdsInScope } from './engine';
 import { type Footprint, gap } from './geometry';
 import { isActiveInWeek } from './time';
 import { batch, bed as makeBed, plant as makePlant } from './test-utils';
@@ -264,6 +264,24 @@ describe('rule engine properties', () => {
         const all = evaluateBed(bed, plantings, plants);
         const filtered = evaluateBed(bed, plantings, plants, { week });
         expect(filtered).toEqual(all.filter((f) => isActiveInWeek(f.period, week)));
+      }),
+    );
+  });
+
+  it('finds in the simple view a subset of all findings for the same week', () => {
+    const spatial: readonly string[] = ruleIdsInScope('SIMPLE');
+    fc.assert(
+      fc.property(sowingScenario, monday, ([plants, plantings, sowings], week) => {
+        const all = evaluateBed(bed, plantings, plants, { week, sowings, lastFrost: '05-15' });
+        const simple = evaluateBed(bed, plantings, plants, {
+          scope: 'SIMPLE',
+          week,
+          sowings,
+          lastFrost: '05-15',
+        });
+        for (const finding of simple) expect(all).toContainEqual(finding);
+        // Exactly the spatial findings of that week, in the same order.
+        expect(simple).toEqual(all.filter((f) => spatial.includes(f.rule)));
       }),
     );
   });
