@@ -40,4 +40,14 @@ describe('rule engine performance', () => {
     console.info(`evaluateBed with sowings: 200 plantings, median ${median.toFixed(1)} ms`);
     expect(median, `median ${median.toFixed(1)} ms`).toBeLessThan(50);
   });
+
+  it.each(['ALL', 'SIMPLE'] as const)('stays under 50 ms for one week with scope %s', (scope) => {
+    const options = { scope, week: '2026-06-15', sowings };
+    const median = medianMs(() => evaluateBed(bed, plantings, plants, options));
+    expect(evaluateBed(bed, plantings, plants, options).length).toBeGreaterThan(0);
+    console.info(
+      `evaluateBed for one week, ${scope}: 200 plantings, median ${median.toFixed(1)} ms`,
+    );
+    expect(median, `median ${median.toFixed(1)} ms`).toBeLessThan(50);
+  });
 });

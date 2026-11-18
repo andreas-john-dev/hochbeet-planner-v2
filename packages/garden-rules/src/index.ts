@@ -13,6 +13,15 @@ export { LATE_TRANSPLANT_GRACE_WEEKS, sowingBatchRules, sowingRule } from './rul
 export { neighborsRule } from './rules/neighbors';
 export { heavyFeedersRule } from './rules/heavy-feeders';
 export { cropRotationRule } from './rules/crop-rotation';
-export { evaluateBed, evaluateSowings, type EvaluateOptions } from './engine';
+export {
+  BED_RULES,
+  type BedRule,
+  EVALUATE_SCOPES,
+  evaluateBed,
+  evaluateSowings,
+  type EvaluateOptions,
+  type EvaluateScope,
+  ruleIdsInScope,
+} from './engine';
 export { candidatePlanting, DEFAULT_CANDIDATE_ROW_CM } from './candidates';
 export { rangeText, weekHint, windowText } from './week-window';

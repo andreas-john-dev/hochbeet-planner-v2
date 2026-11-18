@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateBed } from './engine';
-import { bed, plant, single } from './test-utils';
+import { BED_RULES, evaluateBed, type EvaluateOptions, ruleIdsInScope } from './engine';
+import { RULE_IDS } from './findings';
+import { batch, bed, plant, single } from './test-utils';
 
 const tomato = plant('tomate', {
   name: 'Tomate',
@@ -25,16 +26,16 @@ const basil = plant('basilikum', {
 });
 const plants = [tomato, potato, basil];
 
-describe('evaluateBed', () => {
-  // Tomato x 0..60, potato x 50..80 (overlaps by 10), basil x 70..90 (10 cm beside the
-  // tomato) from June, and a potato at the bed edge.
-  const plantings = [
-    single('t', 'tomate', 30, 30),
-    single('k', 'kartoffel', 65, 30),
-    single('b', 'basilikum', 80, 30, { startDate: '2026-06-01' }),
-    single('e', 'kartoffel', 190, 80),
-  ];
+// Tomato x 0..60, potato x 50..80 (overlaps by 10), basil x 70..90 (10 cm beside the
+// tomato) from June, and a potato at the bed edge.
+const plantings = [
+  single('t', 'tomate', 30, 30),
+  single('k', 'kartoffel', 65, 30),
+  single('b', 'basilikum', 80, 30, { startDate: '2026-06-01' }),
+  single('e', 'kartoffel', 190, 80),
+];
 
+describe('evaluateBed', () => {
   it('runs all rules and sorts warnings before hints and positive hints', () => {
     const findings = evaluateBed(bed(), plantings, plants);
     expect(findings.map((f) => [f.severity, f.rule, f.plantingIds.join('+')])).toEqual([
@@ -125,5 +126,99 @@ describe('evaluateBed', () => {
   it('returns nothing for an empty bed and skips unknown plants', () => {
     expect(evaluateBed(bed(), [], plants)).toEqual([]);
     expect(evaluateBed(bed(), [single('x', 'unbekannt', 30, 30)], plants)).toEqual([]);
+  });
+});
+
+describe('rule list', () => {
+  it('assigns every rule code to exactly one rule, which decides whether it is time dependent', () => {
+    const ids = BED_RULES.flatMap((entry) => entry.ids);
+    expect([...ids].sort()).toEqual([...RULE_IDS].sort());
+    for (const entry of BED_RULES) expect(typeof entry.timeDependent).toBe('boolean');
+  });
+
+  it('keeps the spatial rules for the simple view', () => {
+    expect(ruleIdsInScope('SIMPLE')).toEqual([
+      'SPACING',
+      'BAD_NEIGHBOR',
+      'GOOD_NEIGHBOR',
+      'HEAVY_FEEDER',
+      'BED_EDGE',
+    ]);
+    expect(ruleIdsInScope('ALL')).toEqual(BED_RULES.flatMap((entry) => entry.ids));
+  });
+});
+
+describe('evaluateBed with scope SIMPLE', () => {
+  const simple = (week: string): EvaluateOptions => ({ scope: 'SIMPLE', week });
+
+  it('finds no crop rotation problems', () => {
+    const earlier = single('t1', 'tomate', 30, 30, {
+      startDate: '2026-04-06',
+      endDate: '2026-06-01',
+    });
+    const later = single('t2', 'tomate', 30, 30, {
+      startDate: '2026-06-01',
+      endDate: '2026-09-07',
+    });
+    const all = evaluateBed(bed(), [earlier, later], plants, { week: '2026-07-15' });
+    expect(all.map((f) => f.rule)).toEqual(['CROP_ROTATION']);
+    expect(evaluateBed(bed(), [earlier, later], plants, simple('2026-07-15'))).toEqual([]);
+  });
+
+  it('finds no frost problems', () => {
+    const frosty = [{ ...tomato, frostSensitive: true }];
+    const plantings = [single('t', 'tomate', 30, 30)]; // from Monday 4 May 2026
+    const all = evaluateBed(bed(), plantings, frosty, { week: '2026-05-04' });
+    expect(all.map((f) => f.rule)).toEqual(['FROST']);
+    expect(evaluateBed(bed(), plantings, frosty, simple('2026-05-04'))).toEqual([]);
+  });
+
+  it('finds no sowing problems at planted out seedlings', () => {
+    const raised = {
+      ...basil,
+      sowing: {
+        method: 'PRESOW' as const,
+        presowWeeks: { from: 10, to: 30 },
+        propagationWeeks: { min: 3, max: 4 },
+      },
+    };
+    // Sown 9 March, out after two weeks (three needed), and more planned than alive.
+    const plantings = [
+      single('b', 'basilikum', 50, 50, { startDate: '2026-03-23', sowingId: 's' }),
+    ];
+    const sowings = [batch('s', 'basilikum', { aliveCount: 0 }, plantings)];
+    const options = { sowings, lastFrost: '01-01' };
+    const all = evaluateBed(bed(), plantings, [raised], { ...options, week: '2026-03-23' });
+    expect(all.map((f) => f.rule)).toEqual(['OVERPLANNED', 'TRANSPLANT_EARLY']);
+    expect(
+      evaluateBed(bed(), plantings, [raised], { ...options, scope: 'SIMPLE', week: '2026-03-23' }),
+    ).toEqual([]);
+  });
+
+  it('finds the same with the spatial rules as ALL for that week', () => {
+    for (const week of ['2026-05-13', '2026-06-03', '2027-01-06']) {
+      expect(evaluateBed(bed(), plantings, plants, simple(week))).toEqual(
+        evaluateBed(bed(), plantings, plants, { week }),
+      );
+    }
+    expect(evaluateBed(bed(), plantings, plants, simple('2026-06-03'))).toHaveLength(5);
+  });
+
+  it('only counts the plantings of that week', () => {
+    // The two tomatoes overlap, but one after the other: never both in the bed.
+    const plantings = [
+      single('t1', 'tomate', 30, 30, { startDate: '2026-04-06', endDate: '2026-06-01' }),
+      single('t2', 'tomate', 40, 30, { startDate: '2026-06-01', endDate: '2026-09-07' }),
+      single('e', 'kartoffel', 190, 80, { startDate: '2026-08-03' }),
+    ];
+    expect(evaluateBed(bed(), plantings, plants, simple('2026-05-11'))).toEqual([]);
+    expect(
+      evaluateBed(bed(), plantings, plants, simple('2026-08-05')).map((f) => f.plantingIds),
+    ).toEqual([['e']]);
+  });
+
+  it('needs a week', () => {
+    const options = { scope: 'SIMPLE' } as unknown as EvaluateOptions;
+    expect(() => evaluateBed(bed(), [], plants, options)).toThrow(/needs a week/);
   });
 });
