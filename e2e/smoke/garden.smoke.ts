@@ -40,6 +40,18 @@ async function bedNames(page: Page): Promise<string[]> {
   );
 }
 
+/** Switches the editor back to `view`; after a reload it is still selected, so it was saved. */
+async function restoreView(page: Page, view: string) {
+  const views = page.getByRole('group', { name: 'Einfach oder Experte' });
+  await views.getByRole('button', { name: view }).click({ timeout: 10_000 });
+  // The switch is optimistic: wait for the request before reloading.
+  await page.waitForLoadState('networkidle', { timeout: 10_000 });
+  await page.reload();
+  await expect(views.getByRole('button', { pressed: true })).toHaveText(view, {
+    timeout: 20_000,
+  });
+}
+
 test.describe('signed in as the smoke user', () => {
   test.skip(!email || !password, 'SMOKE_USER_EMAIL and SMOKE_USER_PASSWORD are not set');
 
@@ -61,6 +73,7 @@ test.describe('signed in as the smoke user', () => {
     // Leftovers of an aborted earlier run.
     await deleteBeds(page, (name) => name.startsWith(BED_PREFIX));
 
+    let initialView: string | null = null;
     try {
       // Beet anlegen
       // "Erstes Beet anlegen" while the user has no beds, "Beet anlegen" otherwise.
@@ -95,10 +108,18 @@ test.describe('signed in as the smoke user', () => {
       await page.reload();
       await expect(findings).toContainText('Kartoffel und Tomate sind schlechte Nachbarn.');
 
-      // Zeitachse: a week later both are still in the bed.
+      // Zeitachse (expert view only, T-75): a week later both are still in the bed. The smoke
+      // user has no data, so like every new user it starts in the simple view.
+      const views = page.getByRole('group', { name: 'Einfach oder Experte' });
+      initialView = await views.getByRole('button', { pressed: true }).textContent();
+      await views.getByRole('button', { name: 'Experte' }).click();
       await page.getByRole('button', { name: 'Nächste Woche' }).click();
       await expect(page.locator('[data-testid^="planting-"]')).toHaveCount(2);
     } finally {
+      // Leaves the view as it was; a failure here must not keep the bed from being deleted.
+      if (initialView && initialView !== 'Experte') {
+        await restoreView(page, initialView).catch(() => undefined);
+      }
       // Cleans up also when a step above failed.
       await deleteBeds(page, (name) => name === bedName);
     }
