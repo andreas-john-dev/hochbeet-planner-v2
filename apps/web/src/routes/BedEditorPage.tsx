@@ -923,7 +923,7 @@ function Workspace({
         findings={seasonal}
         week={weekIso}
         highlighted={highlighted}
-        showPeriods={!simple}
+        simple={simple}
         onPick={pick}
       />
       <Sheet open={!isDesktop && paletteOpen} onOpenChange={setPaletteOpen}>

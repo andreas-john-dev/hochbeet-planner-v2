@@ -150,6 +150,7 @@ export const editor: typeof de = {
   },
   findings: {
     title: 'Hints this season',
+    titleSimple: 'Hints in the bed',
     list: 'Hints',
     warnings_one: '{{count}} warning',
     warnings_other: '{{count}} warnings',

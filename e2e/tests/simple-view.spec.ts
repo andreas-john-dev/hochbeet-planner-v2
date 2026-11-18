@@ -165,7 +165,8 @@ test('warns about spacing and bad neighbours, not about crop rotation', async ({
   await addPlant(page, isMobile, 'Kartoffel', { x: 160, y: 50 });
   await expect(findings(page)).toContainText('Kartoffel und Tomate sind schlechte Nachbarn.');
   await expect(findings(page)).not.toContainText('folgt am selben Platz');
-  // The simple view shows no periods ("KW 41 2026", "ab KW 41 2026").
+  // The simple view shows the bed now, without periods ("KW 41 2026", "ab KW 41 2026").
+  await expect(page.getByRole('heading', { name: 'Hinweise im Beet' })).toBeVisible();
   await expect(findings(page)).not.toContainText('KW');
 
   // The expert view knows the crop rotation of the same data.

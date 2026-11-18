@@ -150,6 +150,7 @@ export const editor = {
   },
   findings: {
     title: 'Hinweise dieser Saison',
+    titleSimple: 'Hinweise im Beet',
     list: 'Hinweise',
     warnings_one: '{{count}} Warnung',
     warnings_other: '{{count}} Warnungen',
