@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from .auth import Caller, caller_from_headers
 from .config import Settings
 from .memory import AgentCoreMemoryStore, MemoryStore
+from .messages import Language, language_of, message
 from .prompt import (
     InvalidRequestError,
     MemoryRequest,
@@ -27,27 +28,26 @@ from .suggest import SuggestionError, SuggestionResult
 
 logger = logging.getLogger("bed_assistant")
 
-UNAVAILABLE = "Der Assistent ist gerade nicht erreichbar. Bitte versuche es gleich noch einmal."
-MEMORY_UNAVAILABLE = "Das Gedächtnis des Assistenten ist gerade nicht erreichbar."
 
-
-def error(message: str, status: int) -> JSONResponse:
-    """Same shape as ErrorResponse of the services: a German `message`."""
-    return JSONResponse({"message": message}, status_code=status)
+def error(text: str, status: int) -> JSONResponse:
+    """Same shape as ErrorResponse of the services: a `message` in the request's language."""
+    return JSONResponse({"message": text}, status_code=status)
 
 
 def sse(data: dict[str, Any]) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def events(chunks: AsyncIterator[str], remaining: int) -> AsyncIterator[str]:
+async def events(
+    chunks: AsyncIterator[str], remaining: int, language: Language = "de"
+) -> AsyncIterator[str]:
     """`{"text"}` per chunk, then `{"done", "remaining"}`; a model error ends with `{"error"}`."""
     try:
         async for chunk in chunks:
             yield sse({"text": chunk})
     except Exception:
         logger.exception("model call failed")
-        yield sse({"error": UNAVAILABLE})
+        yield sse({"error": message(language, "unavailable")})
         return
     yield sse({"done": True, "remaining": remaining})
 
@@ -62,12 +62,14 @@ async def handle(
     memory: MemoryStore | None = None,
     session_id: str | None = None,
 ) -> Response:
+    # Refusals before the request is parsed use its language if it has a valid one.
+    language = language_of(payload)
     caller = caller_from_headers(headers)
     if caller is None:
-        return error("Bitte melde dich an.", 401)
+        return error(message(language, "sign_in"), 401)
     # The runtime's authorizer checks the groups already; this is the second line of defence.
     if not caller.groups & settings.allowed_groups:
-        return error("Der Assistent ist noch nicht für dein Konto freigeschaltet.", 403)
+        return error(message(language, "not_enabled"), 403)
     if isinstance(payload, dict) and "memory" in payload:
         try:
             memory_request = parse_memory_request(payload)
@@ -81,15 +83,21 @@ async def handle(
     try:
         remaining = quota.take(caller.user_id)
     except QuotaExceededError:
-        return error(
-            f"Du hast heute schon {settings.daily_limit} Fragen gestellt. Morgen geht es weiter.",
-            429,
-        )
-    logger.info("question", extra={"userId": caller.user_id, "remaining": remaining})
+        return error(message(request.language, "quota", limit=settings.daily_limit), 429)
+    logger.info(
+        "question",
+        extra={"userId": caller.user_id, "remaining": remaining, "language": request.language},
+    )
     stream = (
-        suggestion_events(responder, request.message, caller, request.bed_id, remaining)
+        suggestion_events(
+            responder, request.message, caller, request.bed_id, remaining, request.language
+        )
         if request.suggest and request.bed_id
-        else events(responder.stream(user_prompt(request), caller, session_id), remaining)
+        else events(
+            responder.stream(user_prompt(request), caller, session_id, request.language),
+            remaining,
+            request.language,
+        )
     )
     return StreamingResponse(
         stream,
@@ -102,8 +110,9 @@ async def memory_response(
     request: MemoryRequest, caller: Caller, memory: MemoryStore | None
 ) -> Response:
     """Lists or forgets what the assistant remembers about the caller; never about others."""
+    unavailable = message(request.language, "memory_unavailable")
     if memory is None:
-        return error(MEMORY_UNAVAILABLE, 503)
+        return error(unavailable, 503)
     try:
         if request.memory == "list":
             memories = await asyncio.to_thread(memory.preferences, caller.user_id)
@@ -111,33 +120,38 @@ async def memory_response(
         records, conversation = await asyncio.to_thread(memory.forget, caller.user_id)
     except Exception:
         logger.exception("memory request failed")
-        return error(MEMORY_UNAVAILABLE, 503)
+        return error(unavailable, 503)
     logger.info("forgot", extra={"userId": caller.user_id, "memories": records})
     return JSONResponse({"memories": records, "events": conversation})
 
 
-def suggestion_text(result: SuggestionResult) -> str:
+def suggestion_text(result: SuggestionResult, language: Language = "de") -> str:
     """What the chat shows with the suggestions: the summary and any warnings left."""
     if not result.suggestions:
-        return result.summary or "Ich habe gerade keinen passenden Vorschlag für dieses Beet."
-    text = result.summary or f"{len(result.suggestions)} Vorschläge für dein Beet."
+        return result.summary or message(language, "no_suggestion")
+    text = result.summary or message(language, "suggestion_count", count=len(result.suggestions))
     if result.warnings:
-        text += "\n\nDie Regel-Engine meldet noch: " + " ".join(result.warnings)
+        text += "\n\n" + message(language, "warnings_left") + " " + " ".join(result.warnings)
     return text
 
 
 async def suggestion_events(
-    responder: Responder, question: str, caller: Caller, bed_id: str, remaining: int
+    responder: Responder,
+    question: str,
+    caller: Caller,
+    bed_id: str,
+    remaining: int,
+    language: Language = "de",
 ) -> AsyncIterator[str]:
     """The summary as text, then the checked suggestions with remaining warnings, then done."""
     try:
-        result = await responder.suggest(question, caller, bed_id)
+        result = await responder.suggest(question, caller, bed_id, language)
     except SuggestionError as failed:
         yield sse({"error": str(failed)})
         return
     except Exception:
         logger.exception("suggestions failed")
-        yield sse({"error": UNAVAILABLE})
+        yield sse({"error": message(language, "unavailable")})
         return
     logger.info(
         "suggestions",
@@ -147,7 +161,7 @@ async def suggestion_events(
             "rounds": result.rounds,
         },
     )
-    yield sse({"text": suggestion_text(result)})
+    yield sse({"text": suggestion_text(result, language)})
     yield sse({"suggestions": result.suggestions, "warnings": result.warnings})
     yield sse({"done": True, "remaining": remaining})
 

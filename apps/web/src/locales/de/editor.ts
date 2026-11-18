@@ -212,5 +212,6 @@ export const editor = {
     disclaimer:
       'Antworten stammen von einer KI und können falsch sein. Enter sendet, Umschalt+Enter macht eine neue Zeile.',
     defaultQuestion: 'Was kann ich in dieses Beet noch pflanzen?',
+    interrupted: 'Die Antwort wurde unterbrochen. Bitte versuche es noch einmal.',
   },
 };

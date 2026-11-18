@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Protocol
 
+from .messages import DEFAULT_LANGUAGE, Language, message
+
 GRID_CM = 5
 MAX_SUGGESTIONS = 6
 DEFAULT_ROW_CM = 50
@@ -31,16 +33,11 @@ TOOLS_TARGET = "garden"
 #: The only gateway tool the model may use for suggestions; get_bed and evaluate_bed run in code.
 SUGGESTION_TOOLS = ("find_plants",)
 
-TIMEOUT_MESSAGE = (
-    "Die Vorschläge haben zu lange gedauert. Bitte versuche es noch einmal, gern mit einem "
-    "genaueren Wunsch."
-)
-
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 
 
 class SuggestionError(Exception):
-    """Suggestions cannot be made; the message is German and goes to the user."""
+    """Suggestions cannot be made; the message is in the request's language and goes to the user."""
 
 
 @dataclass(frozen=True)
@@ -50,10 +47,10 @@ class Bed:
     main_row_direction: str
 
     @classmethod
-    def from_tool(cls, data: dict[str, Any]) -> "Bed":
+    def from_tool(cls, data: dict[str, Any], language: Language = DEFAULT_LANGUAGE) -> "Bed":
         bed = data.get("bed")
         if not isinstance(bed, dict):
-            raise SuggestionError("Das Beet konnte nicht gelesen werden.")
+            raise SuggestionError(message(language, "bed_unreadable"))
         return cls(int(bed["widthCm"]), int(bed["depthCm"]), str(bed["mainRowDirection"]))
 
 
@@ -78,7 +75,9 @@ def monday_of(value: str) -> str | None:
     return (day - timedelta(days=day.weekday())).isoformat()
 
 
-def sanitize(raw: Sequence[Any], bed: Bed) -> tuple[list[dict[str, Any]], int]:
+def sanitize(
+    raw: Sequence[Any], bed: Bed, language: Language = DEFAULT_LANGUAGE
+) -> tuple[list[dict[str, Any]], int]:
     """
     Puts suggestions onto the 5 cm grid and the Monday of their week; drops those without a
     valid plant id or date, or outside the bed. Returns the kept ones and how many were dropped.
@@ -86,7 +85,7 @@ def sanitize(raw: Sequence[Any], bed: Bed) -> tuple[list[dict[str, Any]], int]:
     kept: list[dict[str, Any]] = []
     dropped = 0
     for item in raw:
-        suggestion = _sanitize_one(item, bed)
+        suggestion = _sanitize_one(item, bed, language)
         if suggestion is None or len(kept) >= MAX_SUGGESTIONS:
             dropped += 1
         else:
@@ -94,7 +93,7 @@ def sanitize(raw: Sequence[Any], bed: Bed) -> tuple[list[dict[str, Any]], int]:
     return kept, dropped
 
 
-def _sanitize_one(item: Any, bed: Bed) -> dict[str, Any] | None:
+def _sanitize_one(item: Any, bed: Bed, language: Language) -> dict[str, Any] | None:
     if not isinstance(item, dict):
         return None
     plant_id = item.get("plantId")
@@ -107,8 +106,8 @@ def _sanitize_one(item: Any, bed: Bed) -> dict[str, Any] | None:
         return None
     if not (0 <= x <= bed.width_cm and 0 <= y <= bed.depth_cm):
         return None
-    reason = (
-        str(item.get("reason") or "").strip()[:MAX_REASON_CHARS] or "Vorschlag des Assistenten."
+    reason = str(item.get("reason") or "").strip()[:MAX_REASON_CHARS] or message(
+        language, "default_reason"
     )
     suggestion: dict[str, Any] = {
         "plantId": plant_id,
@@ -141,10 +140,14 @@ class GardenTools(Protocol):
 
 
 class McpGardenTools:
-    """Calls the gateway tools directly (not through the model) with the caller's session."""
+    """
+    Calls the gateway tools directly (not through the model) with the caller's session; the
+    client's `Accept-Language` sets the language of their texts and errors.
+    """
 
-    def __init__(self, client: Any) -> None:
+    def __init__(self, client: Any, language: Language = DEFAULT_LANGUAGE) -> None:
         self._client = client
+        self._language = language
 
     async def call(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
         result = await self._client.call_tool_async(
@@ -157,7 +160,7 @@ class McpGardenTools:
         except json.JSONDecodeError:
             data = None
         if result.get("status") == "error" or not isinstance(data, dict):
-            raise SuggestionError("Die Gartendaten sind gerade nicht erreichbar.")
+            raise SuggestionError(message(self._language, "garden_unreachable"))
         if isinstance(data.get("error"), str):
             raise SuggestionError(data["error"])
         return data
@@ -178,12 +181,17 @@ def occupied(bed_data: dict[str, Any], today: date) -> list[dict[str, Any]]:
     return current
 
 
+#: Language of reasons and summary per request language.
+ANSWER_LANGUAGE: dict[Language, str] = {"de": "auf Deutsch", "en": "auf Englisch (britisch)"}
+
+
 def suggestion_prompt(
     question: str,
     bed: Bed,
     bed_data: dict[str, Any],
     today: date,
     preferences: Sequence[str] = (),
+    language: Language = DEFAULT_LANGUAGE,
 ) -> str:
     known = (
         "Bekannte Vorlieben des Users (berücksichtigen):\n"
@@ -209,7 +217,8 @@ def suggestion_prompt(
         "- Konflikte zwischen vorhandenen Pflanzungen sind nicht deine Aufgabe; schlage trotzdem "
         "vor. Eine leere Liste nur, wenn wirklich keine freie Fläche da ist, auch nicht nach dem "
         "Ende einer Pflanzung.\n"
-        "- startDate ist der Montag der Pflanzwoche. Begründe jeden Vorschlag kurz.\n\n"
+        "- startDate ist der Montag der Pflanzwoche. Begründe jeden Vorschlag kurz.\n"
+        f"- Schreibe Begründungen und Zusammenfassung {ANSWER_LANGUAGE[language]}.\n\n"
         f"{known}Wunsch des Users:\n{question}"
     )
 
@@ -236,13 +245,15 @@ async def suggest(
     preferences: Sequence[str] = (),
     seconds: float = 50.0,
     clock: Callable[[], float] = time.monotonic,
+    language: Language = DEFAULT_LANGUAGE,
 ) -> SuggestionResult:
     """
     Runs the check loop: `ask` returns the model's structured answer for a prompt (the same
     conversation across rounds); `evaluate_bed` checks the sanitized suggestions. Everything
     together takes at most `seconds`: a later round that runs out of time is dropped in favour
-    of the last checked one, a first round raises a German `SuggestionError`.
+    of the last checked one, a first round raises a `SuggestionError` in `language`.
     """
+    timeout = message(language, "timeout")
     deadline = clock() + seconds
 
     async def within_deadline[T](step: Awaitable[T]) -> T:
@@ -251,23 +262,23 @@ async def suggest(
     try:
         bed_data = await within_deadline(tools.call("get_bed", {"bedId": bed_id}))
     except TimeoutError as late:
-        raise SuggestionError(TIMEOUT_MESSAGE) from late
-    bed = Bed.from_tool(bed_data)
-    prompt = suggestion_prompt(question, bed, bed_data, today, preferences)
+        raise SuggestionError(timeout) from late
+    bed = Bed.from_tool(bed_data, language)
+    prompt = suggestion_prompt(question, bed, bed_data, today, preferences, language)
     result: SuggestionResult | None = None
     for done in range(1, max(1, rounds) + 1):
         try:
             result, prompt = await within_deadline(
-                _round(ask, tools, prompt, bed, bed_id, done, rounds)
+                _round(ask, tools, prompt, bed, bed_id, done, rounds, language)
             )
         except TimeoutError as late:
             if result is None:
-                raise SuggestionError(TIMEOUT_MESSAGE) from late
+                raise SuggestionError(timeout) from late
             break
         if not prompt:
             break
     if result is None:
-        raise SuggestionError(TIMEOUT_MESSAGE)
+        raise SuggestionError(timeout)
     return result
 
 
@@ -279,11 +290,12 @@ async def _round(
     bed_id: str,
     done: int,
     rounds: int,
+    language: Language,
 ) -> tuple[SuggestionResult, str]:
     """One round: ask, sanitize, check. Returns the result and the next prompt ("" = finished)."""
     answer = await ask(prompt)
     summary = str(answer.get("summary") or "").strip()
-    suggestions, dropped = sanitize(answer.get("suggestions") or [], bed)
+    suggestions, dropped = sanitize(answer.get("suggestions") or [], bed, language)
     if not suggestions:
         return SuggestionResult([], [], summary, done), ""
     evaluation = await tools.call(

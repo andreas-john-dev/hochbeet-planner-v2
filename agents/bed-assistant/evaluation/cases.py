@@ -9,6 +9,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from bed_assistant.messages import Language
+
 from .bed import EvalBed
 
 
@@ -130,8 +132,8 @@ class Case:
     suggest: bool = False
     #: Simple task in the sense of the recommendation (e.g. explain a warning).
     simple: bool = False
-    #: Language of the question; the assistant answers in it.
-    language: str = "de"
+    #: Language of the app (request) and the question; the assistant answers in it.
+    language: Language = "de"
 
 
 #: Applied to every plain answer on top of the case's own checks (plus its language).
@@ -234,11 +236,31 @@ CASES: Sequence[Case] = (
         "Welche Beete habe ich?",
         (uses("list_beds"), mentions("Eval")),
     ),
+    # The app in English (T-72): English names from the tools, English suggestions.
     Case(
         "englisch",
         "How far apart should I plant tomatoes?",
         (mentions("60"),),
         simple=True,
+        language="en",
+    ),
+    Case(
+        "warnings-en",
+        "Which warnings does my bed have?",
+        (
+            uses("evaluate_bed"),
+            mentions("Broccoli|crop rotation", "Beetroot", "Spinach", "Leek"),
+            avoids("Rote Bete", "Lauch", "Fruchtfolge"),
+        ),
+        with_bed=True,
+        language="en",
+    ),
+    Case(
+        "suggestion-en",
+        "What else can I plant in this bed?",
+        (suggests(), suggestions_in_bed(), no_warnings_left(), in_english()),
+        with_bed=True,
+        suggest=True,
         language="en",
     ),
     # Off topic: refuse kindly, without tools.

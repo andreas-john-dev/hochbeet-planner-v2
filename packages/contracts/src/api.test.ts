@@ -183,6 +183,16 @@ describe('assistant contracts', () => {
     expect(AssistantRequestSchema.safeParse({ message: 'Hier?', bedId: 'x' }).success).toBe(false);
   });
 
+  it('carries the app language to the assistant, German or English only', () => {
+    const english = { message: 'What goes with tomatoes?', language: 'en' };
+    expect(AssistantRequestSchema.parse(english)).toEqual(english);
+    expect(AssistantRequestSchema.safeParse({ message: 'Hi', language: 'fr' }).success).toBe(false);
+    expect(AssistantMemoryRequestSchema.parse({ memory: 'list', language: 'en' })).toEqual({
+      memory: 'list',
+      language: 'en',
+    });
+  });
+
   it('describes tool inputs for the model and checks ids and dates', () => {
     expect(GetBedToolInputSchema.safeParse({ bedId: bed.id }).success).toBe(true);
     expect(GetBedToolInputSchema.safeParse({ bedId: '../admin' }).success).toBe(false);

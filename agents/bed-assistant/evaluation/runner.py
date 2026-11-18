@@ -143,15 +143,18 @@ async def run_case(
     started = time.perf_counter()
     try:
         if case.suggest:
-            result = await responder.suggest(case.question, caller, bed_id)
-            outcome.text = suggestion_text(result)
+            result = await responder.suggest(case.question, caller, bed_id, case.language)
+            outcome.text = suggestion_text(result, case.language)
             outcome.suggestions = result.suggestions
             outcome.warnings = result.warnings
         else:
             request = AssistantRequest(
-                message=case.question, bedId=bed_id if case.with_bed else None
+                message=case.question,
+                bedId=bed_id if case.with_bed else None,
+                language=case.language,
             )
-            async for chunk in responder.stream(user_prompt(request), caller, None):
+            prompt = user_prompt(request)
+            async for chunk in responder.stream(prompt, caller, None, request.language):
                 if first_text is None:
                     first_text = time.perf_counter() - started
                 outcome.text += chunk

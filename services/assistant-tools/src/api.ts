@@ -11,11 +11,12 @@ import {
   ListSowingsResponseSchema,
 } from '@hochbeet/contracts';
 import type { z } from 'zod';
+import type { ToolMessageKey } from './messages';
 
-/** A tool cannot answer; the message is German and goes to the model as tool result. */
+/** A tool cannot answer; `key` names the message the model gets as tool result. */
 export class ToolFailure extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(readonly key: ToolMessageKey) {
+    super(key);
     this.name = 'ToolFailure';
   }
 }
@@ -49,15 +50,15 @@ export function createApiReader(
         signal: AbortSignal.timeout(8000),
       });
     } catch {
-      throw new ToolFailure('Die Gartendaten sind gerade nicht erreichbar.');
+      throw new ToolFailure('unreachable');
     }
     if (response.status === 401 || response.status === 403) {
-      throw new ToolFailure('Keine Berechtigung für diese Daten.');
+      throw new ToolFailure('forbidden');
     }
-    if (response.status === 404) throw new ToolFailure('Das Beet gibt es nicht.');
-    if (!response.ok) throw new ToolFailure('Die Gartendaten sind gerade nicht erreichbar.');
+    if (response.status === 404) throw new ToolFailure('bedNotFound');
+    if (!response.ok) throw new ToolFailure('unreachable');
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
-    if (!parsed.success) throw new ToolFailure('Die Gartendaten sind gerade nicht lesbar.');
+    if (!parsed.success) throw new ToolFailure('unreadable');
     return parsed.data;
   }
 

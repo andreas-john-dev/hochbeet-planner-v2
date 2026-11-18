@@ -1,6 +1,7 @@
 import {
   type CandidatePlanting,
   type CatalogPlant,
+  DEFAULT_LOCALE,
   familyName,
   type EvaluateBedToolOutput,
   EvaluateBedToolInputSchema,
@@ -12,6 +13,7 @@ import {
   ListBedsToolInputSchema,
   type ListSowingsToolOutput,
   ListSowingsToolInputSchema,
+  type Locale,
   type Planting,
   plantName,
   type Sowing,
@@ -29,6 +31,7 @@ import {
 } from '@hochbeet/garden-rules';
 import { z } from 'zod';
 import { type GardenReader, ToolFailure } from './api';
+import { toolMessage } from './messages';
 
 /** Most plants find_plants returns; the model can narrow the query for more. */
 export const MAX_PLANTS = 15;
@@ -38,7 +41,8 @@ export const MAX_SOWINGS = 20;
 
 /**
  * The tools of the gateway target. Descriptions are German, short and tell the model when
- * to use the tool; the input schemas come from packages/contracts.
+ * to use the tool; the input schemas come from packages/contracts. What the tools return
+ * (plant names, findings, windows, errors) is in the language of the request (`locale`).
  */
 export const TOOL_DEFINITIONS = {
   list_beds: {
@@ -91,12 +95,13 @@ export function toolInputJsonSchemas(): Record<ToolName, ToolJsonSchema> {
 
 const until = (planting: Planting) => planting.removedDate ?? planting.endDate;
 
-const plantNames = (plants: readonly CatalogPlant[]) =>
-  new Map(plants.map((plant) => [plant.id, plant.name]));
+/** Plant names by id in `locale` (English names of global plants, else the stored name). */
+const plantNames = (plants: readonly CatalogPlant[], locale: Locale) =>
+  new Map(plants.map((plant) => [plant.id, plantName(plant, locale)]));
 
-async function getBed(api: GardenReader, bedId: string): Promise<GetBedToolOutput> {
+async function getBed(api: GardenReader, bedId: string, locale: Locale): Promise<GetBedToolOutput> {
   const [{ bed, plantings }, { plants }] = await Promise.all([api.getBed(bedId), api.listPlants()]);
-  const names = plantNames(plants);
+  const names = plantNames(plants, locale);
   const byId = new Map(plants.map((plant) => [plant.id, plant]));
   const area = (planting: (typeof plantings)[number]) => {
     const plant = byId.get(planting.plantId);
@@ -117,7 +122,7 @@ async function getBed(api: GardenReader, bedId: string): Promise<GetBedToolOutpu
       .sort((a, b) => a.startDate.localeCompare(b.startDate))
       .map((p) => ({
         id: p.id,
-        plant: names.get(p.plantId) ?? 'Unbekannte Sorte',
+        plant: names.get(p.plantId) ?? toolMessage('unknownPlant', locale),
         kind: p.kind,
         x: p.x,
         y: p.y,
@@ -130,22 +135,30 @@ async function getBed(api: GardenReader, bedId: string): Promise<GetBedToolOutpu
 }
 
 /** The raising details of a plant, windows with months so the model need not convert weeks. */
-function sowingOf(sowing: Sowing) {
+function sowingOf(sowing: Sowing, locale: Locale) {
   const { method, presowWeeks, propagationWeeks, prickOutWeeks, directSowWeeks } = sowing;
   return {
     method,
-    ...(presowWeeks ? { presow: windowText(presowWeeks) } : {}),
+    ...(presowWeeks ? { presow: windowText(presowWeeks, undefined, locale) } : {}),
     ...(propagationWeeks
       ? { propagationWeeks: rangeText(propagationWeeks.min, propagationWeeks.max) }
       : {}),
     ...(prickOutWeeks === undefined ? {} : { prickOutWeeks }),
-    ...(directSowWeeks ? { directSow: windowText(directSowWeeks) } : {}),
+    ...(directSowWeeks ? { directSow: windowText(directSowWeeks, undefined, locale) } : {}),
   };
 }
 
-async function findPlants(api: GardenReader, query?: string): Promise<FindPlantsToolOutput> {
+/**
+ * Plants by German or English name, sorted by the stored name. `name`/`family` are the stored
+ * values, `nameEn`/`familyEn` the English ones; neighbours are named in `locale`.
+ */
+async function findPlants(
+  api: GardenReader,
+  locale: Locale,
+  query?: string,
+): Promise<FindPlantsToolOutput> {
   const { plants } = await api.listPlants();
-  const names = plantNames(plants);
+  const names = plantNames(plants, locale);
   const needle = query?.toLocaleLowerCase('de');
   const matches = plants
     .filter(
@@ -157,7 +170,7 @@ async function findPlants(api: GardenReader, query?: string): Promise<FindPlants
     )
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   const neighbors = (ids: readonly string[]) =>
-    ids.flatMap((id) => names.get(id) ?? []).sort((a, b) => a.localeCompare(b, 'de'));
+    ids.flatMap((id) => names.get(id) ?? []).sort((a, b) => a.localeCompare(b, locale));
   return {
     plants: matches.slice(0, MAX_PLANTS).map((plant) => ({
       id: plant.id,
@@ -174,7 +187,7 @@ async function findPlants(api: GardenReader, query?: string): Promise<FindPlants
       badNeighbors: neighbors(plant.badNeighbors),
       own: plant.source === 'OWN',
       frostSensitive: plant.frostSensitive ?? false,
-      ...(plant.sowing ? { sowing: sowingOf(plant.sowing) } : {}),
+      ...(plant.sowing ? { sowing: sowingOf(plant.sowing, locale) } : {}),
     })),
     more: Math.max(0, matches.length - MAX_PLANTS),
   };
@@ -184,27 +197,36 @@ async function findPlants(api: GardenReader, query?: string): Promise<FindPlants
  * The user's batches with what is left of them, counted like the app (`plannedCount()`), and
  * the last frost. Current batches first by sowing week, finished ones after, newest first.
  */
-async function listSowings(api: GardenReader, query?: string): Promise<ListSowingsToolOutput> {
+async function listSowings(
+  api: GardenReader,
+  locale: Locale,
+  query?: string,
+): Promise<ListSowingsToolOutput> {
   const [{ sowings }, { plants }, { lastFrost }] = await Promise.all([
     api.listSowings(),
     api.listPlants(),
     api.getSettings(),
   ]);
-  const names = plantNames(plants);
+  const names = plantNames(plants, locale);
+  const byId = new Map(plants.map((plant) => [plant.id, plant]));
   const needle = query?.toLocaleLowerCase('de');
-  const nameOf = (plantId: string) => names.get(plantId) ?? 'Unbekannte Sorte';
+  const nameOf = (plantId: string) => names.get(plantId) ?? toolMessage('unknownPlant', locale);
+  // Found by the German and the English name, whatever the language.
+  const matchesQuery = (plantId: string) => {
+    const plant = byId.get(plantId);
+    const candidates = plant ? [plant.name, plantName(plant, 'en')] : [nameOf(plantId)];
+    return candidates.some((name) => name.toLocaleLowerCase('de').includes(needle ?? ''));
+  };
   const done = (stage: string) => (stage === 'DONE' ? 1 : 0);
   const matches = sowings
-    .filter(
-      ({ sowing }) => !needle || nameOf(sowing.plantId).toLocaleLowerCase('de').includes(needle),
-    )
+    .filter(({ sowing }) => !needle || matchesQuery(sowing.plantId))
     .sort(
       ({ sowing: a }, { sowing: b }) =>
         done(a.stage) - done(b.stage) ||
         (a.stage === 'DONE'
           ? b.sowDate.localeCompare(a.sowDate)
           : a.sowDate.localeCompare(b.sowDate)) ||
-        nameOf(a.plantId).localeCompare(nameOf(b.plantId), 'de'),
+        nameOf(a.plantId).localeCompare(nameOf(b.plantId), locale),
     );
   return {
     lastFrost,
@@ -233,6 +255,7 @@ const candidateId = (index: number) => `candidate-${String(index)}`;
 
 async function evaluate(
   api: GardenReader,
+  locale: Locale,
   bedId: string,
   week?: string,
   candidates: readonly CandidatePlanting[] = [],
@@ -243,7 +266,7 @@ async function evaluate(
     api.listPlants(),
     api.getSettings(),
   ]);
-  const names = plantNames(plants);
+  const names = plantNames(plants, locale);
   const byId = new Map(plants.map((plant) => [plant.id, plant]));
   const unknownCandidates: number[] = [];
   const planned = candidates.flatMap((candidate, index) => {
@@ -255,14 +278,26 @@ async function evaluate(
     return [candidatePlanting(candidate, bed, plant, candidateId(index))];
   });
   const all = [...plantings, ...planned];
-  const plantOf = new Map(all.map((p) => [p.id, names.get(p.plantId) ?? 'Unbekannte Sorte']));
+  const unknown = toolMessage('unknownPlant', locale);
+  const plantOf = new Map(all.map((p) => [p.id, names.get(p.plantId) ?? unknown]));
   const indexOf = new Map(planned.map((p) => [p.id, Number(p.id.slice('candidate-'.length))]));
-  const findings = evaluateBed(bed, all, plants, week ? { week, lastFrost } : { lastFrost });
+  // Messages in `locale`, with the plants' names and families in it, like the app.
+  const findings = evaluateBed(bed, all, plants, {
+    lastFrost,
+    ...(week ? { week } : {}),
+    locale,
+    // By id: the rule engine may hand over a copy without `global` (adjusted plants).
+    plantName: (plant) => names.get(plant.id) ?? plant.name,
+    familyName: (plant) => {
+      const own = byId.get(plant.id);
+      return own ? familyName(own, locale) : plant.family;
+    },
+  });
   return {
     findings: findings.map((finding) => ({
       severity: finding.severity,
       message: finding.message,
-      plants: finding.plantingIds.map((id) => plantOf.get(id) ?? 'Unbekannte Sorte'),
+      plants: finding.plantingIds.map((id) => plantOf.get(id) ?? unknown),
       from: finding.period.start,
       until: finding.period.end,
       candidates: finding.plantingIds.flatMap((id) => indexOf.get(id) ?? []),
@@ -279,14 +314,17 @@ export type ToolOutput =
   | ListSowingsToolOutput;
 
 /**
- * Runs one tool. Invalid input and failures become `{ error }` with a German message, so the
- * agent can explain them instead of the gateway reporting an internal error.
+ * Runs one tool with texts in `locale`. Invalid input and failures become `{ error }` with a
+ * message in `locale`, so the agent can explain them instead of the gateway reporting an
+ * internal error.
  */
 export async function runTool(
   name: ToolName,
   args: unknown,
   api: GardenReader,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<ToolOutput | ToolError> {
+  const error = (key: Parameters<typeof toolMessage>[0]) => ({ error: toolMessage(key, locale) });
   try {
     switch (name) {
       case 'list_beds': {
@@ -297,31 +335,33 @@ export async function runTool(
       }
       case 'get_bed': {
         const input = GetBedToolInputSchema.safeParse(args);
-        if (!input.success) return { error: 'Bitte gib eine gültige Beet-ID an.' };
-        return await getBed(api, input.data.bedId);
+        if (!input.success) return error('invalidBedId');
+        return await getBed(api, input.data.bedId, locale);
       }
       case 'find_plants': {
         const input = FindPlantsToolInputSchema.safeParse(args);
-        if (!input.success) return { error: 'Bitte gib einen kürzeren Suchbegriff an.' };
-        return await findPlants(api, input.data.query);
+        if (!input.success) return error('queryTooLong');
+        return await findPlants(api, locale, input.data.query);
       }
       case 'evaluate_bed': {
         const input = EvaluateBedToolInputSchema.safeParse(args);
-        if (!input.success) {
-          return {
-            error: 'Bitte gib eine gültige Beet-ID und optional ein Datum (JJJJ-MM-TT) an.',
-          };
-        }
-        return await evaluate(api, input.data.bedId, input.data.week, input.data.candidates);
+        if (!input.success) return error('invalidEvaluation');
+        return await evaluate(
+          api,
+          locale,
+          input.data.bedId,
+          input.data.week,
+          input.data.candidates,
+        );
       }
       case 'list_sowings': {
         const input = ListSowingsToolInputSchema.safeParse(args);
-        if (!input.success) return { error: 'Bitte gib einen kürzeren Suchbegriff an.' };
-        return await listSowings(api, input.data.query);
+        if (!input.success) return error('queryTooLong');
+        return await listSowings(api, locale, input.data.query);
       }
     }
   } catch (cause) {
-    if (cause instanceof ToolFailure) return { error: cause.message };
+    if (cause instanceof ToolFailure) return error(cause.key);
     throw cause;
   }
 }

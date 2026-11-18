@@ -4,13 +4,17 @@ from typing import Any
 
 from starlette.responses import Response, StreamingResponse
 
-from bed_assistant.app import MEMORY_UNAVAILABLE, UNAVAILABLE, handle
+from bed_assistant.app import handle
 from bed_assistant.auth import Caller
 from bed_assistant.config import Settings
+from bed_assistant.messages import MESSAGES, Language
 from bed_assistant.quota import QuotaExceededError
 from bed_assistant.suggest import SuggestionError, SuggestionResult
 
 from .helpers import token
+
+UNAVAILABLE = MESSAGES["de"]["unavailable"]
+MEMORY_UNAVAILABLE = MESSAGES["de"]["memory_unavailable"]
 
 SETTINGS = Settings.from_env(
     {"MODEL_ID": "model", "QUOTA_TABLE": "quota", "DAILY_LIMIT": "20", "MAX_INPUT_CHARS": "50"}
@@ -36,10 +40,14 @@ class FakeResponder:
         self.prompts: list[str] = []
         self.tokens: list[str] = []
         self.sessions: list[str | None] = []
+        self.languages: list[Language] = []
 
-    async def suggest(self, question: str, caller: Caller, bed_id: str) -> SuggestionResult:
+    async def suggest(
+        self, question: str, caller: Caller, bed_id: str, language: Language = "de"
+    ) -> SuggestionResult:
         self.prompts.append(f"suggest:{bed_id}:{question}")
         self.tokens.append(caller.token)
+        self.languages.append(language)
         if self.fail:
             raise SuggestionError("Das Beet gibt es nicht.")
         return SuggestionResult(
@@ -59,11 +67,12 @@ class FakeResponder:
         )
 
     async def stream(
-        self, prompt: str, caller: Caller, session_id: str | None
+        self, prompt: str, caller: Caller, session_id: str | None, language: Language = "de"
     ) -> AsyncIterator[str]:
         self.prompts.append(prompt)
         self.tokens.append(caller.token)
         self.sessions.append(session_id)
+        self.languages.append(language)
         for chunk in self.chunks:
             yield chunk
         if self.fail:
@@ -156,6 +165,49 @@ async def test_streams_the_answer_and_the_remaining_quota() -> None:
     assert responder.tokens == [headers(["ai-testers"])["Authorization"].removeprefix("Bearer ")]
     # The conversation continues in the chat's session.
     assert responder.sessions == ["chat-1"]
+    # Without a language the assistant stays German.
+    assert responder.languages == ["de"]
+
+
+async def test_hands_the_app_language_to_the_answer_and_the_suggestions() -> None:
+    responder = FakeResponder(["Tomatoes like basil."])
+    await body_events(
+        await call(
+            {"message": "What fits?", "language": "en"}, headers(["admins"]), None, responder
+        )
+    )
+    response = await call(
+        {"message": "More?", "bedId": BED, "suggest": True, "language": "en"},
+        headers(["admins"]),
+        None,
+        responder,
+    )
+    events = await body_events(response)
+    assert events[0] == {"text": "Ein Vorschlag.\n\nThe rule engine still reports: Zu dicht."}
+    assert responder.languages == ["en", "en"]
+
+
+async def test_refuses_and_fails_in_english_for_an_english_app() -> None:
+    english = {"message": "Hi", "language": "en"}
+    assert message(await call(english, {})) == "Please sign in."
+    forbidden = await call(english, headers(["others"]))
+    assert message(forbidden) == "The assistant has not been enabled for your account yet."
+    too_long = await call({**english, "message": "x" * 51}, headers(["admins"]))
+    assert message(too_long) == (
+        "Your question is too long. Please keep it shorter (at most 50 characters)."
+    )
+    no_bed = await call({**english, "suggest": True}, headers(["admins"]))
+    assert message(no_bed) == "I need a bed for planting suggestions."
+    quota = await call(english, headers(["admins"]), FakeQuota(remaining=None))
+    assert message(quota) == "You have already asked 20 questions today. You can continue tomorrow."
+    broken = await call(english, headers(["admins"]), responder=FakeResponder(["Part"], fail=True))
+    assert (await body_events(broken))[-1] == {"error": MESSAGES["en"]["unavailable"]}
+    memory = await call({"memory": "list", "language": "en"}, headers(["admins"]), memory=None)
+    assert message(memory) == "The assistant's memory cannot be reached right now."
+    unknown = await call({"memory": "dump", "language": "en"}, headers(["admins"]))
+    assert message(unknown) == "Unknown request to the memory."
+    # An unknown language is German, like an invalid request.
+    assert message(await call({"message": "Hi", "language": "fr"}, {})) == "Bitte melde dich an."
 
 
 async def test_401_without_token_and_403_without_group() -> None:
