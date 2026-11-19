@@ -217,6 +217,39 @@ describe('mock assistant', () => {
     expect(result.remaining).toBe(MOCK_ASSISTANT_DAILY_LIMIT - 1);
   });
 
+  it('sends the view and gets the same suggestions in both views from the mock', async () => {
+    const mock = createMockFetch(new MockStore(new MemoryStorage()));
+    const bodies: unknown[] = [];
+    const fetchFn: typeof fetch = (input, init) => {
+      bodies.push(JSON.parse(init?.body as string));
+      return mock(input, init);
+    };
+    const suggest = async (view?: 'SIMPLE' | 'EXPERT') => {
+      const received: unknown[] = [];
+      await askAssistant(
+        createApiStream(() => Promise.resolve(token('|admins')), fetchFn),
+        {
+          message: 'Was passt noch?',
+          bedId: BED,
+          suggest: true,
+          ...(view ? { view } : {}),
+          sessionId: newSessionId(),
+          onText: () => undefined,
+          onSuggestions: (suggestions) => received.push(suggestions),
+        },
+      );
+      return received;
+    };
+    expect(await suggest('SIMPLE')).toEqual([mockSuggestions()]);
+    expect(await suggest('EXPERT')).toEqual([mockSuggestions()]);
+    expect(await suggest()).toEqual([mockSuggestions()]);
+    expect(bodies.map((body) => (body as { view?: string }).view)).toEqual([
+      'SIMPLE',
+      'EXPERT',
+      undefined,
+    ]);
+  });
+
   it('answers like the guardrail when a question has the blocked word, also for suggestions', async () => {
     const fetchFn = createMockFetch(new MockStore(new MemoryStorage()));
     for (const suggest of [false, true]) {

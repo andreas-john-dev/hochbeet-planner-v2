@@ -129,7 +129,8 @@ export const isPreference = (message: string) => /^ich\b/i.test(message.trim());
  * server-sent events, chunk by chunk; a question with `MOCK_BLOCKED_WORD` gets the guardrail's
  * message instead (still counted, like in the agent). Lists and forgets remembered preferences
  * like the agent (without counting questions). Answers, suggestions and refusals come in the
- * request's `language`.
+ * request's `language`; `view` is checked like the other fields but answered the same in both
+ * views (the app makes suggestions fit the simple view when it takes them over).
  */
 export function assistantRoutes(store: MockStore, user: MockUser): Route[] {
   return [

@@ -12,6 +12,7 @@ from bed_assistant.responder import (
     TOOL_LIMIT_MESSAGE,
     StrandsResponder,
     ToolCallLimit,
+    ViewArgument,
     gateway_client,
 )
 from bed_assistant.suggest import SuggestionError
@@ -41,9 +42,13 @@ class FakeGateway:
     calls: list[str] = field(default_factory=list)
     #: Accept-Language of the client: the language of the tools' texts.
     language: str = "de"
+    #: Arguments of the evaluate_bed calls.
+    arguments: list[dict[str, Any]] = field(default_factory=list)
 
     async def call_tool_async(self, _id: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
         self.calls.append(name)
+        if name == "garden___evaluate_bed":
+            self.arguments.append(args)
         if name == "garden___get_bed":
             text = (
                 '{"bed": {"widthCm": 200, "depthCm": 100, "mainRowDirection": "H"}, "plantings": '
@@ -120,9 +125,13 @@ async def test_uses_the_gateway_tools_with_the_callers_token(agents: list[FakeAg
     assert text == ["Im Beet ", "stehen Tomaten."]
     [agent] = agents
     assert agent.kwargs["tools"] == [FakeGateway("https://gw.example/mcp", USER_TOKEN)]
-    [limit] = agent.kwargs["hooks"]
+    limit, view = agent.kwargs["hooks"]
     assert isinstance(limit, ToolCallLimit)
     assert limit.limit == 4
+    # Without a view from the app: expert view, all tools, evaluate_bed with all rules.
+    assert isinstance(view, ViewArgument)
+    assert view.view == "EXPERT"
+    assert agent.kwargs["tools"][0].tools is None
     assert agent.kwargs["prompt"] == "Was steht im Beet?"
     # One gateway call at a time: parallel calls closed the gateway session.
     assert isinstance(agent.kwargs["tool_executor"], SequentialToolExecutor)
@@ -158,6 +167,44 @@ def test_refuses_tool_calls_beyond_the_limit() -> None:
     for call in calls:
         limit.before_tool_call(call)  # type: ignore[arg-type]
     assert [c.cancel_tool for c in calls] == [False, False, TOOL_LIMIT_MESSAGE, TOOL_LIMIT_MESSAGE]
+
+
+def test_evaluate_bed_always_checks_in_the_view_of_the_request() -> None:
+    simple = ViewArgument("SIMPLE")
+    left_out = FakeToolCall({"name": "garden___evaluate_bed", "input": {"bedId": "B"}})
+    expert_by_model = FakeToolCall(
+        {"name": "garden___evaluate_bed", "input": {"bedId": "B", "view": "EXPERT"}}
+    )
+    other = FakeToolCall({"name": "garden___get_bed", "input": {"bedId": "B"}})
+    for call in (left_out, expert_by_model, other):
+        simple.before_tool_call(call)  # type: ignore[arg-type]
+    assert left_out.tool_use["input"] == {"bedId": "B", "view": "SIMPLE"}
+    assert expert_by_model.tool_use["input"] == {"bedId": "B", "view": "SIMPLE"}
+    assert other.tool_use["input"] == {"bedId": "B"}
+    # In the expert view the model cannot narrow the check to the simple one either.
+    by_model = FakeToolCall({"name": "garden___evaluate_bed", "input": {"view": "SIMPLE"}})
+    ViewArgument("EXPERT").before_tool_call(by_model)  # type: ignore[arg-type]
+    assert by_model.tool_use["input"] == {"view": "EXPERT"}
+
+
+async def test_the_simple_view_answers_without_batches_and_suggests_for_this_week(
+    agents: list[FakeAgent],
+) -> None:
+    responder = StrandsResponder(settings(GATEWAY_URL="https://gw.example/mcp"), FakeGateway)
+    await collect(responder.stream("Was passt?", USER, None, "de", "SIMPLE"))
+    result = await responder.suggest(
+        "Was passt noch?", USER, "01J9ZQ3W8D6V2K5M7N8P9R0S1A", "de", "SIMPLE"
+    )
+    chat, suggestions = agents
+    assert "Der User nutzt die einfache Ansicht" in chat.kwargs["system_prompt"]
+    # No list_sowings in the simple view; evaluate_bed checks the spatial rules of the week.
+    assert chat.kwargs["tools"][0].tools == ("list_beds", "get_bed", "find_plants", "evaluate_bed")
+    assert chat.kwargs["hooks"][1].view == "SIMPLE"
+    assert suggestions.kwargs["tools"][0].tools == ("find_plants",)
+    assert "der Montag dieser Woche" in suggestions.kwargs["prompts"][0]
+    [check] = suggestions.kwargs["tools"][0].arguments
+    assert check["view"] == "SIMPLE"
+    assert result.suggestions[0]["startDate"] == check["week"]
 
 
 def test_the_structured_output_tool_does_not_count() -> None:

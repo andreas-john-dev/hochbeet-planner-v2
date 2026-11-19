@@ -83,8 +83,8 @@ export interface AskOptions extends AssistantRequest {
 }
 
 /**
- * Asks the assistant in `language` (the app's language by default) and streams the answer
- * into `onText`. Resolves with the questions left today; throws `ApiError` (`message` in that
+ * Asks the assistant in `language` (the app's language by default) for the app's `view` (the
+ * expert view without it) and streams the answer into `onText`. Resolves with the questions left today; throws `ApiError` (`message` in that
  * language) for refusals such as 429 and for an answer that failed or broke off midway, and an
  * `AbortError` when `signal` aborts.
  */
@@ -95,6 +95,7 @@ export async function askAssistant(
     bedId,
     suggest,
     language = currentLanguage(),
+    view,
     sessionId,
     signal,
     onText,
@@ -111,6 +112,7 @@ export async function askAssistant(
       ...(bedId ? { bedId } : {}),
       ...(suggest ? { suggest } : {}),
       language,
+      ...(view ? { view } : {}),
     }),
     ...(signal ? { signal } : {}),
   });

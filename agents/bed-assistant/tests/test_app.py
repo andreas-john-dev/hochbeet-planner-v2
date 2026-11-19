@@ -8,6 +8,7 @@ from bed_assistant.app import handle
 from bed_assistant.auth import Caller
 from bed_assistant.config import Settings
 from bed_assistant.messages import MESSAGES, Language
+from bed_assistant.prompt import View
 from bed_assistant.quota import QuotaExceededError
 from bed_assistant.suggest import SuggestionError, SuggestionResult
 
@@ -41,13 +42,20 @@ class FakeResponder:
         self.tokens: list[str] = []
         self.sessions: list[str | None] = []
         self.languages: list[Language] = []
+        self.views: list[View] = []
 
     async def suggest(
-        self, question: str, caller: Caller, bed_id: str, language: Language = "de"
+        self,
+        question: str,
+        caller: Caller,
+        bed_id: str,
+        language: Language = "de",
+        view: View = "EXPERT",
     ) -> SuggestionResult:
         self.prompts.append(f"suggest:{bed_id}:{question}")
         self.tokens.append(caller.token)
         self.languages.append(language)
+        self.views.append(view)
         if self.fail:
             raise SuggestionError("Das Beet gibt es nicht.")
         return SuggestionResult(
@@ -67,12 +75,18 @@ class FakeResponder:
         )
 
     async def stream(
-        self, prompt: str, caller: Caller, session_id: str | None, language: Language = "de"
+        self,
+        prompt: str,
+        caller: Caller,
+        session_id: str | None,
+        language: Language = "de",
+        view: View = "EXPERT",
     ) -> AsyncIterator[str]:
         self.prompts.append(prompt)
         self.tokens.append(caller.token)
         self.sessions.append(session_id)
         self.languages.append(language)
+        self.views.append(view)
         for chunk in self.chunks:
             yield chunk
         if self.fail:
@@ -165,8 +179,22 @@ async def test_streams_the_answer_and_the_remaining_quota() -> None:
     assert responder.tokens == [headers(["ai-testers"])["Authorization"].removeprefix("Bearer ")]
     # The conversation continues in the chat's session.
     assert responder.sessions == ["chat-1"]
-    # Without a language the assistant stays German.
+    # Without a language the assistant stays German, without a view in the expert view.
     assert responder.languages == ["de"]
+    assert responder.views == ["EXPERT"]
+
+
+async def test_hands_the_simple_view_to_the_answer_and_the_suggestions() -> None:
+    responder = FakeResponder(["Hier passt Salat."])
+    simple = {"message": "Was passt?", "bedId": BED, "view": "SIMPLE"}
+    await body_events(await call(simple, headers(["admins"]), None, responder))
+    await body_events(await call(simple | {"suggest": True}, headers(["admins"]), None, responder))
+    assert responder.views == ["SIMPLE", "SIMPLE"]
+    # An unknown view is an invalid request, before the quota is used.
+    quota = FakeQuota(remaining=3)
+    response = await call({"message": "Hi", "view": "EASY"}, headers(["admins"]), quota)
+    assert response.status_code == 400
+    assert quota.users == []
 
 
 async def test_hands_the_app_language_to_the_answer_and_the_suggestions() -> None:

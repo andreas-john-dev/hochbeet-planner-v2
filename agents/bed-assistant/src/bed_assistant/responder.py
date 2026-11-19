@@ -25,7 +25,7 @@ from .auth import Caller
 from .config import Settings
 from .memory import PREFERENCE_NAMESPACE, MemoryStore, memory_session_id
 from .messages import BLOCKED_MESSAGES, DEFAULT_LANGUAGE, Language, localize_blocked, message
-from .prompt import system_prompt
+from .prompt import CHAT_TOOLS, DEFAULT_VIEW, View, system_prompt
 from .schema_model import suggestion_list_model
 from .suggest import (
     SUGGESTION_TOOLS,
@@ -59,10 +59,16 @@ class Responder(Protocol):
         caller: Caller,
         session_id: str | None,
         language: Language = DEFAULT_LANGUAGE,
+        view: View = DEFAULT_VIEW,
     ) -> AsyncIterator[str]: ...
 
     async def suggest(
-        self, question: str, caller: Caller, bed_id: str, language: Language = DEFAULT_LANGUAGE
+        self,
+        question: str,
+        caller: Caller,
+        bed_id: str,
+        language: Language = DEFAULT_LANGUAGE,
+        view: View = DEFAULT_VIEW,
     ) -> SuggestionResult: ...
 
 
@@ -133,6 +139,30 @@ class ToolCallLimit(HookProvider):
         self.calls += 1
         if self.calls > self.limit:
             event.cancel_tool = TOOL_LIMIT_MESSAGE
+
+
+class ViewArgument(HookProvider):
+    """
+    Sets `view` of every `evaluate_bed` call to the view of the request, whatever the model put
+    there: in the simple view the rule engine checks only the spatial rules of this week. The
+    view is harmless as tool input; this only keeps the model from leaving it out.
+    """
+
+    def __init__(self, view: View) -> None:
+        self.view = view
+
+    def register_hooks(self, registry: HookRegistry, **_: Any) -> None:
+        registry.add_callback(BeforeToolCallEvent, self.before_tool_call)
+
+    def before_tool_call(self, event: BeforeToolCallEvent) -> None:
+        tool_use = event.tool_use
+        if tool_use.get("name") != f"{TOOLS_TARGET}___evaluate_bed":
+            return
+        arguments = tool_use.get("input")
+        event.tool_use = {
+            **tool_use,
+            "input": {**(arguments if isinstance(arguments, dict) else {}), "view": self.view},
+        }
 
 
 def gateway_client(
@@ -227,18 +257,23 @@ class StrandsResponder:
         session_id: str | None = None,
         model: BedrockModel | None = None,
         language: Language = DEFAULT_LANGUAGE,
+        view: View = DEFAULT_VIEW,
     ) -> Agent:
+        """
+        The agent for one request. Without `client` it gets the gateway tools of the chat in
+        `view` (the simple view has no batches); `evaluate_bed` always checks in `view`.
+        """
         if client is None and self._settings.gateway_url:
             client = self._client_factory(
-                self._settings.gateway_url, caller.token, language=language
+                self._settings.gateway_url, caller.token, CHAT_TOOLS[view], language=language
             )
         tools = [client] if client is not None else []
         session = memory_session_id(session_id) if self._settings.memory_id else None
         return Agent(
             model=model or self._model,
-            system_prompt=system_prompt(language),
+            system_prompt=system_prompt(language, view),
             tools=tools,
-            hooks=[ToolCallLimit(self._settings.max_tool_calls)],
+            hooks=[ToolCallLimit(self._settings.max_tool_calls), ViewArgument(view)],
             # One gateway call at a time: parallel calls closed the MCP session (T-48 evaluation).
             tool_executor=SequentialToolExecutor(),
             callback_handler=None,
@@ -258,14 +293,15 @@ class StrandsResponder:
         caller: Caller,
         session_id: str | None,
         language: Language = DEFAULT_LANGUAGE,
+        view: View = DEFAULT_VIEW,
     ) -> AsyncIterator[str]:
         """
-        The answer in chunks. The guardrail's messages are German (one text per guardrail); a
-        chunk that is one of them is replaced with the message in `language`. Bedrock sends the
-        message as one chunk of its own.
+        The answer in chunks, for the app's `view`. The guardrail's messages are German (one
+        text per guardrail); a chunk that is one of them is replaced with the message in
+        `language`. Bedrock sends the message as one chunk of its own.
         """
         # Restoring the conversation reads AgentCore Memory synchronously: off the event loop.
-        agent = await asyncio.to_thread(self.agent, caller, None, session_id, None, language)
+        agent = await asyncio.to_thread(self.agent, caller, None, session_id, None, language, view)
         try:
             used_tool = False
             emitted = False
@@ -293,7 +329,12 @@ class StrandsResponder:
             self._done(agent)
 
     async def suggest(
-        self, question: str, caller: Caller, bed_id: str, language: Language = DEFAULT_LANGUAGE
+        self,
+        question: str,
+        caller: Caller,
+        bed_id: str,
+        language: Language = DEFAULT_LANGUAGE,
+        view: View = DEFAULT_VIEW,
     ) -> SuggestionResult:
         """
         Checked planting suggestions; one agent and gateway session for all rounds. The model
@@ -301,7 +342,8 @@ class StrandsResponder:
         The rounds are not stored as conversation, but the caller's fitting preferences go into
         the prompt. The whole request ends after `suggestion_seconds`. A wish the guardrail
         blocks ends before any model call, with its message as the summary. Reasons, summary,
-        warnings and errors are in `language`.
+        warnings and errors are in `language`; in the simple `view` all suggestions start this
+        week and only the spatial rules check them.
         """
         if not self._settings.gateway_url:
             raise SuggestionError(message(language, "suggestions_unavailable"))
@@ -313,7 +355,9 @@ class StrandsResponder:
         client = self._client_factory(
             self._settings.gateway_url, caller.token, SUGGESTION_TOOLS, language=language
         )
-        agent = self.agent(caller, client, model=self._suggestion_model, language=language)
+        agent = self.agent(
+            caller, client, model=self._suggestion_model, language=language, view=view
+        )
         model = suggestion_list_model()
         preferences = await self.recall(caller, question)
 
@@ -333,6 +377,7 @@ class StrandsResponder:
                 preferences=preferences,
                 seconds=self._settings.suggestion_seconds,
                 language=language,
+                view=view,
             )
         finally:
             self._done(agent)

@@ -1,6 +1,16 @@
 import type { Page } from '@playwright/test';
+import { requestSuggestions } from './assistant-helpers';
 import { expect, open, signInAs, test, USERS } from './fixtures';
-import { bed, type Garden, MOCK_API_KEY, planting, PLANTS, seedGarden } from './garden';
+import {
+  bed,
+  EXAMPLE_BED_ID,
+  exampleGarden,
+  type Garden,
+  MOCK_API_KEY,
+  planting,
+  PLANTS,
+  seedGarden,
+} from './garden';
 
 // The bed editor in the simple view (T-75): the current week only, no timeline, no dates,
 // only the spatial rules; new plantings start this week, removing keeps the history.
@@ -24,8 +34,8 @@ interface StoredPlanting {
   removedDate: string | null;
 }
 
-/** The plantings the mock API saved for the test user. */
-const storedPlantings = (page: Page) =>
+/** The plantings the mock API saved for the test user (or `email`). */
+const storedPlantings = (page: Page, email: string = USERS.user.email) =>
   page.evaluate(
     ([key, user]) =>
       (
@@ -34,7 +44,7 @@ const storedPlantings = (page: Page) =>
           { plantings: StoredPlanting[] }
         >
       )[user]?.plantings ?? [],
-    [MOCK_API_KEY, USERS.user.email] as const,
+    [MOCK_API_KEY, email] as const,
   );
 
 const canvas = (page: Page) => page.getByTestId('bed-canvas');
@@ -285,4 +295,36 @@ test('the bed dialog has no soil renewals and keeps the stored ones', async ({ p
       ),
     )
     .toEqual(['2026-07-06']);
+});
+
+test('suggestions of the assistant taken over in the simple view start this week without an end', async ({
+  page,
+}) => {
+  const LETTUCE = '01M49THV00RK9E9PC83NEE87CJ';
+  const RADISH = '01M49THV00NAC3VGAMQF7XGNWF';
+  await signInAs(page, 'admin');
+  await seedGarden(page, { ...exampleGarden, view: 'SIMPLE' }, USERS.admin.email);
+  await open(page, `/beete/${EXAMPLE_BED_ID}`, 'Hochbeet Süd');
+  await requestSuggestions(page);
+  await page.getByRole('button', { name: 'Alle übernehmen' }).click();
+  await expect(page.getByRole('region', { name: 'Pflanzvorschläge im Beet' })).toBeHidden();
+
+  const adopted = async () =>
+    (await storedPlantings(page, USERS.admin.email))
+      .filter((p) => [LETTUCE, RADISH].includes(p.plantId))
+      .map(({ plantId, startDate, endDate, removedDate }) => ({
+        plantId,
+        startDate,
+        endDate,
+        removedDate,
+      }))
+      .sort((a, b) => a.plantId.localeCompare(b.plantId));
+  // The lifecycle decides the end, as for plantings placed by hand in the simple view.
+  await expect
+    .poll(adopted)
+    .toEqual(
+      [LETTUCE, RADISH]
+        .sort()
+        .map((plantId) => ({ plantId, startDate: '2026-10-05', endDate: null, removedDate: null })),
+    );
 });

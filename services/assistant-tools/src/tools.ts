@@ -6,6 +6,7 @@ import {
   type EvaluateBedToolOutput,
   EvaluateBedToolInputSchema,
   type FindPlantsToolOutput,
+  type GardenView,
   FindPlantsToolInputSchema,
   type GetBedToolOutput,
   GetBedToolInputSchema,
@@ -253,12 +254,18 @@ async function listSowings(
 /** Id of a candidate planting while it is checked; never stored. */
 const candidateId = (index: number) => `candidate-${String(index)}`;
 
+/**
+ * Findings of a bed, optionally with candidates. In the simple view (`view: 'SIMPLE'`) only
+ * the spatial rules run, on the plantings of `week` (today's week without one), like in the
+ * app's simple view: no crop rotation, soil renewal, frost or raising findings.
+ */
 async function evaluate(
   api: GardenReader,
   locale: Locale,
   bedId: string,
   week?: string,
   candidates: readonly CandidatePlanting[] = [],
+  view: GardenView = 'EXPERT',
 ): Promise<EvaluateBedToolOutput> {
   // The user's last frost, so the frost hint matches what the app shows.
   const [{ bed, plantings }, { plants }, { lastFrost }] = await Promise.all([
@@ -284,7 +291,11 @@ async function evaluate(
   // Messages in `locale`, with the plants' names and families in it, like the app.
   const findings = evaluateBed(bed, all, plants, {
     lastFrost,
-    ...(week ? { week } : {}),
+    ...(view === 'SIMPLE'
+      ? { scope: 'SIMPLE' as const, week: week ?? new Date() }
+      : week
+        ? { week }
+        : {}),
     locale,
     // By id: the rule engine may hand over a copy without `global` (adjusted plants).
     plantName: (plant) => names.get(plant.id) ?? plant.name,
@@ -352,6 +363,7 @@ export async function runTool(
           input.data.bedId,
           input.data.week,
           input.data.candidates,
+          input.data.view,
         );
       }
       case 'list_sowings': {

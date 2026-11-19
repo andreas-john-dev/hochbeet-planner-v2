@@ -16,8 +16,10 @@ from .config import Settings
 from .memory import AgentCoreMemoryStore, MemoryStore
 from .messages import Language, language_of, message
 from .prompt import (
+    DEFAULT_VIEW,
     InvalidRequestError,
     MemoryRequest,
+    View,
     parse_memory_request,
     parse_request,
     user_prompt,
@@ -86,15 +88,28 @@ async def handle(
         return error(message(request.language, "quota", limit=settings.daily_limit), 429)
     logger.info(
         "question",
-        extra={"userId": caller.user_id, "remaining": remaining, "language": request.language},
+        extra={
+            "userId": caller.user_id,
+            "remaining": remaining,
+            "language": request.language,
+            "view": request.view,
+        },
     )
     stream = (
         suggestion_events(
-            responder, request.message, caller, request.bed_id, remaining, request.language
+            responder,
+            request.message,
+            caller,
+            request.bed_id,
+            remaining,
+            request.language,
+            request.view,
         )
         if request.suggest and request.bed_id
         else events(
-            responder.stream(user_prompt(request), caller, session_id, request.language),
+            responder.stream(
+                user_prompt(request), caller, session_id, request.language, request.view
+            ),
             remaining,
             request.language,
         )
@@ -142,10 +157,11 @@ async def suggestion_events(
     bed_id: str,
     remaining: int,
     language: Language = "de",
+    view: View = DEFAULT_VIEW,
 ) -> AsyncIterator[str]:
     """The summary as text, then the checked suggestions with remaining warnings, then done."""
     try:
-        result = await responder.suggest(question, caller, bed_id, language)
+        result = await responder.suggest(question, caller, bed_id, language, view)
     except SuggestionError as failed:
         yield sse({"error": str(failed)})
         return

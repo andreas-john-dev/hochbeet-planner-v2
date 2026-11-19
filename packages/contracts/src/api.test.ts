@@ -211,6 +211,19 @@ describe('assistant contracts', () => {
     });
   });
 
+  it('carries the view to the assistant and evaluate_bed, simple or expert only', () => {
+    const simple = { message: 'Was passt hierher?', bedId: bed.id, view: 'SIMPLE' };
+    expect(AssistantRequestSchema.parse(simple)).toEqual(simple);
+    expect(AssistantRequestSchema.safeParse({ message: 'Hi', view: 'EASY' }).success).toBe(false);
+    expect(EvaluateBedToolInputSchema.parse({ bedId: bed.id, view: 'SIMPLE' })).toEqual({
+      bedId: bed.id,
+      view: 'SIMPLE',
+    });
+    expect(EvaluateBedToolInputSchema.safeParse({ bedId: bed.id, view: 'ALL' }).success).toBe(
+      false,
+    );
+  });
+
   it('describes tool inputs for the model and checks ids and dates', () => {
     expect(GetBedToolInputSchema.safeParse({ bedId: bed.id }).success).toBe(true);
     expect(GetBedToolInputSchema.safeParse({ bedId: '../admin' }).success).toBe(false);

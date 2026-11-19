@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from bed_assistant.messages import MESSAGES, Language
+from bed_assistant.prompt import View
 from bed_assistant.suggest import (
     Bed,
     McpGardenTools,
@@ -144,6 +145,7 @@ async def run(
     rounds: int = 3,
     seconds: float = 50,
     language: Language = "de",
+    view: View = "EXPERT",
 ) -> Any:
     return await suggest(
         model,
@@ -154,6 +156,7 @@ async def run(
         today=date(2026, 5, 1),
         seconds=seconds,
         language=language,
+        view=view,
     )
 
 
@@ -284,3 +287,46 @@ async def test_calls_the_gateway_tools_directly_and_turns_errors_into_german_mes
         await McpGardenTools(broken).call("get_bed", {"bedId": BED_ID})
     with pytest.raises(SuggestionError, match="cannot be reached"):
         await McpGardenTools(broken, "en").call("get_bed", {"bedId": BED_ID})
+
+
+async def test_the_expert_view_checks_with_all_rules_as_before() -> None:
+    tools = FakeTools()
+    await run(FakeModel({"suggestions": [item(x=150)], "summary": "Rechts."}), tools)
+    [_, (tool, arguments)] = tools.calls
+    assert tool == "evaluate_bed"
+    assert "view" not in arguments
+    assert "week" not in arguments
+
+
+async def test_the_simple_view_suggests_for_this_week_and_checks_the_spatial_rules() -> None:
+    model = FakeModel(
+        {"suggestions": [item(x=150, startDate="2026-06-15")], "summary": "Tomate rechts."}
+    )
+    tools = FakeTools()
+    result = await run(model, tools, view="SIMPLE")
+    # 1 May 2026 is a Friday: every suggestion starts on Monday 27 April, whatever the model says.
+    assert result.suggestions == [item(x=150, startDate="2026-04-27")]
+    [_, (tool, arguments)] = tools.calls
+    assert tool == "evaluate_bed"
+    assert arguments["view"] == "SIMPLE"
+    assert arguments["week"] == "2026-04-27"
+    assert arguments["candidates"][0]["startDate"] == "2026-04-27"
+    prompt = model.prompts[0]
+    assert "startDate ist 2026-04-27, der Montag dieser Woche" in prompt
+    assert "Fruchtfolge, Termine und Anzucht spielen keine Rolle" in prompt
+    assert "nach dem Ende einer Pflanzung" not in prompt
+    # The chives still stand, the onion was harvested before today.
+    assert '"plant":"Schnittlauch"' in prompt
+    assert "Zwiebel" not in prompt
+
+
+def test_the_simple_view_leaves_out_plantings_after_this_week() -> None:
+    later = {
+        "plantings": [
+            {"plant": "Kürbis", "kind": "SINGLE", "from": "2026-05-04", "until": None},
+            {"plant": "Salat", "kind": "SINGLE", "from": "2026-05-03", "until": None},
+        ]
+    }
+    # Friday 1 May: the week ends on Sunday 3 May.
+    assert [p["plant"] for p in occupied(later, date(2026, 5, 1))] == ["Kürbis", "Salat"]
+    assert [p["plant"] for p in occupied(later, date(2026, 5, 1), True)] == ["Salat"]
