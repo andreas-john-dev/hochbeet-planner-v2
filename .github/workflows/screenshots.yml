@@ -33,7 +33,8 @@ concurrency:
 jobs:
   screenshots:
     name: Capture and report
-    runs-on: ubuntu-latest
+    # Playwright 1.56 has no Chromium for Ubuntu 26.04 (ubuntu-latest): pinned until it does.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       TARGET: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
