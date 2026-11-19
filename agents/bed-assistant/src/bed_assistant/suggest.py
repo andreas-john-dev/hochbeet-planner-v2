@@ -8,6 +8,10 @@ The model gets the bed with the areas its plantings occupy in the prompt and onl
 plants itself; checking is the code's job. The whole request has a deadline below the 60 s
 read timeout of CloudFront: a round that would run past it is dropped, and the last checked
 round is answered instead.
+
+In the simple view (Epic #161) every suggestion starts this week, the prompt only has the
+plantings of this week and leaves out rotation, dates and raising, and the check runs with
+the spatial rules only (`evaluate_bed` with `view: SIMPLE`).
 """
 
 import asyncio
@@ -21,6 +25,7 @@ from datetime import date, timedelta
 from typing import Any, Protocol
 
 from .messages import DEFAULT_LANGUAGE, Language, message
+from .prompt import DEFAULT_VIEW, View
 
 GRID_CM = 5
 MAX_SUGGESTIONS = 6
@@ -76,16 +81,22 @@ def monday_of(value: str) -> str | None:
 
 
 def sanitize(
-    raw: Sequence[Any], bed: Bed, language: Language = DEFAULT_LANGUAGE
+    raw: Sequence[Any],
+    bed: Bed,
+    language: Language = DEFAULT_LANGUAGE,
+    start: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """
-    Puts suggestions onto the 5 cm grid and the Monday of their week; drops those without a
-    valid plant id or date, or outside the bed. Returns the kept ones and how many were dropped.
+    Puts suggestions onto the 5 cm grid and the Monday of their week (or `start`, a Monday,
+    for all of them); drops those without a valid plant id or date, or outside the bed.
+    Returns the kept ones and how many were dropped.
     """
     kept: list[dict[str, Any]] = []
     dropped = 0
     for item in raw:
         suggestion = _sanitize_one(item, bed, language)
+        if suggestion is not None and start is not None:
+            suggestion["startDate"] = start
         if suggestion is None or len(kept) >= MAX_SUGGESTIONS:
             dropped += 1
         else:
@@ -166,12 +177,21 @@ class McpGardenTools:
         return data
 
 
-def occupied(bed_data: dict[str, Any], today: date) -> list[dict[str, Any]]:
-    """Plantings still in the bed from `today` on: plant, kind, occupied area and end."""
+def occupied(
+    bed_data: dict[str, Any], today: date, this_week_only: bool = False
+) -> list[dict[str, Any]]:
+    """
+    Plantings still in the bed from `today` on: plant, kind, occupied area and end. With
+    `this_week_only` (simple view) none that start after this week.
+    """
+    sunday = (today + timedelta(days=6 - today.weekday())).isoformat()
     current = []
     for planting in bed_data.get("plantings") or []:
         until = planting.get("until")
         if isinstance(until, str) and until < today.isoformat():
+            continue
+        start = planting.get("from")
+        if this_week_only and isinstance(start, str) and start > sunday:
             continue
         entry = {"plant": planting.get("plant"), "kind": planting.get("kind")}
         if isinstance(planting.get("area"), dict):
@@ -192,7 +212,9 @@ def suggestion_prompt(
     today: date,
     preferences: Sequence[str] = (),
     language: Language = DEFAULT_LANGUAGE,
+    view: View = DEFAULT_VIEW,
 ) -> str:
+    simple = view == "SIMPLE"
     known = (
         "Bekannte Vorlieben des Users (berücksichtigen):\n"
         + "".join(f"- {p}\n" for p in preferences)
@@ -200,7 +222,22 @@ def suggestion_prompt(
         if preferences
         else ""
     )
-    plantings = json.dumps(occupied(bed_data, today), ensure_ascii=False, separators=(",", ":"))
+    plantings = json.dumps(
+        occupied(bed_data, today, simple), ensure_ascii=False, separators=(",", ":")
+    )
+    free = (
+        "Eine leere Liste nur, wenn wirklich keine freie Fläche da ist.\n"
+        if simple
+        else "Eine leere Liste nur, wenn wirklich keine freie Fläche da ist, auch nicht nach dem "
+        "Ende einer Pflanzung.\n"
+    )
+    start = (
+        f"- startDate ist {monday_of(today.isoformat())}, der Montag dieser Woche: Der User "
+        "plant in der einfachen Ansicht nur, was jetzt ins Beet kommt. Fruchtfolge, Termine "
+        "und Anzucht spielen keine Rolle, erwähne sie nicht. Begründe jeden Vorschlag kurz.\n"
+        if simple
+        else "- startDate ist der Montag der Pflanzwoche. Begründe jeden Vorschlag kurz.\n"
+    )
     return (
         f"Heute ist {today.isoformat()}. Mache Pflanzvorschläge (höchstens {MAX_SUGGESTIONS}) "
         f"für ein Beet von {bed.width_cm} × {bed.depth_cm} cm (x nach rechts, y nach unten, "
@@ -215,9 +252,8 @@ def suggestion_prompt(
         "halben Abstand in der Reihe als Radius, eine Reihe einen Streifen in Reihenabstand "
         "Breite. Positionen in cm auf dem 5-cm-Raster.\n"
         "- Konflikte zwischen vorhandenen Pflanzungen sind nicht deine Aufgabe; schlage trotzdem "
-        "vor. Eine leere Liste nur, wenn wirklich keine freie Fläche da ist, auch nicht nach dem "
-        "Ende einer Pflanzung.\n"
-        "- startDate ist der Montag der Pflanzwoche. Begründe jeden Vorschlag kurz.\n"
+        f"vor. {free}"
+        f"{start}"
         f"- Schreibe Begründungen und Zusammenfassung {ANSWER_LANGUAGE[language]}.\n\n"
         f"{known}Wunsch des Users:\n{question}"
     )
@@ -246,10 +282,12 @@ async def suggest(
     seconds: float = 50.0,
     clock: Callable[[], float] = time.monotonic,
     language: Language = DEFAULT_LANGUAGE,
+    view: View = DEFAULT_VIEW,
 ) -> SuggestionResult:
     """
     Runs the check loop: `ask` returns the model's structured answer for a prompt (the same
-    conversation across rounds); `evaluate_bed` checks the sanitized suggestions. Everything
+    conversation across rounds); `evaluate_bed` checks the sanitized suggestions (in `view`:
+    the simple one starts them all this week and checks with the spatial rules). Everything
     together takes at most `seconds`: a later round that runs out of time is dropped in favour
     of the last checked one, a first round raises a `SuggestionError` in `language`.
     """
@@ -264,12 +302,13 @@ async def suggest(
     except TimeoutError as late:
         raise SuggestionError(timeout) from late
     bed = Bed.from_tool(bed_data, language)
-    prompt = suggestion_prompt(question, bed, bed_data, today, preferences, language)
+    prompt = suggestion_prompt(question, bed, bed_data, today, preferences, language, view)
+    check = Check(bed_id, monday_of(today.isoformat()) if view == "SIMPLE" else None)
     result: SuggestionResult | None = None
     for done in range(1, max(1, rounds) + 1):
         try:
             result, prompt = await within_deadline(
-                _round(ask, tools, prompt, bed, bed_id, done, rounds, language)
+                _round(ask, tools, prompt, bed, check, done, rounds, language)
             )
         except TimeoutError as late:
             if result is None:
@@ -282,12 +321,27 @@ async def suggest(
     return result
 
 
+@dataclass(frozen=True)
+class Check:
+    """What `evaluate_bed` checks: the bed, and in the simple view the Monday of this week."""
+
+    bed_id: str
+    #: Simple view: every suggestion starts this week, checked with the spatial rules only.
+    simple_week: str | None = None
+
+    def arguments(self, suggestions: Sequence[dict[str, Any]]) -> dict[str, Any]:
+        arguments: dict[str, Any] = {"bedId": self.bed_id, "candidates": candidates(suggestions)}
+        if self.simple_week is not None:
+            arguments |= {"view": "SIMPLE", "week": self.simple_week}
+        return arguments
+
+
 async def _round(
     ask: Callable[[str], Awaitable[dict[str, Any]]],
     tools: GardenTools,
     prompt: str,
     bed: Bed,
-    bed_id: str,
+    check: Check,
     done: int,
     rounds: int,
     language: Language,
@@ -295,12 +349,12 @@ async def _round(
     """One round: ask, sanitize, check. Returns the result and the next prompt ("" = finished)."""
     answer = await ask(prompt)
     summary = str(answer.get("summary") or "").strip()
-    suggestions, dropped = sanitize(answer.get("suggestions") or [], bed, language)
+    suggestions, dropped = sanitize(
+        answer.get("suggestions") or [], bed, language, check.simple_week
+    )
     if not suggestions:
         return SuggestionResult([], [], summary, done), ""
-    evaluation = await tools.call(
-        "evaluate_bed", {"bedId": bed_id, "candidates": candidates(suggestions)}
-    )
+    evaluation = await tools.call("evaluate_bed", check.arguments(suggestions))
     unknown = set(evaluation.get("unknownCandidates") or [])
     known = [i for i in range(len(suggestions)) if i not in unknown]
     warnings = list(

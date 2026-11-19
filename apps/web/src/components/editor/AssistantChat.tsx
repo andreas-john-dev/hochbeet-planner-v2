@@ -1,4 +1,4 @@
-import { MAX_ASSISTANT_MESSAGE_CHARS, type Suggestion } from '@hochbeet/contracts';
+import { type GardenView, MAX_ASSISTANT_MESSAGE_CHARS, type Suggestion } from '@hochbeet/contracts';
 import { Bot, MessageSquarePlus, Send, Sprout, Square } from 'lucide-react';
 import {
   type KeyboardEvent,
@@ -34,12 +34,18 @@ const isAbort = (error: unknown) => error instanceof DOMException && error.name 
  */
 export function AssistantChat({
   bedId,
+  view,
   active = true,
   onSuggestions,
   suggestions,
   className,
 }: {
   bedId: string;
+  /**
+   * The editor's view: in the simple one the assistant leaves out rotation, dates and raising
+   * and suggests for this week.
+   */
+  view?: GardenView;
   /** Focuses the question field whenever the chat is shown (e.g. the panel opens). */
   active?: boolean;
   /** Receives checked planting suggestions; without it the chat offers none. */
@@ -97,6 +103,7 @@ export function AssistantChat({
         message,
         bedId,
         language,
+        ...(view ? { view } : {}),
         sessionId,
         signal: controller.signal,
         onText: appendToAnswer,

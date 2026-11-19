@@ -1,5 +1,6 @@
 import pytest
 
+from bed_assistant.messages import Language
 from bed_assistant.prompt import (
     AssistantRequest,
     InvalidRequestError,
@@ -108,3 +109,45 @@ def test_the_prompt_asks_for_the_markdown_the_app_renders() -> None:
     # apps/web renders bold, italic, code and lists (src/lib/markdown.ts), nothing more.
     assert "Markdown" in SYSTEM_PROMPT
     assert "Keine Tabellen, Links, Bilder oder Überschriften" in SYSTEM_PROMPT
+
+
+def test_without_a_view_the_assistant_stays_in_the_expert_view() -> None:
+    from bed_assistant.prompt import system_prompt
+
+    request = parse_request({"message": "Was passt?"}, 100)
+    assert request.view == "EXPERT"
+    assert system_prompt() == system_prompt("de", request.view)
+    assert "Fruchtfolge, Pflanzzeiten und Anzucht" in system_prompt()
+    assert "einfache Ansicht" not in system_prompt()
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_the_simple_view_lands_in_the_prompt(language: Language) -> None:
+    from bed_assistant.prompt import system_prompt
+
+    request = parse_request({"message": "Was passt?", "view": "SIMPLE", "language": language}, 100)
+    assert request.view == "SIMPLE"
+    prompt = system_prompt(request.language, request.view)
+    assert "Der User nutzt die einfache Ansicht" in prompt
+    # No rotation, soil renewal, dates or raising: the user plants this week.
+    assert "Fruchtfolge, Erde erneuern, Termine" in prompt
+    assert "Sprich sie nicht an" in prompt
+    assert "gelten für diese Woche" in prompt
+    # Same rules and language as the expert view, without the batches.
+    assert system_prompt(language).endswith(prompt[prompt.index("Regeln:") :])
+    assert "list_sowings" not in prompt
+    assert "Anzucht-Chargen" not in prompt
+    assert "{" not in prompt
+
+
+def test_refuses_an_unknown_view() -> None:
+    with pytest.raises(InvalidRequestError, match="Bitte schreib eine Frage"):
+        parse_request({"message": "Hi", "view": "EASY"}, 100)
+
+
+@pytest.mark.parametrize("tool", ["list_beds", "get_bed", "find_plants", "evaluate_bed"])
+def test_the_simple_prompt_names_every_tool_of_its_chat(tool: str) -> None:
+    from bed_assistant.prompt import CHAT_TOOLS, system_prompt
+
+    assert tool in (CHAT_TOOLS["SIMPLE"] or ())
+    assert f"{tool}:" in system_prompt(view="SIMPLE")

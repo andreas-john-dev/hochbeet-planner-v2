@@ -495,6 +495,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
             </div>
             <AssistantChat
               bedId={bed.id}
+              {...(view ? { view } : {})}
               active={assistantOpen}
               onSuggestions={receiveSuggestions}
               suggestions={suggestionList}
@@ -531,6 +532,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
             <SheetTitle>{t('assistant.title')}</SheetTitle>
             <AssistantChat
               bedId={bed.id}
+              {...(view ? { view } : {})}
               onSuggestions={receiveSuggestions}
               suggestions={suggestionList}
               className="flex-1"

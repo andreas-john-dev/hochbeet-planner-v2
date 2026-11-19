@@ -7,7 +7,20 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from .messages import DEFAULT_LANGUAGE, Language, language_of, message
 
-SYSTEM_PROMPT = """\
+#: Views of the app (Epic #161), as GardenViewSchema in packages/contracts.
+View = Literal["SIMPLE", "EXPERT"]
+
+DEFAULT_VIEW: View = "EXPERT"
+
+#: Tools of the chat per view; None means all. The simple view has no raising, so no batches.
+CHAT_TOOLS: dict[View, tuple[str, ...] | None] = {
+    "EXPERT": None,
+    "SIMPLE": ("list_beds", "get_bed", "find_plants", "evaluate_bed"),
+}
+
+#: Role, topics and tools per view. The simple view plans only what goes into the bed now.
+INTRODUCTIONS: dict[View, str] = {
+    "EXPERT": """\
 Du bist der Beet-Assistent im Hochbeet-Planer, ein freundlicher, kundiger Gemüsegärtner.
 Du hilfst beim Planen von Hochbeeten: Pflanzabstände, gute und schlechte Nachbarn,
 Starkzehrer, Fruchtfolge, Pflanzzeiten und Anzucht.
@@ -26,6 +39,32 @@ Editor, Chargen legt er auf der Seite Anzucht an.
 Anzucht: Vorgezogen wird im Vorkultur-Fenster, so dass nach der Vorkulturdauer gepflanzt
 werden kann; frostempfindliche Sorten kommen erst nach dem letzten Frost des Users ins Beet.
 
+""",
+    "SIMPLE": """\
+Du bist der Beet-Assistent im Hochbeet-Planer, ein freundlicher, kundiger Gemüsegärtner.
+Du hilfst beim Bepflanzen von Hochbeeten: Pflanzabstände, gute und schlechte Nachbarn
+und Starkzehrer.
+
+Der User nutzt die einfache Ansicht: Er sieht sein Beet, wie es jetzt ist, und plant, was
+jetzt hineinkommt. Fruchtfolge, Erde erneuern, Termine (Pflanzwochen, Ende von Pflanzungen,
+Aussaatfenster) und Anzucht gibt es dort nicht: Sprich sie nicht an, auch nicht von dir aus.
+Fragt er ausdrücklich danach, sag nur kurz, dass das die Expertenansicht kann (Umschalter
+„Einfach/Experte“ im Editor oder im Profil). Vorschläge und Ratschläge gelten für diese Woche.
+
+Werkzeuge (nur lesend, immer mit den Daten des angemeldeten Users):
+- list_beds: Beete des Users. get_bed: ein Beet mit seinen Pflanzungen; für dich zählen nur
+  die, die jetzt im Beet stehen.
+- find_plants: Sorten mit Abständen, Nachbarn, Familie und Nährstoffbedarf.
+- evaluate_bed: Hinweise der Regel-Engine des Planers zu einem Beet in dieser Woche
+  (Abstand, Nachbarn, Starkzehrer, Beetrand).
+Nutze sie, wenn die Frage Beete, Pflanzungen oder Sorten betrifft, aber sparsam: meist
+reichen ein bis drei Aufrufe. Du kannst nichts ändern; Änderungen macht der User im Editor.
+
+""",
+}
+
+#: Rules of every answer, in both views.
+RULES = """\
 Regeln:
 - {language_rule}
   Antworte knapp und konkret, höchstens etwa 150 Wörter.
@@ -57,9 +96,9 @@ LANGUAGE_RULES: dict[Language, str] = {
 }
 
 
-def system_prompt(language: Language = DEFAULT_LANGUAGE) -> str:
-    """The system prompt with the answer language of the request."""
-    return SYSTEM_PROMPT.format(language_rule=LANGUAGE_RULES[language])
+def system_prompt(language: Language = DEFAULT_LANGUAGE, view: View = DEFAULT_VIEW) -> str:
+    """The system prompt for the view of the app, with the answer language of the request."""
+    return INTRODUCTIONS[view] + RULES.format(language_rule=LANGUAGE_RULES[language])
 
 
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
@@ -81,6 +120,8 @@ class AssistantRequest(BaseModel):
     suggest: bool = False
     #: The app's language: answers, suggestions and messages use it.
     language: Language = DEFAULT_LANGUAGE
+    #: The app's view: the simple one leaves out rotation, dates and raising.
+    view: View = DEFAULT_VIEW
 
     @field_validator("message")
     @classmethod

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_GARDEN_SETTINGS,
   EvaluateBedToolOutputSchema,
   FindPlantsToolOutputSchema,
   GetBedToolOutputSchema,
@@ -165,9 +166,12 @@ describe('tools through the gateway path', () => {
 
   it('uses the user’s last frost for the frost hint, like the app', async () => {
     // The tomatoes start on Monday 4 May 2026: before 15 May, after 20 April.
-    const frost = async (settings?: { lastFrost: string }) => {
+    const frost = async (lastFrost?: string) => {
       const api = fakeApi({
-        'user-a': { ...gardens['user-a'], ...(settings ? { settings } : {}) },
+        'user-a': {
+          ...gardens['user-a'],
+          ...(lastFrost ? { settings: { ...DEFAULT_GARDEN_SETTINGS, lastFrost } } : {}),
+        },
       });
       const { result } = await callAsUser('user-a', 'evaluate_bed', { bedId: BED_A }, api);
       expect(api.calls).toContainEqual({ path: '/api/garden/settings', sub: 'user-a' });
@@ -179,7 +183,7 @@ describe('tools through the gateway path', () => {
       'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
       'Tomate ist frostempfindlich und sollte erst nach dem 15. Mai ins Beet.',
     ]);
-    expect(await frost({ lastFrost: '04-20' })).toEqual([]);
+    expect(await frost('04-20')).toEqual([]);
   });
 
   it('checks planned plantings together with the bed and marks them', async () => {
@@ -205,6 +209,77 @@ describe('tools through the gateway path', () => {
     );
     // Findings of the bed alone carry no candidate.
     expect(output.findings.some((f) => f.candidates.length === 0)).toBe(true);
+  });
+
+  describe('in the simple view', () => {
+    const BED_C = '01J9ZQ3W8D6V2K5M7N8P9R0S1C';
+    // Broccoli, then kale on the same spot in one season (crop rotation), and a tomato too close
+    // to the kale from 4 May (before the last frost on 15 May).
+    const rotation = fakeApi({
+      'user-a': {
+        beds: [bed(BED_C, 'Kohlbeet')],
+        plantings: [
+          {
+            ...planting('01J9ZQ3W8D6V2K5M7N8P9R0T11', BED_C, 'Brokkoli', { x: 30, y: 40 }),
+            startDate: '2026-04-06',
+            endDate: '2026-05-03',
+          },
+          {
+            ...planting('01J9ZQ3W8D6V2K5M7N8P9R0T12', BED_C, 'Grünkohl', { x: 30, y: 40 }),
+            startDate: '2026-05-04',
+            endDate: '2026-11-30',
+          },
+          planting('01J9ZQ3W8D6V2K5M7N8P9R0T13', BED_C, 'Tomate', { x: 50, y: 40 }),
+        ],
+        sowings: [],
+      },
+    });
+    const messages = async (args: Record<string, unknown>) => {
+      const { result } = await callAsUser('user-a', 'evaluate_bed', args, rotation);
+      return EvaluateBedToolOutputSchema.parse(result).findings.map((f) => f.message);
+    };
+
+    it('has no crop rotation or frost findings, only the spatial ones of the week', async () => {
+      const expert = await messages({ bedId: BED_C, week: '2026-05-06' });
+      expect(expert.some((m) => m.includes('ohne Erneuerung der Erde'))).toBe(true);
+      expect(expert.some((m) => m.includes('frostempfindlich'))).toBe(true);
+
+      const simple = await messages({ bedId: BED_C, week: '2026-05-06', view: 'SIMPLE' });
+      expect(simple.some((m) => m.includes('ohne Erneuerung der Erde'))).toBe(false);
+      expect(simple.some((m) => m.includes('frostempfindlich'))).toBe(false);
+      expect(simple).toContainEqual(expect.stringMatching(/Grünkohl.*Tomate|Tomate.*Grünkohl/));
+      // The broccoli was gone before that week: it counts for nothing.
+      expect(simple.join(' ')).not.toMatch(/Brokkoli/);
+    });
+
+    it('checks the current week without a week, also with candidates', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-04-15T10:00:00'));
+      try {
+        const { result } = await callAsUser(
+          'user-a',
+          'evaluate_bed',
+          {
+            bedId: BED_C,
+            view: 'SIMPLE',
+            candidates: [
+              { plantId: plantId('Tomate'), kind: 'SINGLE', x: 35, y: 45, startDate: '2026-04-13' },
+            ],
+          },
+          rotation,
+        );
+        const output = EvaluateBedToolOutputSchema.parse(result);
+        // In mid April only the broccoli stands: the candidate is too close to it, no frost hint.
+        expect(output.findings).toContainEqual(
+          expect.objectContaining({ severity: 'WARNING', candidates: [0] }),
+        );
+        expect(output.findings.map((f) => f.message).join(' ')).not.toMatch(
+          /frostempfindlich|Grünkohl/,
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('finds plants with neighbours by name', async () => {
@@ -304,7 +379,10 @@ describe('tools through the gateway path', () => {
   it('reads only the batches of the signed-in user, with their last frost', async () => {
     const api = fakeApi({
       ...gardens,
-      'user-b': { ...gardens['user-b'], settings: { lastFrost: '04-20' } },
+      'user-b': {
+        ...gardens['user-b'],
+        settings: { ...DEFAULT_GARDEN_SETTINGS, lastFrost: '04-20' },
+      },
     });
     const { result } = await callAsUser(
       'user-b',

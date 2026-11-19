@@ -9,7 +9,7 @@ import {
   SowingStageSchema,
 } from '../domain';
 import { DirectionSchema, GridCmSchema, IsoDateSchema, UlidSchema } from '../primitives';
-import { MonthDaySchema } from './garden';
+import { GardenViewSchema, MonthDaySchema } from './garden';
 
 // Beet-Assistent on Bedrock AgentCore (docs/architecture/assistant.md). The agent is
 // Python (agents/bed-assistant); its pydantic model mirrors this schema, and infra passes the
@@ -69,6 +69,12 @@ export const AssistantRequestSchema = z.object({
    * other one, and its messages, suggestions and tool texts use it. German without it.
    */
   language: AssistantLanguageSchema.optional(),
+  /**
+   * The app's view (Epic #161). `SIMPLE`: the assistant leaves out crop rotation, soil
+   * renewal, dates and raising, checks with the spatial rules only, and suggests for the
+   * current week. Expert view without it.
+   */
+  view: GardenViewSchema.optional(),
 });
 export type AssistantRequest = z.infer<typeof AssistantRequestSchema>;
 
@@ -181,6 +187,9 @@ export const EvaluateBedToolInputSchema = GetBedToolInputSchema.extend({
     .max(MAX_SUGGESTIONS)
     .optional()
     .describe('Geplante Pflanzungen, die zusammen mit dem Beet geprüft werden sollen.'),
+  view: GardenViewSchema.optional().describe(
+    'Ansicht des Users. SIMPLE: nur Abstand, Nachbarn, Starkzehrer und Beetrand für die Pflanzungen einer Woche (ohne week die aktuelle). Ohne Angabe: EXPERT, alle Regeln.',
+  ),
 });
 
 export const FindPlantsToolInputSchema = z.object({
