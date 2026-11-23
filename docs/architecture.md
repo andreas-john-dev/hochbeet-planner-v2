@@ -82,7 +82,7 @@ Weitere Dokumente: [`deployment.md`](./deployment.md) (Einrichtung, Betrieb, Feh
 
 ## Monorepo-Struktur
 
-Das Repo nutzt pnpm Workspaces mit Turborepo für Builds, Tests und Caching.
+Das Repo nutzt pnpm Workspaces mit Turborepo für Builds, Tests und Caching. Interne Pakete exportieren ihren Quelltext ohne eigenen Build; damit `lint`, `typecheck` und `test` trotzdem neu laufen, wenn sich eine interne Abhängigkeit ändert, hängen sie am Transit-Knoten `transit` (`"dependsOn": ["^transit"]`, T-77). Er ist kein Script und führt nichts aus, die Tasks bleiben parallel.
 
 ```
 hochbeet-planer/

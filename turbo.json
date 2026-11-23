@@ -18,9 +18,17 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "lint": {},
-    "typecheck": {},
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "lint": {
+      "dependsOn": ["transit"]
+    },
+    "typecheck": {
+      "dependsOn": ["transit"]
+    },
     "test": {
+      "dependsOn": ["transit"],
       "outputs": ["coverage/**"]
     },
     "dev": {
