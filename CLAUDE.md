@@ -63,7 +63,7 @@ Interne Pakete exportieren ihren TypeScript-Quelltext direkt (`exports` → `src
 Deployment: `deploy.yml` deployt jeden grünen `main`-Commit per OIDC nach `prod` und führt danach die Smoke-Tests aus;
 einmalige Einrichtung und Fehlersuche in `docs/deployment.md`.
 Die CI (`.github/workflows/ci.yml`) führt bei jedem PR und auf `main` format:check, lint, typecheck, test (`--concurrency=2`, sonst laufen Tests auf dem Runner in den 5-s-Timeout), build und synth aus, dazu Playwright je Projekt als parallele Matrix (Job `e2e`) und Lighthouse (Job `lighthouse`);
-der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt.
+der Turborepo-Cache liegt in `.turbo` und wird per `actions/cache` geteilt. `lint`, `typecheck` und `test` hängen in `turbo.json` am Transit-Knoten `transit` (T-77), damit eine Änderung in einem internen Paket den Cache der abhängigen Pakete ungültig macht; neue Tasks, die Quelltext anderer Pakete lesen, bekommen ebenfalls `"dependsOn": ["transit"]`. Kein Script darf `transit` heißen.
 Frontend (`apps/web`): Routen code-basiert in `src/router.tsx` (deutsche Pfade `/beete`, `/anzucht`, `/katalog`, `/profil`, `/admin`),
 Seiten in `src/routes/`, shadcn/ui-Komponenten in `src/components/ui/` (Konfiguration `components.json`), Import-Alias `@/` → `src/`.
 Farbschema über `useTheme()` aus `src/lib/theme.ts`; Wochenlabels über `formatWeek(date, language)` aus `@hochbeet/garden-rules` (ebenso `weekHint()`/`windowText()` mit der Sprache, Befunde über `locale` an `evaluateBed()`/`evaluateSowings()`).
