@@ -24,18 +24,31 @@ export const MAX_SCALE = 40;
 
 const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 
-/** Shows the whole bed, centred, with `marginPx` of space around it. */
+/**
+ * Narrowest part of the drawing area (px) the bed is fitted into when a panel covers the rest;
+ * below it the cover is ignored, a smaller bed would not help anyone.
+ */
+export const MIN_VISIBLE_PX = 200;
+
+/**
+ * Shows the whole bed, centred, with `marginPx` of space around it. `coverRightPx` is the
+ * part on the right that a floating panel covers (the assistant, T-78): the bed is fitted into
+ * the rest, unless that is narrower than `MIN_VISIBLE_PX`.
+ */
 export function fitToBed(
   bed: { widthCm: number; depthCm: number },
   size: Size,
   marginPx = 24,
+  coverRightPx = 0,
 ): Viewport {
+  const width =
+    size.width - coverRightPx >= MIN_VISIBLE_PX ? size.width - coverRightPx : size.width;
   const scale = clampScale(
-    Math.min((size.width - 2 * marginPx) / bed.widthCm, (size.height - 2 * marginPx) / bed.depthCm),
+    Math.min((width - 2 * marginPx) / bed.widthCm, (size.height - 2 * marginPx) / bed.depthCm),
   );
   return {
     scale,
-    x: bed.widthCm / 2 - size.width / scale / 2,
+    x: bed.widthCm / 2 - width / scale / 2,
     y: bed.depthCm / 2 - size.height / scale / 2,
   };
 }

@@ -11,6 +11,19 @@ describe('viewport', () => {
     expect(toCm(vp, { x: 224, y: 124 })).toEqual({ x: 100, y: 50 });
   });
 
+  it('fits the bed into the part a floating panel leaves free on the right', () => {
+    const wide = { width: 848, height: 248 };
+    // 400 px covered: the bed fits into the left 448 px like above.
+    const vp = fitToBed({ widthCm: 200, depthCm: 100 }, wide, 24, 400);
+    expect(vp.scale).toBe(2);
+    expect(toCm(vp, { x: 24, y: 24 })).toEqual({ x: 0, y: 0 });
+    expect(toCm(vp, { x: 424, y: 124 })).toEqual({ x: 200, y: 50 });
+    // Too little left (under MIN_VISIBLE_PX): the cover is ignored.
+    expect(fitToBed({ widthCm: 200, depthCm: 100 }, wide, 24, 700)).toEqual(
+      fitToBed({ widthCm: 200, depthCm: 100 }, wide, 24),
+    );
+  });
+
   it('keeps the point under the cursor when zooming', () => {
     const vp = fitToBed({ widthCm: 200, depthCm: 100 }, size);
     const at = { x: 300, y: 100 };

@@ -136,6 +136,8 @@ const bedEditorRoute = createRoute({
   path: '/beete/$bedId',
   component: BedEditorPage,
   validateSearch: parseBedEditorSearch,
+  // The editor uses the whole width next to the sidebar (T-78).
+  staticData: { wide: true },
 });
 
 // Developer pages: public, no data.
@@ -192,5 +194,9 @@ export function createAppRouter(auth: AuthStore, history?: RouterHistory) {
 declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof createAppRouter>;
+  }
+  interface StaticDataRouteOption {
+    /** The page uses the whole width of the app shell instead of `max-w-5xl`. */
+    wide?: boolean;
   }
 }
