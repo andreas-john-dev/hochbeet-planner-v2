@@ -79,6 +79,10 @@ Umsetzung (Stand T-30):
   - Eigene Termine sind Datumsfelder mit „Entfernen“; „Erneuerung hinzufügen“ legt einen weiteren an. Leere Felder werden verworfen, doppelte Daten abgelehnt.
   - Eigene Termine eines Jahres ersetzen den 1. März dieses Jahres (wie in `soilRenewalsIn`). Der Dialog weist darauf hin.
   - Die Erneuerungen des Slider-Jahres erscheinen als Markierungen auf dem Wochen-Slider (`data-testid="renewal-mark"`, Text „Erde erneuert am …“).
+- **Breite und Assistent (Desktop, T-78):**
+  - Der Editor nutzt die ganze Breite neben dem Menü (`staticData: { wide: true }` an der Route, ausgewertet in `AppShell`). Die übrigen Seiten bleiben bei `max-w-5xl`.
+  - Der Beet-Assistent ist ein schwebendes Panel rechts über dem Arbeitsbereich (320 px, mit Schatten, nicht modal). Das Beet behält seine Breite, Beet und Palette bleiben bedienbar. Escape im Panel schließt es, und der Fokus geht zurück auf „Assistent“.
+  - Der abgedeckte Teil steht im Store (`coverRight`, gemessen mit einem `ResizeObserver`). „Auf Beet einpassen“ und eintreffende Vorschläge passen das Beet in den freien Teil links vom Panel ein (`fitToBed(…, coverRightPx)`). Bleiben dort weniger als 200 px (`MIN_VISIBLE_PX`), etwa bei 1024 px Fensterbreite, wird das ganze Beet eingepasst und liegt teils unter dem Panel.
 - **Pflanzen hinzufügen (Desktop):**
   - Die Seitenleiste „Pflanzen hinzufügen“ (ab `md`) bietet Suche, Kategorie-Filter, Icons und den Umschalter Einzelpflanze/Reihe.
   - Sorten werden mit dnd-kit (Pointer-Sensor, ab 5 px Bewegung) ins Beet gezogen. Die Vorschau rastet auf 5 cm ein und bleibt im Beet.

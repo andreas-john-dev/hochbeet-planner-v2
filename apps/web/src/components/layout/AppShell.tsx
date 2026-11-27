@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Link, Outlet, useMatches, useNavigate, useRouterState } from '@tanstack/react-router';
 import { LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { GuestImportDialog } from '@/components/GuestImportDialog';
@@ -17,6 +17,8 @@ export function AppShell() {
   const { t } = useTranslation('layout');
   const { user, guest } = useAuth();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  // Pages such as the bed editor use the whole width (`staticData.wide`), the others stay narrow.
+  const wide = useMatches({ select: (matches) => matches.some((m) => m.staticData.wide) });
   const { view } = useView();
   const items = visibleNavItems({ admin: isAdmin(user), guest, view });
 
@@ -62,7 +64,12 @@ export function AppShell() {
           <ThemeToggle />
         </header>
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-10">
+        <main
+          className={cn(
+            'mx-auto w-full flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-10',
+            !wide && 'max-w-5xl',
+          )}
+        >
           {/* Keyed by path: each page enters softly (not with reduced motion). */}
           {guest && <GuestBanner />}
           {user && <GuestImportDialog key={user.userId} />}

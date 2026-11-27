@@ -123,6 +123,13 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
   const viewSwitchId = useId();
   const assistant = canUseAssistant(user, guest);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const assistantButton = useRef<HTMLButtonElement>(null);
+  const assistantPanel = useRef<HTMLElement>(null);
+  /** Closes the floating panel and gives the focus back to the button that opened it. */
+  const closeAssistant = () => {
+    setAssistantOpen(false);
+    assistantButton.current?.focus();
+  };
   const [moreOpen, setMoreOpen] = useState(false);
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const assistantId = useId();
@@ -206,7 +213,27 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
 
   const receiveSuggestions = (list: Suggestion[], warnings: string[]) => {
     setSuggested({ items: list.map((suggestion, index) => ({ index, suggestion })), warnings });
+    // The suggestions are drawn in the bed: fit it next to the floating panel (T-78).
+    if (bed && list.length > 0) store.getState().fit(bed);
   };
+  // The open panel covers the right of the drawing area, which ends at the panel's right edge:
+  // fitting the bed leaves that part out.
+  useEffect(() => {
+    const panel = assistantPanel.current;
+    if (!assistantOpen || !isDesktop || !panel) {
+      store.getState().setCoverRight(0);
+      return;
+    }
+    const update = () => {
+      store.getState().setCoverRight(panel.offsetWidth);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(panel);
+    return () => {
+      observer.disconnect();
+    };
+  }, [assistantOpen, isDesktop, store]);
   const dropSuggestions = (indexes: readonly number[]) => {
     setSuggested((current) => {
       const items = current?.items.filter((i) => !indexes.includes(i.index)) ?? [];
@@ -404,6 +431,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
           </div>
           {assistant && (
             <Button
+              ref={assistantButton}
               variant={assistantOpen ? 'secondary' : 'outline'}
               className="h-11"
               aria-expanded={assistantOpen}
@@ -444,8 +472,9 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
           }}
         />
       )}
-      <div className="flex flex-col gap-4 md:flex-row">
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+      {/* The assistant floats over the workspace on desktop (T-78), so the bed keeps its width. */}
+      <div className="relative">
+        <div className="flex min-w-0 flex-col gap-4">
           {bed && plants.data && view ? (
             <Workspace
               simple={simple}
@@ -471,12 +500,20 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
           )}
         </div>
         {assistant && isDesktop && bed && (
-          // Stays mounted while hidden, so closing the panel keeps the conversation.
+          // Stays mounted while hidden, so closing the panel keeps the conversation. Not modal:
+          // bed and palette stay usable next to it; Escape inside the panel closes it.
           <aside
+            ref={assistantPanel}
             id={assistantId}
             hidden={!assistantOpen}
             aria-labelledby={`${assistantId}-title`}
-            className="bg-card w-80 shrink-0 flex-col gap-2 rounded-xl border p-3 md:h-[65dvh] [&:not([hidden])]:flex"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                closeAssistant();
+              }
+            }}
+            className="bg-card absolute top-0 right-0 z-20 h-[65dvh] w-80 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-xl border p-3 shadow-xl [&:not([hidden])]:flex"
           >
             <div className="flex items-center justify-between gap-2">
               <h2 id={`${assistantId}-title`} className="font-semibold">
@@ -486,9 +523,7 @@ function BedEditor({ bedId, week: initialWeek }: { bedId: string; week?: string 
                 variant="ghost"
                 size="icon"
                 aria-label={t('assistant.close')}
-                onClick={() => {
-                  setAssistantOpen(false);
-                }}
+                onClick={closeAssistant}
               >
                 <X />
               </Button>

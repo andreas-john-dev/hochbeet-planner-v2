@@ -22,6 +22,10 @@ export interface EditorState {
   /** False until the editor was fitted to the bed once. */
   fitted: boolean;
   setSize: (size: Size) => void;
+  /** Px on the right of the drawing area that a floating panel covers (T-78); 0 without. */
+  coverRight: number;
+  setCoverRight: (px: number) => void;
+  /** Shows the whole bed in the part of the drawing area that is not covered. */
   fit: (bed: { widthCm: number; depthCm: number }) => void;
   zoomAt: (factor: number, at: Point) => void;
   /** Zooms around the centre of the drawing area, e.g. for the + and − buttons. */
@@ -104,8 +108,13 @@ export function createEditorStore(today: Date = new Date()) {
     setSize: (size) => {
       set({ size });
     },
+    coverRight: 0,
+    setCoverRight: (coverRight) => {
+      set({ coverRight });
+    },
     fit: (bed) => {
-      set({ viewport: fitToBed(bed, get().size), fitted: true });
+      const { size, coverRight } = get();
+      set({ viewport: fitToBed(bed, size, undefined, coverRight), fitted: true });
     },
     zoomAt: (factor, at) => {
       set({ viewport: zoomAt(get().viewport, factor, at) });

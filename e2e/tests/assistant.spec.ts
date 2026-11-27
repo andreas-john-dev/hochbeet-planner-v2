@@ -5,6 +5,7 @@ import {
   exhaustAssistantQuota,
   MOCK_ANSWER,
   openAssistant,
+  requestSuggestions,
 } from './assistant-helpers';
 import { EXAMPLE_BED_ID, exampleGarden, seedGarden } from './garden';
 
@@ -92,6 +93,49 @@ test.describe('assistant chat', () => {
     await expect(input).toBeHidden();
     await toggle.click();
     await expect(page.getByRole('log').getByText(MOCK_ANSWER)).toBeVisible();
+  });
+
+  test('floats over the bed on desktop, which keeps its width', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Phones use the bottom sheet.');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, EDITOR, 'Hochbeet Süd');
+    const canvas = page.getByTestId('bed-canvas');
+    const before = await canvas.boundingBox();
+    // The editor uses the whole width next to the sidebar, unlike the other pages (T-78).
+    expect(before?.width ?? 0).toBeGreaterThan(700);
+
+    await openAssistant(page);
+    const panel = page.getByRole('complementary', { name: 'Beet-Assistent' });
+    const after = await canvas.boundingBox();
+    const box = await panel.boundingBox();
+    expect(after?.width).toBe(before?.width);
+    // Over the right of the bed, not next to it.
+    expect(box && after && box.x < after.x + after.width).toBe(true);
+
+    // Not modal: the palette stays usable while the panel is open.
+    const palette = page.getByRole('complementary', { name: 'Pflanzen hinzufügen' });
+    await palette.getByRole('searchbox', { name: 'Sorte suchen' }).fill('Tomate');
+    await expect(palette.getByRole('button', { name: 'Tomate', exact: true })).toBeVisible();
+
+    // Escape in the panel closes it and returns to the button that opened it.
+    await panel.getByRole('textbox', { name: 'Frage an den Assistenten' }).press('Escape');
+    await expect(panel).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Assistent', exact: true })).toBeFocused();
+
+    await open(page, '/beete', 'Meine Beete');
+    const main = await page.getByRole('main').boundingBox();
+    expect(main?.width ?? 0).toBeLessThanOrEqual(1024);
+  });
+
+  test('fits the bed next to the panel when suggestions arrive', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Phones use the bottom sheet.');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, EDITOR, 'Hochbeet Süd');
+    await requestSuggestions(page);
+    const panel = await page.getByRole('complementary', { name: 'Beet-Assistent' }).boundingBox();
+    const grid = await page.getByTestId('bed-grid').boundingBox();
+    // The whole bed is left of the panel, so the suggestions in it can be seen.
+    expect(grid && panel && grid.x + grid.width <= panel.x).toBe(true);
   });
 
   test('opens as bottom sheet on phones', async ({ page, isMobile }) => {
